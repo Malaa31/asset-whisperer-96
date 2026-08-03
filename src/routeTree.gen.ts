@@ -10,33 +10,102 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PatrimoineRouteImport } from './routes/patrimoine'
+import { Route as PilotageRouteImport } from './routes/pilotage'
+import { Route as ProfilRouteImport } from './routes/profil'
+import { Route as ApiPublicQuoteRouteImport } from './routes/api/public/quote'
+import { Route as ApiPublicSearchSymbolsRouteImport } from './routes/api/public/search-symbols'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PatrimoineRoute = PatrimoineRouteImport.update({
+  id: '/patrimoine',
+  path: '/patrimoine',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PilotageRoute = PilotageRouteImport.update({
+  id: '/pilotage',
+  path: '/pilotage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfilRoute = ProfilRouteImport.update({
+  id: '/profil',
+  path: '/profil',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicQuoteRoute = ApiPublicQuoteRouteImport.update({
+  id: '/api/public/quote',
+  path: '/api/public/quote',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSearchSymbolsRoute = ApiPublicSearchSymbolsRouteImport.update({
+  id: '/api/public/search-symbols',
+  path: '/api/public/search-symbols',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/patrimoine': typeof PatrimoineRoute
+  '/pilotage': typeof PilotageRoute
+  '/profil': typeof ProfilRoute
+  '/api/public/quote': typeof ApiPublicQuoteRoute
+  '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/patrimoine': typeof PatrimoineRoute
+  '/pilotage': typeof PilotageRoute
+  '/profil': typeof ProfilRoute
+  '/api/public/quote': typeof ApiPublicQuoteRoute
+  '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/patrimoine': typeof PatrimoineRoute
+  '/pilotage': typeof PilotageRoute
+  '/profil': typeof ProfilRoute
+  '/api/public/quote': typeof ApiPublicQuoteRoute
+  '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/patrimoine'
+    | '/pilotage'
+    | '/profil'
+    | '/api/public/quote'
+    | '/api/public/search-symbols'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/patrimoine'
+    | '/pilotage'
+    | '/profil'
+    | '/api/public/quote'
+    | '/api/public/search-symbols'
+  id:
+    | '__root__'
+    | '/'
+    | '/patrimoine'
+    | '/pilotage'
+    | '/profil'
+    | '/api/public/quote'
+    | '/api/public/search-symbols'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PatrimoineRoute: typeof PatrimoineRoute
+  PilotageRoute: typeof PilotageRoute
+  ProfilRoute: typeof ProfilRoute
+  ApiPublicQuoteRoute: typeof ApiPublicQuoteRoute
+  ApiPublicSearchSymbolsRoute: typeof ApiPublicSearchSymbolsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,22 +117,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/patrimoine': {
+      id: '/patrimoine'
+      path: '/patrimoine'
+      fullPath: '/patrimoine'
+      preLoaderRoute: typeof PatrimoineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pilotage': {
+      id: '/pilotage'
+      path: '/pilotage'
+      fullPath: '/pilotage'
+      preLoaderRoute: typeof PilotageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profil': {
+      id: '/profil'
+      path: '/profil'
+      fullPath: '/profil'
+      preLoaderRoute: typeof ProfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/quote': {
+      id: '/api/public/quote'
+      path: '/api/public/quote'
+      fullPath: '/api/public/quote'
+      preLoaderRoute: typeof ApiPublicQuoteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/search-symbols': {
+      id: '/api/public/search-symbols'
+      path: '/api/public/search-symbols'
+      fullPath: '/api/public/search-symbols'
+      preLoaderRoute: typeof ApiPublicSearchSymbolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PatrimoineRoute: PatrimoineRoute,
+  PilotageRoute: PilotageRoute,
+  ProfilRoute: ProfilRoute,
+  ApiPublicQuoteRoute: ApiPublicQuoteRoute,
+  ApiPublicSearchSymbolsRoute: ApiPublicSearchSymbolsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
