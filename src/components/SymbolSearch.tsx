@@ -5,7 +5,7 @@ import { fetchQuote, searchSymbols } from "@/lib/market";
 import { num } from "@/lib/format";
 
 export interface SelectedSymbol extends CatalogEntry {
-  price?: number;
+  price?: number | undefined;
 }
 
 export function SymbolSearch({
