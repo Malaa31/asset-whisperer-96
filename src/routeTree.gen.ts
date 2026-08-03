@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicQuoteRouteImport } from './routes/api/public/quote'
+import { Route as ApiPublicSearchSymbolsRouteImport } from './routes/api/public/search-symbols'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicQuoteRoute = ApiPublicQuoteRouteImport.update({
+  id: '/api/public/quote',
+  path: '/api/public/quote',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicSearchSymbolsRoute = ApiPublicSearchSymbolsRouteImport.update({
+  id: '/api/public/search-symbols',
+  path: '/api/public/search-symbols',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/public/quote': typeof ApiPublicQuoteRoute
+  '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/public/quote': typeof ApiPublicQuoteRoute
+  '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/public/quote': typeof ApiPublicQuoteRoute
+  '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/public/quote' | '/api/public/search-symbols'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/public/quote' | '/api/public/search-symbols'
+  id: '__root__' | '/' | '/api/public/quote' | '/api/public/search-symbols'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiPublicQuoteRoute: typeof ApiPublicQuoteRoute
+  ApiPublicSearchSymbolsRoute: typeof ApiPublicSearchSymbolsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/quote': {
+      id: '/api/public/quote'
+      path: '/api/public/quote'
+      fullPath: '/api/public/quote'
+      preLoaderRoute: typeof ApiPublicQuoteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/search-symbols': {
+      id: '/api/public/search-symbols'
+      path: '/api/public/search-symbols'
+      fullPath: '/api/public/search-symbols'
+      preLoaderRoute: typeof ApiPublicSearchSymbolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiPublicQuoteRoute: ApiPublicQuoteRoute,
+  ApiPublicSearchSymbolsRoute: ApiPublicSearchSymbolsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
