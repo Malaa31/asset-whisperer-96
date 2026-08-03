@@ -11,7 +11,7 @@ import {
   XAxis,
 } from "recharts";
 import { useApp } from "@/lib/storage";
-import { assetValue, project, totals } from "@/lib/calc";
+import { project, totals } from "@/lib/calc";
 import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
 import { fetchQuote } from "@/lib/market";
 import type { Asset } from "@/lib/types";
@@ -251,5 +251,3 @@ function buildPlan(assets: Asset[], dca: number): PlanLine[] {
   const total = active.reduce((s, [, w]) => s + w, 0);
   return active.map(([line, w]) => ({ ...line, amount: Math.round((dca * w) / total) }));
 }
-
-export { assetValue };
