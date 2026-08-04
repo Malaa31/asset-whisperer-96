@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, RefreshCw, TrendingUp } from "lucide-react";
+import { Eye, EyeOff, Pencil, RefreshCw, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
 import { useApp } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
@@ -89,14 +90,24 @@ function Dashboard() {
           <p className="text-xs text-muted-foreground">Bonjour</p>
           <h1 className="font-display text-2xl">{profile?.name}</h1>
         </div>
-        <button
-          type="button"
-          onClick={() => void refresh()}
-          className="tap flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-[11px] text-muted-foreground"
-        >
-          <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          {sinceLabel(lastUpdate)}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Mode discret"
+            onClick={() => profile && saveProfile({ ...profile, hideAmounts: !profile.hideAmounts })}
+            className="tap flex size-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground"
+          >
+            {profile?.hideAmounts ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="tap flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-[11px] text-muted-foreground"
+          >
+            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            {sinceLabel(lastUpdate)}
+          </button>
+        </div>
       </header>
 
       {needsBackup && (
@@ -176,6 +187,7 @@ function Dashboard() {
             const { planLines: _drop, ...rest } = profile;
             saveProfile(lines ? { ...rest, planLines: lines } : rest);
             setEditingPlan(false);
+            toast.success(lines ? "Plan personnalisé enregistré" : "Plan conseillé rétabli");
           }}
         />
       )}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Trash2, RefreshCw, ArrowLeft } from "lucide-react";
+import { X, Trash2, RefreshCw, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Landmark,
   ShieldCheck,
@@ -88,6 +88,18 @@ const FIELDS: Record<AssetType, Field[]> = {
   ],
 };
 
+/** Champs affichés d'emblée ; les autres sont repliés sous « Plus d'options ». */
+const ESSENTIAL: Record<AssetType, string[]> = {
+  pea: ["name", "quantity", "pru", "currentPrice"],
+  av: ["name", "fondsEurosAmount", "ucAmount"],
+  livret: ["type", "amount"],
+  immo: ["type", "name", "valeurEstimee"],
+  crypto: ["ticker", "quantity", "prixUnitaire"],
+  cash: ["name", "amount"],
+  autre: ["name", "amount"],
+  credit: ["name", "capitalRestant", "mensualite"],
+};
+
 const TYPE_CARDS: Array<{ type: AssetType; Icon: typeof Home; color: string }> = [
   { type: "pea", Icon: Landmark, color: "text-primary" },
   { type: "av", Icon: ShieldCheck, color: "text-info" },
@@ -118,6 +130,15 @@ export function AssetModal({
     return init;
   });
   const [fetching, setFetching] = useState(false);
+  // Déplié d'office en modification si un champ avancé est déjà renseigné.
+  const [showMore, setShowMore] = useState(() =>
+    Boolean(
+      asset &&
+        FIELDS[asset.type].some(
+          (f) => !ESSENTIAL[asset.type].includes(f.key) && asset.data[f.key] !== undefined && asset.data[f.key] !== "",
+        ),
+    ),
+  );
 
   const searchable = type === "pea" || type === "crypto";
 
@@ -244,18 +265,29 @@ export function AssetModal({
 
         {type && (mode === "manual" || !searchable) && (
           <div className="space-y-3">
-            {FIELDS[type].map((f) => (
-              <label key={f.key} className="block">
-                <span className="mb-1 block text-xs text-muted-foreground">{f.label}</span>
-                <input
-                  inputMode={f.type === "number" ? "decimal" : "text"}
-                  value={data[f.key] ?? ""}
-                  placeholder={f.placeholder ?? ""}
-                  onChange={(e) => setData((d) => ({ ...d, [f.key]: e.target.value }))}
-                  className="h-11 w-full rounded-xl border border-border bg-elevated px-3 font-mono text-sm outline-none focus:border-primary"
-                />
-              </label>
-            ))}
+            {FIELDS[type]
+              .filter((f) => ESSENTIAL[type].includes(f.key))
+              .map((f) => (
+                <FieldInput key={f.key} f={f} data={data} setData={setData} />
+              ))}
+
+            {FIELDS[type].some((f) => !ESSENTIAL[type].includes(f.key)) && (
+              <button
+                type="button"
+                onClick={() => setShowMore((v) => !v)}
+                className="tap flex w-full items-center justify-center gap-1 py-1 text-xs font-semibold text-muted-foreground"
+              >
+                {showMore ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                {showMore ? "Moins d'options" : "Plus d'options (ISIN, secteur, taux…)"}
+              </button>
+            )}
+
+            {showMore &&
+              FIELDS[type]
+                .filter((f) => !ESSENTIAL[type].includes(f.key))
+                .map((f) => (
+                  <FieldInput key={f.key} f={f} data={data} setData={setData} />
+                ))}
 
             {searchable && (
               <button
@@ -295,5 +327,28 @@ export function AssetModal({
         </div>
       )}
     </div>
+  );
+}
+
+function FieldInput({
+  f,
+  data,
+  setData,
+}: {
+  f: { key: string; label: string; type?: string; placeholder?: string };
+  data: Record<string, string>;
+  setData: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs text-muted-foreground">{f.label}</span>
+      <input
+        inputMode={f.type === "number" ? "decimal" : "text"}
+        value={data[f.key] ?? ""}
+        placeholder={f.placeholder ?? ""}
+        onChange={(e) => setData((d) => ({ ...d, [f.key]: e.target.value }))}
+        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 font-mono text-sm outline-none focus:border-primary"
+      />
+    </label>
   );
 }

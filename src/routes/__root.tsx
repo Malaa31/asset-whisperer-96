@@ -13,6 +13,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppProvider } from "@/components/AppProvider";
 import { BottomNav } from "@/components/BottomNav";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { AssetModal } from "@/components/AssetModal";
 import { Onboarding } from "@/components/Onboarding";
 import { useApp } from "@/lib/storage";
@@ -121,7 +123,13 @@ function RootComponent() {
 
 function Shell() {
   const { profile, ready, saveProfile, upsertAsset } = useApp();
-  const [adding, setAdding] = useState(false);
+  // Ouvre le modal d'ajout si l'onboarding s'est terminé sur « Ajouter ma première ligne ».
+  const [adding, setAdding] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.sessionStorage.getItem("patrimoine.openAdd") === "1",
+  );
+  if (typeof window !== "undefined") window.sessionStorage.removeItem("patrimoine.openAdd");
 
   if (!ready) return <div className="min-h-screen bg-background" />;
   if (!profile) return <Onboarding onDone={saveProfile} />;
@@ -138,9 +146,11 @@ function Shell() {
           onSave={(a) => {
             upsertAsset(a);
             setAdding(false);
+            toast.success("Ligne ajoutée");
           }}
         />
       )}
+      <Toaster position="top-center" />
     </div>
   );
 }

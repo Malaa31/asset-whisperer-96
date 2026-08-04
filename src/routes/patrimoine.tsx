@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, ChevronRight } from "lucide-react";
+import { Plus, ChevronRight, ClipboardCheck } from "lucide-react";
+import { toast } from "sonner";
+import { QuickUpdate } from "@/components/QuickUpdate";
 import { useApp } from "@/lib/storage";
 import { assetValue, assetGain, totals, n } from "@/lib/calc";
 import { eur, num, rawPct, signedEur } from "@/lib/format";
@@ -27,11 +29,12 @@ export const Route = createFileRoute("/patrimoine")({
 });
 
 function Patrimoine() {
-  const { assets, upsertAsset, removeAsset } = useApp();
+  const { assets, upsertAsset, removeAsset, setAssets } = useApp();
   const [side, setSide] = useState<"actifs" | "passifs">("actifs");
   const [filter, setFilter] = useState<AssetType | "all">("all");
   const [editing, setEditing] = useState<Asset | null>(null);
   const [creating, setCreating] = useState(false);
+  const [pointing, setPointing] = useState(false);
 
   const t = useMemo(() => totals(assets), [assets]);
   const list = assets.filter((a) =>
@@ -50,7 +53,16 @@ function Patrimoine() {
 
   return (
     <div className="fade-up px-4 pt-6">
-      <h1 className="font-display text-2xl">Patrimoine</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-2xl">Patrimoine</h1>
+        <button
+          type="button"
+          onClick={() => setPointing(true)}
+          className="tap flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+        >
+          <ClipboardCheck className="size-3.5" /> Pointage
+        </button>
+      </div>
 
       <div className="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-elevated p-1">
         {(["actifs", "passifs"] as const).map((s) => (
@@ -135,10 +147,22 @@ function Patrimoine() {
             upsertAsset(a);
             setEditing(null);
             setCreating(false);
+            toast.success(editing ? "Ligne enregistrée" : "Ligne ajoutée");
           }}
           onDelete={(id) => {
             removeAsset(id);
             setEditing(null);
+          }}
+        />
+      )}
+      {pointing && (
+        <QuickUpdate
+          assets={assets}
+          onClose={() => setPointing(false)}
+          onSave={(next) => {
+            setAssets(next);
+            setPointing(false);
+            toast.success("Montants mis à jour");
           }}
         />
       )}
