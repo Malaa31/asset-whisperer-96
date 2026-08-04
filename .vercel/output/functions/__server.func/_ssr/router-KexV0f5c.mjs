@@ -380,7 +380,7 @@ async function fetchQuote(tickers) {
 	}
 }
 //#endregion
-//#region node_modules/.nitro/vite/services/ssr/assets/router-DlQw_hyS.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-KexV0f5c.js
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
 var __exportAll = (all, no_symbols) => {
@@ -2164,11 +2164,14 @@ function exportBackup() {
 }
 /** Restaure une sauvegarde puis recharge l'app. Lance une erreur si invalide. */
 async function restoreBackup(file) {
+	if (file.size > 5242880) throw new Error("Fichier trop volumineux pour être une sauvegarde Patrimoine.");
 	const parsed = JSON.parse(await file.text());
 	if (parsed.app !== "patrimoine" || !Array.isArray(parsed.assets)) throw new Error("Fichier non reconnu : ce n'est pas une sauvegarde Patrimoine.");
-	if (parsed.profile) storage.set(KEYS.profile, parsed.profile);
+	const assets = parsed.assets.filter(isPlausibleAsset);
+	if (parsed.assets.length && !assets.length) throw new Error("Aucune ligne exploitable dans ce fichier.");
+	if (parsed.profile && isPlausibleProfile(parsed.profile)) storage.set(KEYS.profile, parsed.profile);
 	else storage.remove(KEYS.profile);
-	storage.set(KEYS.assets, parsed.assets);
+	storage.set(KEYS.assets, assets);
 	storage.set(KEYS.history, Array.isArray(parsed.history) ? parsed.history : []);
 	storage.remove(REMINDER_SEEN_KEY);
 	window.location.reload();
@@ -2176,6 +2179,27 @@ async function restoreBackup(file) {
 function daysSinceBackup(profile) {
 	if (!profile?.lastBackup) return void 0;
 	return Math.floor((Date.now() - new Date(profile.lastBackup).getTime()) / 864e5);
+}
+var ASSET_TYPES = [
+	"pea",
+	"av",
+	"livret",
+	"immo",
+	"crypto",
+	"cash",
+	"autre",
+	"credit"
+];
+/** Contrôle de forme minimal d'une ligne importée. */
+function isPlausibleAsset(a) {
+	if (!a || typeof a !== "object") return false;
+	const o = a;
+	return typeof o["id"] === "string" && typeof o["type"] === "string" && ASSET_TYPES.includes(o["type"]) && typeof o["data"] === "object" && o["data"] !== null && !Array.isArray(o["data"]);
+}
+function isPlausibleProfile(p) {
+	if (!p || typeof p !== "object") return false;
+	const o = p;
+	return typeof o["name"] === "string" && (o["goals"] === void 0 || Array.isArray(o["goals"]));
 }
 /**
 * Trois écrans, une question par écran.
@@ -2687,7 +2711,7 @@ function Shell() {
 		]
 	});
 }
-var $$splitComponentImporter$2 = () => import("./routes-WQqzcfU8.mjs");
+var $$splitComponentImporter$2 = () => import("./routes-C-rzQHCo.mjs");
 var Route$5 = createFileRoute("/")({
 	head: () => ({ meta: [
 		{ title: "Accueil — Patrimoine" },
@@ -2706,7 +2730,7 @@ var Route$5 = createFileRoute("/")({
 	] }),
 	component: lazyRouteComponent($$splitComponentImporter$2, "component")
 });
-var $$splitComponentImporter$1 = () => import("./patrimoine-mPdFb5P3.mjs");
+var $$splitComponentImporter$1 = () => import("./patrimoine-4yo-4ONO.mjs");
 var Route$4 = createFileRoute("/patrimoine")({
 	head: () => ({ meta: [
 		{ title: "Patrimoine — Actifs et passifs" },
@@ -2725,7 +2749,7 @@ var Route$4 = createFileRoute("/patrimoine")({
 	] }),
 	component: lazyRouteComponent($$splitComponentImporter$1, "component")
 });
-var $$splitComponentImporter = () => import("./profil-BSqk4q4s.mjs");
+var $$splitComponentImporter = () => import("./profil-BhM1wrUf.mjs");
 var Route$3 = createFileRoute("/profil")({
 	head: () => ({ meta: [
 		{ title: "Profil — Patrimoine" },
@@ -2855,8 +2879,8 @@ var Route$1 = createFileRoute("/api/public/quote")({ server: { handlers: { GET: 
 } } } });
 var Route = createFileRoute("/api/public/search-symbols")({ server: { handlers: { GET: async ({ request }) => {
 	if (!isAllowedOrigin(request)) return forbidden();
-	const q = (new URL(request.url).searchParams.get("q") ?? "").trim();
-	if (!q) return Response.json([]);
+	const q = (new URL(request.url).searchParams.get("q") ?? "").trim().slice(0, 64);
+	if (q.length < 2) return Response.json([]);
 	try {
 		const res = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0`, {
 			headers: {

@@ -7,8 +7,10 @@ export const Route = createFileRoute("/api/public/search-symbols")({
       GET: async ({ request }) => {
         if (!isAllowedOrigin(request)) return forbidden();
         const url = new URL(request.url);
-        const q = (url.searchParams.get("q") ?? "").trim();
-        if (!q) return Response.json([]);
+        // Bornée : une requête utile fait quelques caractères, et une
+        // chaîne géante ne ferait que charger l'amont pour rien.
+        const q = (url.searchParams.get("q") ?? "").trim().slice(0, 64);
+        if (q.length < 2) return Response.json([]);
         try {
           const res = await fetch(
             `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0`,

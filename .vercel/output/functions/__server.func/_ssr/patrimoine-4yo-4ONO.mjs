@@ -3,8 +3,8 @@ import { n as require_react, r as require_jsx_runtime } from "../_libs/react+tan
 import { c as Pie, l as Cell, n as PieChart, u as ResponsiveContainer } from "../_libs/recharts+[...].mjs";
 import { n as toast } from "../_libs/sonner.mjs";
 import { D as ClipboardCheck, k as ChevronRight, m as Plus, t as X, x as Info } from "../_libs/lucide-react.mjs";
-import { C as n, I as rawPct, L as signedEur, M as useApp, N as eur, P as num, S as lookThrough, T as totals, _ as assetValue, b as foreignCurrencyAssets, g as assetGain, h as allocationByType, k as TYPE_LABELS, m as REGION_BUCKETS, s as AssetModal, v as canConvert, x as fxSnapshot, y as diversificationScore } from "./router-DlQw_hyS.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/patrimoine-mPdFb5P3.js
+import { C as n, I as rawPct, L as signedEur, M as useApp, N as eur, P as num, S as lookThrough, T as totals, _ as assetValue, b as foreignCurrencyAssets, g as assetGain, h as allocationByType, k as TYPE_LABELS, m as REGION_BUCKETS, s as AssetModal, v as canConvert, x as fxSnapshot, y as diversificationScore } from "./router-KexV0f5c.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/patrimoine-4yo-4ONO.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var KEY_BY_TYPE = {
