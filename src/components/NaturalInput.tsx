@@ -17,9 +17,17 @@ interface SpeechRec {
   interimResults: boolean;
   start: () => void;
   stop: () => void;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  maxAlternatives: number;
+  abort: () => void;
+  onresult:
+    | ((e: {
+        resultIndex: number;
+        results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }>;
+      }) => void)
+    | null;
+  onstart: (() => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
 }
 
 type SpeechCtor = new () => SpeechRec;
@@ -28,6 +36,25 @@ function speechCtor(): SpeechCtor | undefined {
   if (typeof window === "undefined") return undefined;
   const w = window as unknown as Record<string, SpeechCtor | undefined>;
   return w["SpeechRecognition"] ?? w["webkitSpeechRecognition"];
+}
+
+/** Traduit le code d'erreur de l'API en message actionnable. */
+function micMessage(code?: string): string {
+  switch (code) {
+    case "not-allowed":
+    case "service-not-allowed":
+      return "Micro refusé. Autorise-le dans les réglages du navigateur, puis réessaie.";
+    case "no-speech":
+      return "Rien n'a été entendu. Réessaie en parlant juste après le tap.";
+    case "audio-capture":
+      return "Aucun micro détecté sur cet appareil.";
+    case "network":
+      return "La reconnaissance vocale n'a pas pu joindre le réseau.";
+    case "aborted":
+      return "";
+    default:
+      return "La dictée du navigateur a échoué. Utilise le micro de ton clavier.";
+  }
 }
 
 /**
@@ -43,9 +70,13 @@ export function NaturalInput({
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const recRef = useRef<SpeechRec | null>(null);
-  const supported = Boolean(speechCtor());
+  const baseRef = useRef("");
+  const [supported, setSupported] = useState(false);
+  const [micError, setMicError] = useState("");
 
-  useEffect(() => () => recRef.current?.stop(), []);
+  useEffect(() => setSupported(Boolean(speechCtor())), []);
+
+  useEffect(() => () => recRef.current?.abort(), []);
 
   const toggleMic = () => {
     if (listening) {
@@ -55,23 +86,37 @@ export function NaturalInput({
     }
     const Ctor = speechCtor();
     if (!Ctor) return;
+    setMicError("");
+    // Le texte déjà saisi est conservé : la dictée s'ajoute à la suite.
+    baseRef.current = text ? text.trimEnd() + " " : "";
     const rec = new Ctor();
     recRef.current = rec;
     rec.lang = "fr-FR";
     rec.continuous = false;
     rec.interimResults = true;
+    rec.maxAlternatives = 1;
     rec.onresult = (e) => {
       let out = "";
       for (let i = 0; i < e.results.length; i++) {
         const alt = e.results[i]?.[0];
         if (alt) out += alt.transcript;
       }
-      setText(out);
+      setText(baseRef.current + out);
     };
+    rec.onstart = () => setListening(true);
     rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.start();
-    setListening(true);
+    rec.onerror = (e) => {
+      setListening(false);
+      setMicError(micMessage(e?.error));
+    };
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      // start() lève si une session est déjà en cours.
+      setListening(false);
+      setMicError("Dictée déjà en cours — réessaie dans un instant.");
+    }
   };
 
   const preview = text.trim().length > 3 ? parseAssetText(text) : null;
@@ -105,11 +150,13 @@ export function NaturalInput({
         )}
       </div>
 
-      {!supported && (
-        <p className="mt-1.5 text-[11px] text-muted-foreground">
-          Pour dicter, utilise le micro de ton clavier.
-        </p>
-      )}
+      {micError && <p className="mt-1.5 text-[11px] text-destructive">{micError}</p>}
+
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        {supported
+          ? "Tu peux aussi dicter avec le micro de ton clavier."
+          : "Pour dicter, utilise le micro de ton clavier (à côté de la barre d'espace)."}
+      </p>
 
       {preview && (
         <div className="mt-3 rounded-xl border border-border bg-card p-3">
