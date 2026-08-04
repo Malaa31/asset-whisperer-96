@@ -14,7 +14,7 @@ import { TrajectoryChart, ChartLegend } from "./TrajectoryChart";
 import { GoalEditor } from "./GoalEditor";
 
 export function GoalPanel() {
-  const { profile, assets, saveProfile } = useApp();
+  const { profile, assets, history, saveProfile } = useApp();
   const goals = useMemo(() => profileGoals(profile), [profile]);
   const [editing, setEditing] = useState<Goal | null | "new">(null);
 
@@ -35,8 +35,8 @@ export function GoalPanel() {
 
   const current = goal ? goalCurrent(assets, goal) : 0;
   const traj = useMemo(
-    () => (goal ? buildTrajectory(current, goal) : []),
-    [current, goal],
+    () => (goal ? buildTrajectory(current, goal, history) : []),
+    [current, goal, history],
   );
   const cross = goal ? crossingYear(traj, goal.amount) : undefined;
   const progress = goal?.amount ? Math.min(100, (current / goal.amount) * 100) : 0;

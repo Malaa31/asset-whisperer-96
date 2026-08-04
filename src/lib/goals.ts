@@ -65,18 +65,30 @@ export function buildTrajectory(
 ): TrajectoryPoint[] {
   const rate = (goal.rate ?? 7.5) / 100;
   const proj = project(current, goal.dca, Math.max(1, goal.horizon), rate);
-  const points: TrajectoryPoint[] = proj.map((p) => ({
+
+  const past: TrajectoryPoint[] = history
+    .slice(-12)
+    .map((h) => {
+      const d = new Date(h.date);
+      const months = Math.round((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24 * 30.4));
+      return {
+        annee: -months / 12,
+        label: months <= 0 ? "Auj." : `-${months} m`,
+        reel: h.value,
+        objectif: goal.amount,
+      };
+    })
+    .filter((p) => p.label !== "Auj.");
+
+  const future: TrajectoryPoint[] = proj.map((p) => ({
     annee: p.annee,
     label: p.annee === 0 ? "Auj." : `+${p.annee} an${p.annee > 1 ? "s" : ""}`,
     projection: p.valeur,
     objectif: goal.amount,
   }));
-  if (points[0]) points[0].reel = current;
-  // les points historiques sont rattachés à l'année 0 (courbe réelle courte)
-  if (history.length > 1 && points[0]) {
-    points[0].reel = history[history.length - 1]?.value ?? current;
-  }
-  return points;
+  if (future[0]) future[0].reel = current;
+
+  return [...past, ...future];
 }
 
 /** Année (entière) où la projection franchit l'objectif, sinon undefined. */
