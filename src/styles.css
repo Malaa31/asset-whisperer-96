@@ -34,38 +34,42 @@
   --color-violet: var(--violet);
   --color-orange: var(--orange);
   --color-elevated: var(--elevated);
-  --font-display: "Fraunces", Georgia, serif;
-  --font-sans: "Manrope", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-display:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
 }
 
 :root {
-  --radius: 1rem;
-  --background: oklch(0.16 0.008 160);
-  --foreground: oklch(0.96 0.006 150);
-  --card: oklch(0.221 0.011 185);
-  --card-foreground: oklch(0.96 0.006 150);
-  --elevated: oklch(0.262 0.012 185);
-  --popover: oklch(0.221 0.011 185);
-  --popover-foreground: oklch(0.96 0.006 150);
-  --primary: oklch(0.7 0.145 162.5);
-  --primary-foreground: oklch(0.16 0.02 160);
-  --secondary: oklch(0.262 0.012 185);
-  --secondary-foreground: oklch(0.96 0.006 150);
-  --muted: oklch(0.262 0.012 185);
-  --muted-foreground: oklch(0.68 0.012 175);
-  --accent: oklch(0.262 0.012 185);
-  --accent-foreground: oklch(0.96 0.006 150);
-  --destructive: oklch(0.63 0.21 25.5);
-  --destructive-foreground: oklch(0.98 0 0);
-  --amber: oklch(0.79 0.12 88);
-  --info: oklch(0.7 0.13 234);
-  --violet: oklch(0.62 0.2 293);
-  --orange: oklch(0.7 0.19 48);
-  --border: oklch(0.32 0.011 190);
-  --input: oklch(0.32 0.011 190);
-  --ring: oklch(0.7 0.145 162.5);
+  --radius: 0.875rem;
+  --background: oklch(0.15 0 0);
+  --foreground: oklch(0.98 0 0);
+  --card: oklch(0.196 0 0);
+  --card-foreground: oklch(0.98 0 0);
+  --elevated: oklch(0.246 0 0);
+  --popover: oklch(0.196 0 0);
+  --popover-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.68 0.16 250);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.246 0 0);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(0.246 0 0);
+  --muted-foreground: oklch(0.68 0 0);
+  --accent: oklch(0.246 0 0);
+  --accent-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.63 0.2 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --amber: oklch(0.82 0.15 85);
+  --info: oklch(0.68 0.16 250);
+  --violet: oklch(0.65 0.17 295);
+  --orange: oklch(0.72 0.17 50);
+  --border: oklch(0.28 0 0);
+  --input: oklch(0.28 0 0);
+  --ring: oklch(0.68 0.16 250);
+  --success: oklch(0.74 0.16 152);
 }
+
 
 @layer base {
   * {
