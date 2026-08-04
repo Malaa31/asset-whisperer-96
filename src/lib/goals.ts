@@ -98,7 +98,7 @@ export function newGoal(kind: GoalKind = "patrimoine"): Goal {
     horizon: 10,
     dca: 500,
     rate: 7.5,
-    scope: kind === "enveloppe" ? "pea" : undefined,
+    ...(kind === "enveloppe" ? { scope: "pea" as const } : {}),
   };
 }
 
