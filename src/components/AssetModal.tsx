@@ -13,6 +13,7 @@ import {
 import type { Asset, AssetType } from "@/lib/types";
 import { TYPE_LABELS } from "@/lib/types";
 import { uid } from "@/lib/storage";
+import { NaturalInput } from "./NaturalInput";
 import { SymbolSearch, type SelectedSymbol } from "./SymbolSearch";
 import { fetchQuote } from "@/lib/market";
 
@@ -219,6 +220,24 @@ export function AssetModal({
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-28">
+        {!type && (
+          <div className="mb-5">
+            <NaturalInput
+              onParsed={(p) => {
+                setType(p.type);
+                setData(
+                  Object.fromEntries(Object.entries(p.data).map(([k, v]) => [k, String(v)])),
+                );
+                setMode("manual");
+                setShowMore(true);
+              }}
+            />
+            <p className="mt-5 mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              ou choisis une catégorie
+            </p>
+          </div>
+        )}
+
         {!type && (
           <div className="grid grid-cols-2 gap-3">
             {TYPE_CARDS.map(({ type: t, Icon, color }) => (
