@@ -10,7 +10,12 @@ export const Route = createFileRoute("/api/public/search-symbols")({
         try {
           const res = await fetch(
             `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0`,
-            { headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" } },
+            {
+        headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+        // Sans délai d'expiration, une réponse qui ne vient jamais retient
+        // la fonction serveur jusqu'au timeout de la plateforme.
+        signal: AbortSignal.timeout(6000),
+      },
           );
           if (!res.ok) return Response.json([]);
           const json = (await res.json()) as {

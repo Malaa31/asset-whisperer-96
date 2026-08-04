@@ -15,9 +15,19 @@ export const storage = {
       return null;
     }
   },
-  set(key: string, value: unknown) {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(key, JSON.stringify(value));
+  /**
+   * Écrit dans le stockage local. Retourne false si l'écriture échoue
+   * (quota dépassé, mode privé) : sans cela, une sauvegarde perdue
+   * passait totalement inaperçue.
+   */
+  set(key: string, value: unknown): boolean {
+    if (typeof window === "undefined") return false;
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch {
+      return false;
+    }
   },
   remove(key: string) {
     if (typeof window === "undefined") return;

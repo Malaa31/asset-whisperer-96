@@ -1,11 +1,10 @@
 import { i as __toESM } from "../_runtime.mjs";
-import { n as require_jsx_runtime, r as require_react } from "../_libs/react+tanstack__react-query.mjs";
+import { n as require_react, r as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
 import { h as Link } from "../_libs/@tanstack/react-router+[...].mjs";
-import { C as Eye, M as CalendarCheck, P as BellRing, a as TrendingUp, f as RotateCcw, g as Pencil, j as Check, k as ChevronRight, m as Plus, o as Trash2, p as RefreshCw, s as Target, t as X, w as EyeOff, x as Info } from "../_libs/lucide-react.mjs";
 import { n as toast } from "../_libs/sonner.mjs";
-import { A as requestAddAsset, C as RISK_LABELS, E as eur, M as sinceLabel, N as uid, O as pct, P as useApp, T as TYPE_LABELS, _ as fetchQuote, b as project, c as maybeNotify, h as assetValue, k as rawPct, n as daysSinceBackup, o as contributionDue, p as allocationByType, s as currentMonth, w as TARGET_ALLOCATIONS, x as totals } from "./router-BqKF7lMf.mjs";
-import { a as Area, d as Tooltip, i as XAxis, o as Line, r as YAxis, s as CartesianGrid, t as ComposedChart, u as ResponsiveContainer } from "../_libs/recharts+[...].mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-CQefuaRj.js
+import { C as Eye, M as CalendarCheck, P as BellRing, a as TrendingUp, f as RotateCcw, g as Pencil, j as Check, k as ChevronRight, m as Plus, o as Trash2, p as RefreshCw, s as Target, t as X, w as EyeOff, x as Info } from "../_libs/lucide-react.mjs";
+import { A as useApp, C as totals, D as TYPE_LABELS, E as TARGET_ALLOCATIONS, I as sinceLabel, N as pct, O as requestAddAsset, P as rawPct, S as project, T as RISK_LABELS, _ as assetValue, c as contributionDue, h as allocationByType, i as daysSinceBackup, j as eur, k as uid, l as currentMonth, n as lastPriceUpdate, r as refreshPrices, u as maybeNotify } from "./router-CPppA-3k.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-wg4v7jsk.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var GOAL_KIND_LABELS = {
@@ -124,124 +123,7 @@ function profileGoals(profile) {
 		rate: 7.5
 	}];
 }
-var AXIS = "oklch(0.55 0.01 270)";
-var GRID = "oklch(0.9 0.004 260)";
-function compact(v) {
-	if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1).replace(".0", "")} M€`;
-	if (Math.abs(v) >= 1e3) return `${Math.round(v / 1e3)} k€`;
-	return `${Math.round(v)} €`;
-}
-function TrajectoryChart({ data }) {
-	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-		className: "h-56 w-full",
-		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ResponsiveContainer, {
-			width: "100%",
-			height: "100%",
-			children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(ComposedChart, {
-				data,
-				margin: {
-					left: 0,
-					right: 4,
-					top: 8,
-					bottom: 0
-				},
-				children: [
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("defs", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("linearGradient", {
-						id: "projFill",
-						x1: "0",
-						y1: "0",
-						x2: "0",
-						y2: "1",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
-							offset: "0%",
-							stopColor: "var(--primary)",
-							stopOpacity: .18
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
-							offset: "100%",
-							stopColor: "var(--primary)",
-							stopOpacity: 0
-						})]
-					}) }),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CartesianGrid, {
-						stroke: GRID,
-						strokeDasharray: "2 6",
-						vertical: false
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(XAxis, {
-						dataKey: "label",
-						tick: {
-							fill: AXIS,
-							fontSize: 11
-						},
-						axisLine: false,
-						tickLine: false,
-						minTickGap: 18
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(YAxis, {
-						width: 52,
-						tick: {
-							fill: AXIS,
-							fontSize: 11
-						},
-						axisLine: false,
-						tickLine: false,
-						tickFormatter: compact
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tooltip, {
-						cursor: {
-							stroke: GRID,
-							strokeWidth: 1
-						},
-						contentStyle: {
-							background: "var(--card)",
-							border: "1px solid var(--border)",
-							borderRadius: 12,
-							fontSize: 12,
-							padding: "8px 10px"
-						},
-						labelStyle: {
-							color: AXIS,
-							marginBottom: 4
-						},
-						formatter: (v, name) => [eur(v), name]
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Area, {
-						type: "monotone",
-						dataKey: "projection",
-						name: "Projection",
-						stroke: "var(--primary)",
-						strokeWidth: 1.75,
-						fill: "url(#projFill)",
-						dot: false,
-						activeDot: { r: 3 }
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Line, {
-						type: "monotone",
-						dataKey: "objectif",
-						name: "Objectif",
-						stroke: "var(--amber)",
-						strokeWidth: 1.25,
-						strokeDasharray: "5 5",
-						dot: false
-					}),
-					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Line, {
-						type: "monotone",
-						dataKey: "reel",
-						name: "Réel",
-						stroke: "var(--foreground)",
-						strokeWidth: 2,
-						dot: {
-							r: 3,
-							fill: "var(--foreground)",
-							stroke: "none"
-						},
-						connectNulls: true
-					})
-				]
-			})
-		})
-	});
-}
+/** Légende du graphe de trajectoire, sans dépendance à recharts. */
 function ChartLegend() {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: "flex flex-wrap items-center gap-4",
@@ -411,6 +293,7 @@ function Field({ label, value, onChange, numeric }) {
 		})]
 	});
 }
+var TrajectoryChart = (0, import_react.lazy)(() => import("./TrajectoryChart-DtfwZXx-.mjs").then((m) => ({ default: m.TrajectoryChart })));
 /**
 * Sur l'accueil : une carte compacte (un message : où j'en suis).
 * Le détail (trajectoire, multi-objectifs, réglages) vit dans une
@@ -555,7 +438,10 @@ function GoalPanel() {
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 						className: "mt-5",
-						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TrajectoryChart, { data: traj })
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_react.Suspense, {
+							fallback: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-[200px] animate-pulse rounded-xl bg-elevated" }),
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TrajectoryChart, { data: traj })
+						})
 					}),
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 						className: "mt-3",
@@ -976,27 +862,10 @@ function Dashboard() {
 	const refresh = async () => {
 		setRefreshing(true);
 		try {
-			const priced = assets.filter((a) => a.type === "pea" || a.type === "crypto");
-			const quotes = await fetchQuote(priced.map((a) => String(a.data["ticker"] ?? "")));
-			if (Object.keys(quotes).length) {
-				const stamp = (/* @__PURE__ */ new Date()).toISOString();
-				const next = assets.map((a) => {
-					const ticker = String(a.data["ticker"] ?? "");
-					const q = quotes[ticker];
-					if (!q) return a;
-					const key = a.type === "crypto" ? "prixUnitaire" : "currentPrice";
-					return {
-						...a,
-						data: {
-							...a.data,
-							[key]: q.price,
-							lastPriceUpdate: stamp
-						},
-						updatedAt: stamp
-					};
-				});
+			const next = await refreshPrices(assets);
+			if (next) {
 				setAssets(next);
-				setLastUpdate(stamp);
+				setLastUpdate(lastPriceUpdate(next));
 			}
 		} finally {
 			setRefreshing(false);

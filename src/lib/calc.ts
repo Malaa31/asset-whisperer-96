@@ -92,6 +92,19 @@ export function lookThrough(assets: Asset[]): Record<RegionBucket, number> {
   return out;
 }
 
+/**
+ * Lignes libellées dans une autre devise que l'euro.
+ * Les totaux additionnent les montants tels quels : une ligne en dollars
+ * fausse donc le patrimoine net tant qu'elle n'est pas convertie à la main.
+ * On les signale plutôt que de laisser l'erreur passer inaperçue.
+ */
+export function foreignCurrencyAssets(assets: Asset[]): Asset[] {
+  return assets.filter((a) => {
+    const c = String(a.data["currency"] ?? "EUR").toUpperCase();
+    return c !== "EUR" && c !== "";
+  });
+}
+
 // --- Répartition & diversification ---
 
 /** Valeur positive par classe d'actif (les crédits sont exclus). */

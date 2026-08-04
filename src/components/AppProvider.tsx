@@ -8,8 +8,21 @@ import {
 } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { setAmountMasking } from "@/lib/format";
+import { toast } from "sonner";
 import { REMINDER_SEEN_KEY } from "@/lib/reminder";
 import type { Asset, Profile } from "@/lib/types";
+
+/** Une seule alerte par session : inutile de harceler à chaque frappe. */
+let storageWarned = false;
+function warnStorageFull() {
+  if (storageWarned) return;
+  storageWarned = true;
+  toast.error("Enregistrement impossible", {
+    description:
+      "Le stockage du navigateur est plein ou indisponible. Exporte une sauvegarde depuis Profil avant de fermer l'app.",
+    duration: 10000,
+  });
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -29,7 +42,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback((next: Asset[]) => {
     setAssetsState(next);
-    storage.set(KEYS.assets, next);
+    if (!storage.set(KEYS.assets, next)) warnStorageFull();
   }, []);
 
   // Enregistre un point d'historique par jour pour la courbe "réel".
@@ -54,7 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveProfile: (p) => {
         setProfile(p);
         setAmountMasking(Boolean(p.hideAmounts));
-        storage.set(KEYS.profile, p);
+        if (!storage.set(KEYS.profile, p)) warnStorageFull();
       },
       upsertAsset: (a) => {
         const exists = assets.some((x) => x.id === a.id);

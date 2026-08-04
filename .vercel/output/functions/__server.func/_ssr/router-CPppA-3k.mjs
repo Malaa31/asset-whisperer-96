@@ -1,52 +1,10 @@
 import { i as __toESM } from "../_runtime.mjs";
-import { n as require_jsx_runtime, r as require_react, t as QueryClientProvider } from "../_libs/react+tanstack__react-query.mjs";
-import { _ as useRouter, c as HeadContent, d as Outlet, f as lazyRouteComponent, h as Link, m as createRootRouteWithContext, p as createFileRoute, s as Scripts, u as createRouter } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_react, r as require_jsx_runtime, t as QueryClientProvider } from "../_libs/react+tanstack__react-query.mjs";
+import { c as HeadContent, d as Outlet, f as lazyRouteComponent, g as useRouter, h as Link, m as createRootRouteWithContext, p as createFileRoute, s as Scripts, u as createRouter } from "../_libs/@tanstack/react-router+[...].mjs";
 import { t as QueryClient } from "../_libs/tanstack__query-core.mjs";
-import { A as ChevronDown, E as CreditCard, F as Banknote, I as ArrowRight, L as ArrowLeft, N as Bitcoin, O as ChevronUp, S as House, _ as Package, b as Landmark, c as Square, d as Search, h as PiggyBank, i as Upload, k as ChevronRight, l as Sparkles, m as Plus, n as Wallet, o as Trash2, p as RefreshCw, r as User, t as X, u as ShieldCheck, v as Mic, y as LoaderCircle } from "../_libs/lucide-react.mjs";
 import { n as toast, t as Toaster } from "../_libs/sonner.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/types-Ve2GXR07.js
-var import_react = /* @__PURE__ */ __toESM(require_react());
-var KEY_PROFILE = "patrimoine.profile";
-var KEY_ASSETS = "patrimoine.assets";
-var KEY_HISTORY = "patrimoine.history";
-var storage = {
-	get(key) {
-		if (typeof window === "undefined") return null;
-		try {
-			const raw = window.localStorage.getItem(key);
-			return raw ? JSON.parse(raw) : null;
-		} catch {
-			return null;
-		}
-	},
-	set(key, value) {
-		if (typeof window === "undefined") return;
-		window.localStorage.setItem(key, JSON.stringify(value));
-	},
-	remove(key) {
-		if (typeof window === "undefined") return;
-		window.localStorage.removeItem(key);
-	}
-};
-var KEYS = {
-	profile: KEY_PROFILE,
-	assets: KEY_ASSETS,
-	history: KEY_HISTORY
-};
-function uid() {
-	return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-}
-var AppContext = (0, import_react.createContext)(null);
-function useApp() {
-	const ctx = (0, import_react.useContext)(AppContext);
-	if (!ctx) throw new Error("useApp must be used within AppProvider");
-	return ctx;
-}
-/** Demande l'ouverture du modal d'ajout, monté dans la racine. */
-var ADD_ASSET_EVENT = "patrimoine:add-asset";
-function requestAddAsset() {
-	window.dispatchEvent(new Event(ADD_ASSET_EVENT));
-}
+import { A as ChevronDown, E as CreditCard, F as Banknote, I as ArrowRight, L as ArrowLeft, N as Bitcoin, O as ChevronUp, S as House, _ as Package, b as Landmark, c as Square, d as Search, h as PiggyBank, i as Upload, k as ChevronRight, l as Sparkles, m as Plus, n as Wallet, o as Trash2, p as RefreshCw, r as User, t as X, u as ShieldCheck, v as Mic, y as LoaderCircle } from "../_libs/lucide-react.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/format-DLlMg2Mr.js
 var nbsp = " ";
 var masked = false;
 function setAmountMasking(on) {
@@ -80,6 +38,60 @@ function sinceLabel(iso) {
 	const h = Math.round(min / 60);
 	if (h < 24) return `il y a ${h} h`;
 	return `il y a ${Math.round(h / 24)} j`;
+}
+//#endregion
+//#region node_modules/.nitro/vite/services/ssr/assets/types-DCsneB_N.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var KEY_PROFILE = "patrimoine.profile";
+var KEY_ASSETS = "patrimoine.assets";
+var KEY_HISTORY = "patrimoine.history";
+var storage = {
+	get(key) {
+		if (typeof window === "undefined") return null;
+		try {
+			const raw = window.localStorage.getItem(key);
+			return raw ? JSON.parse(raw) : null;
+		} catch {
+			return null;
+		}
+	},
+	/**
+	* Écrit dans le stockage local. Retourne false si l'écriture échoue
+	* (quota dépassé, mode privé) : sans cela, une sauvegarde perdue
+	* passait totalement inaperçue.
+	*/
+	set(key, value) {
+		if (typeof window === "undefined") return false;
+		try {
+			window.localStorage.setItem(key, JSON.stringify(value));
+			return true;
+		} catch {
+			return false;
+		}
+	},
+	remove(key) {
+		if (typeof window === "undefined") return;
+		window.localStorage.removeItem(key);
+	}
+};
+var KEYS = {
+	profile: KEY_PROFILE,
+	assets: KEY_ASSETS,
+	history: KEY_HISTORY
+};
+function uid() {
+	return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+var AppContext = (0, import_react.createContext)(null);
+function useApp() {
+	const ctx = (0, import_react.useContext)(AppContext);
+	if (!ctx) throw new Error("useApp must be used within AppProvider");
+	return ctx;
+}
+/** Demande l'ouverture du modal d'ajout, monté dans la racine. */
+var ADD_ASSET_EVENT = "patrimoine:add-asset";
+function requestAddAsset() {
+	window.dispatchEvent(new Event(ADD_ASSET_EVENT));
 }
 var TYPE_LABELS = {
 	pea: "Bourse",
@@ -130,7 +142,7 @@ var INCOME_KIND_LABELS = {
 	autre: "Autre"
 };
 //#endregion
-//#region node_modules/.nitro/vite/services/ssr/assets/market-sDnrb2H-.js
+//#region node_modules/.nitro/vite/services/ssr/assets/market-Ck3Dr32f.js
 function n(v) {
 	const x = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
 	return Number.isFinite(x) ? x : 0;
@@ -210,6 +222,18 @@ function lookThrough(assets) {
 	}
 	return out;
 }
+/**
+* Lignes libellées dans une autre devise que l'euro.
+* Les totaux additionnent les montants tels quels : une ligne en dollars
+* fausse donc le patrimoine net tant qu'elle n'est pas convertie à la main.
+* On les signale plutôt que de laisser l'erreur passer inaperçue.
+*/
+function foreignCurrencyAssets(assets) {
+	return assets.filter((a) => {
+		const c = String(a.data["currency"] ?? "EUR").toUpperCase();
+		return c !== "EUR" && c !== "";
+	});
+}
 /** Valeur positive par classe d'actif (les crédits sont exclus). */
 function allocationByType(assets) {
 	const map = /* @__PURE__ */ new Map();
@@ -285,7 +309,7 @@ async function fetchQuote(tickers) {
 	}
 }
 //#endregion
-//#region node_modules/.nitro/vite/services/ssr/assets/router-BqKF7lMf.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-CPppA-3k.js
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
 var __exportAll = (all, no_symbols) => {
@@ -297,7 +321,7 @@ var __exportAll = (all, no_symbols) => {
 	if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
 	return target;
 };
-var styles_default = "/assets/styles-CC5r3i-I.css";
+var styles_default = "/assets/styles-08B3A1hk.css";
 function reportLovableError(error, context = {}) {
 	if (typeof window === "undefined") return;
 	window.__lovableEvents?.captureException?.(error, {
@@ -375,6 +399,16 @@ function maybeNotify(profile, dca) {
 		tag: `patrimoine-${month}`
 	});
 }
+/** Une seule alerte par session : inutile de harceler à chaque frappe. */
+var storageWarned = false;
+function warnStorageFull() {
+	if (storageWarned) return;
+	storageWarned = true;
+	toast.error("Enregistrement impossible", {
+		description: "Le stockage du navigateur est plein ou indisponible. Exporte une sauvegarde depuis Profil avant de fermer l'app.",
+		duration: 1e4
+	});
+}
 function AppProvider({ children }) {
 	const [profile, setProfile] = (0, import_react.useState)(null);
 	const [assets, setAssetsState] = (0, import_react.useState)([]);
@@ -391,7 +425,7 @@ function AppProvider({ children }) {
 	}, []);
 	const persist = (0, import_react.useCallback)((next) => {
 		setAssetsState(next);
-		storage.set(KEYS.assets, next);
+		if (!storage.set(KEYS.assets, next)) warnStorageFull();
 	}, []);
 	(0, import_react.useEffect)(() => {
 		if (!ready) return;
@@ -414,7 +448,7 @@ function AppProvider({ children }) {
 		saveProfile: (p) => {
 			setProfile(p);
 			setAmountMasking(Boolean(p.hideAmounts));
-			storage.set(KEYS.profile, p);
+			if (!storage.set(KEYS.profile, p)) warnStorageFull();
 		},
 		upsertAsset: (a) => {
 			const exists = assets.some((x) => x.id === a.id);
@@ -1068,6 +1102,18 @@ function speechCtor() {
 	const w = window;
 	return w["SpeechRecognition"] ?? w["webkitSpeechRecognition"];
 }
+/** Traduit le code d'erreur de l'API en message actionnable. */
+function micMessage(code) {
+	switch (code) {
+		case "not-allowed":
+		case "service-not-allowed": return "Micro refusé. Autorise-le dans les réglages du navigateur, puis réessaie.";
+		case "no-speech": return "Rien n'a été entendu. Réessaie en parlant juste après le tap.";
+		case "audio-capture": return "Aucun micro détecté sur cet appareil.";
+		case "network": return "La reconnaissance vocale n'a pas pu joindre le réseau.";
+		case "aborted": return "";
+		default: return "La dictée du navigateur a échoué. Utilise le micro de ton clavier.";
+	}
+}
 /**
 * Saisie d'un actif en une phrase, tapée ou dictée.
 * L'analyse est locale et le résultat est toujours relu dans le
@@ -1077,8 +1123,11 @@ function NaturalInput({ onParsed }) {
 	const [text, setText] = (0, import_react.useState)("");
 	const [listening, setListening] = (0, import_react.useState)(false);
 	const recRef = (0, import_react.useRef)(null);
-	const supported = Boolean(speechCtor());
-	(0, import_react.useEffect)(() => () => recRef.current?.stop(), []);
+	const baseRef = (0, import_react.useRef)("");
+	const [supported, setSupported] = (0, import_react.useState)(false);
+	const [micError, setMicError] = (0, import_react.useState)("");
+	(0, import_react.useEffect)(() => setSupported(Boolean(speechCtor())), []);
+	(0, import_react.useEffect)(() => () => recRef.current?.abort(), []);
 	const toggleMic = () => {
 		if (listening) {
 			recRef.current?.stop();
@@ -1087,23 +1136,35 @@ function NaturalInput({ onParsed }) {
 		}
 		const Ctor = speechCtor();
 		if (!Ctor) return;
+		setMicError("");
+		baseRef.current = text ? text.trimEnd() + " " : "";
 		const rec = new Ctor();
 		recRef.current = rec;
 		rec.lang = "fr-FR";
 		rec.continuous = false;
 		rec.interimResults = true;
+		rec.maxAlternatives = 1;
 		rec.onresult = (e) => {
 			let out = "";
 			for (let i = 0; i < e.results.length; i++) {
 				const alt = e.results[i]?.[0];
 				if (alt) out += alt.transcript;
 			}
-			setText(out);
+			setText(baseRef.current + out);
 		};
+		rec.onstart = () => setListening(true);
 		rec.onend = () => setListening(false);
-		rec.onerror = () => setListening(false);
-		rec.start();
-		setListening(true);
+		rec.onerror = (e) => {
+			setListening(false);
+			setMicError(micMessage(e?.error));
+		};
+		try {
+			rec.start();
+			setListening(true);
+		} catch {
+			setListening(false);
+			setMicError("Dictée déjà en cours — réessaie dans un instant.");
+		}
 	};
 	const preview = text.trim().length > 3 ? parseAssetText(text) : null;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -1132,9 +1193,13 @@ function NaturalInput({ onParsed }) {
 					children: listening ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Square, { className: "size-3.5" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { className: "size-4" })
 				})]
 			}),
-			!supported && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			micError && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-1.5 text-[11px] text-destructive",
+				children: micError
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 				className: "mt-1.5 text-[11px] text-muted-foreground",
-				children: "Pour dicter, utilise le micro de ton clavier."
+				children: supported ? "Tu peux aussi dicter avec le micro de ton clavier." : "Pour dicter, utilise le micro de ton clavier (à côté de la barre d'espace)."
 			}),
 			preview && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "mt-3 rounded-xl border border-border bg-card p-3",
@@ -1169,6 +1234,115 @@ function NaturalInput({ onParsed }) {
 				}, e))
 			})
 		]
+	});
+}
+var parse = (v) => {
+	const n = Number(v.replace(",", "."));
+	return Number.isFinite(n) ? n : 0;
+};
+/** Arrondi d'affichage : 2 décimales pour l'argent, 6 pour les quantités. */
+var fmt = (v, key) => {
+	if (!Number.isFinite(v) || v <= 0) return "";
+	const rounded = key === "quantity" ? Math.round(v * 1e6) / 1e6 : Math.round(v * 100) / 100;
+	return String(rounded);
+};
+/**
+* Recalcule le champ manquant après une saisie.
+* `edited` est le champ qui vient d'être modifié, `order` la liste des
+* champs déjà renseignés du plus ancien au plus récent.
+*/
+function solveTriangle(values, edited, order) {
+	const q = parse(values.quantity);
+	const p = parse(values.price);
+	const t = parse(values.total);
+	if ([
+		"quantity",
+		"price",
+		"total"
+	].filter((k) => parse(values[k]) > 0).length < 2) return values;
+	const others = [
+		"quantity",
+		"price",
+		"total"
+	].filter((k) => k !== edited);
+	const target = others.find((k) => parse(values[k]) <= 0) ?? others.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b))[0];
+	if (!target) return values;
+	const out = { ...values };
+	if (target === "total" && q > 0 && p > 0) out.total = fmt(q * p, "total");
+	else if (target === "price" && q > 0 && t > 0) out.price = fmt(t / q, "price");
+	else if (target === "quantity" && p > 0 && t > 0) out.quantity = fmt(t / p, "quantity");
+	return out;
+}
+function AmountTriangle({ values, onChange, priceLabel, quantityLabel = "Quantité", marketPrice, onFetchPrice, fetching }) {
+	const set = (key, v) => onChange({
+		...values,
+		[key]: v
+	}, key);
+	const priceDiffers = marketPrice !== void 0 && marketPrice > 0 && Math.abs(parse(values.price) - marketPrice) > .005;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "rounded-2xl border border-border bg-card p-3",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "grid grid-cols-2 gap-2",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Cell, {
+					label: quantityLabel,
+					value: values.quantity,
+					onChange: (v) => set("quantity", v)
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Cell, {
+					label: priceLabel,
+					value: values.price,
+					onChange: (v) => set("price", v)
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-2",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Cell, {
+					label: "Montant total (€)",
+					value: values.total,
+					onChange: (v) => set("total", v)
+				})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-2 text-[11px] leading-relaxed text-muted-foreground",
+				children: "Renseigne deux valeurs, la troisième se calcule."
+			}),
+			marketPrice !== void 0 && marketPrice > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-2 flex items-center justify-between gap-2 rounded-xl bg-elevated px-3 py-2",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: "text-[11px] text-muted-foreground",
+					children: ["Cours du jour : ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "font-mono text-foreground",
+						children: eur(marketPrice, 2)
+					})]
+				}), priceDiffers && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => set("price", fmt(marketPrice, "price")),
+					className: "tap shrink-0 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground",
+					children: "Utiliser"
+				})]
+			}),
+			onFetchPrice && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+				type: "button",
+				onClick: onFetchPrice,
+				disabled: fetching,
+				className: "tap mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 py-2 text-xs font-semibold text-primary disabled:opacity-40",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(RefreshCw, { className: `size-3.5 ${fetching ? "animate-spin" : ""}` }), "Récupérer le cours"]
+			})
+		]
+	});
+}
+function Cell({ label, value, onChange }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+		className: "block",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "mb-1 block text-[11px] text-muted-foreground",
+			children: label
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+			inputMode: "decimal",
+			value,
+			onChange: (e) => onChange(e.target.value),
+			className: "h-11 w-full rounded-xl border border-border bg-elevated px-3 font-mono text-sm outline-none focus:border-primary"
+		})]
 	});
 }
 function SymbolSearch({ kind = "titre", onSelect, onManual }) {
@@ -1593,6 +1767,11 @@ var ESSENTIAL = {
 	]
 };
 /** Métadonnées sans champ dédié, conservées telles quelles à l'enregistrement. */
+/** Types dont la saisie passe par le trio quantité · prix · total. */
+var TRIANGLE_KEYS = {
+	pea: ["quantity", "currentPrice"],
+	crypto: ["quantity", "prixUnitaire"]
+};
 var PRESERVED = [
 	"envelope",
 	"region",
@@ -1652,6 +1831,32 @@ function AssetModal({ asset, onClose, onSave, onDelete }) {
 		return init;
 	});
 	const [fetching, setFetching] = (0, import_react.useState)(false);
+	const [marketPrice, setMarketPrice] = (0, import_react.useState)(void 0);
+	const priceField = type === "crypto" ? "prixUnitaire" : "currentPrice";
+	const [totalDraft, setTotalDraft] = (0, import_react.useState)(() => {
+		const q = Number(asset?.data["quantity"] ?? 0);
+		const p = Number(asset?.data[asset?.type === "crypto" ? "prixUnitaire" : "currentPrice"] ?? 0);
+		return q > 0 && p > 0 ? String(Math.round(q * p * 100) / 100) : "";
+	});
+	/** Ordre de saisie du trio, pour savoir quelle valeur recalculer. */
+	const triangleOrder = (0, import_react.useRef)([]);
+	/** Va chercher le cours du marché pour le ticker saisi. */
+	const loadPrice = async () => {
+		const ticker = (data["ticker"] ?? "").trim().toUpperCase();
+		if (!ticker) return;
+		setFetching(true);
+		try {
+			const q = (await fetchQuote([ticker]))[ticker];
+			if (q?.price) setMarketPrice(q.price);
+		} finally {
+			setFetching(false);
+		}
+	};
+	(0, import_react.useEffect)(() => {
+		if (!TRIANGLE_KEYS[type ?? "autre"]) return;
+		if (!(data["ticker"] ?? "").trim() || marketPrice !== void 0) return;
+		loadPrice();
+	}, [type, data["ticker"]]);
 	const [showMore, setShowMore] = (0, import_react.useState)(() => Boolean(asset && FIELDS[asset.type].some((f) => !ESSENTIAL[asset.type].includes(f.key) && asset.data[f.key] !== void 0 && asset.data[f.key] !== "")));
 	const searchable = type === "pea" || type === "crypto";
 	const applySymbol = (s) => {
@@ -1774,11 +1979,33 @@ function AssetModal({ asset, onClose, onSave, onDelete }) {
 					type && (mode === "manual" || !searchable) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 						className: "space-y-3",
 						children: [
-							FIELDS[type].filter((f) => ESSENTIAL[type].includes(f.key)).map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FieldInput, {
+							FIELDS[type].filter((f) => ESSENTIAL[type].includes(f.key) && !TRIANGLE_KEYS[type]?.includes(f.key)).map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FieldInput, {
 								f,
 								data,
 								setData
 							}, f.key)),
+							TRIANGLE_KEYS[type] && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AmountTriangle, {
+								values: {
+									quantity: data["quantity"] ?? "",
+									price: data[priceField] ?? "",
+									total: totalDraft
+								},
+								priceLabel: type === "crypto" ? "Prix unitaire (€)" : "Cours actuel (€)",
+								quantityLabel: type === "crypto" ? "Quantité" : "Nombre de parts",
+								marketPrice,
+								onFetchPrice: data["ticker"] ? () => void loadPrice() : void 0,
+								fetching,
+								onChange: (next, edited) => {
+									const solved = solveTriangle(next, edited, triangleOrder.current);
+									if (!triangleOrder.current.includes(edited)) triangleOrder.current.push(edited);
+									setData((d) => ({
+										...d,
+										quantity: solved.quantity,
+										[priceField]: solved.price
+									}));
+									setTotalDraft(solved.total);
+								}
+							}),
 							FIELDS[type].some((f) => !ESSENTIAL[type].includes(f.key)) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 								type: "button",
 								onClick: () => setShowMore((v) => !v),
@@ -2156,6 +2383,55 @@ function Onboarding({ onDone }) {
 		]
 	});
 }
+/** Lignes dont le cours peut être récupéré automatiquement. */
+function pricedAssets(assets) {
+	return assets.filter((a) => (a.type === "pea" || a.type === "crypto") && String(a.data["ticker"] ?? "").trim());
+}
+/** Clé portant le cours courant selon le type de ligne. */
+function priceKey(type) {
+	return type === "crypto" ? "prixUnitaire" : "currentPrice";
+}
+/** Horodatage de la dernière récupération, toutes lignes confondues. */
+function lastPriceUpdate(assets) {
+	const stamps = assets.map((a) => a.data["lastPriceUpdate"]).filter(Boolean).map(String).sort();
+	return stamps[stamps.length - 1];
+}
+/**
+* Récupère les cours et renvoie la liste mise à jour,
+* ou null si rien n'a changé (aucun ticker, réseau indisponible…).
+*/
+async function refreshPrices(assets) {
+	const priced = pricedAssets(assets);
+	if (!priced.length) return null;
+	const quotes = await fetchQuote(priced.map((a) => String(a.data["ticker"])));
+	if (!Object.keys(quotes).length) return null;
+	const stamp = (/* @__PURE__ */ new Date()).toISOString();
+	let changed = false;
+	const next = assets.map((a) => {
+		const q = quotes[String(a.data["ticker"] ?? "")];
+		if (!q) return a;
+		changed = true;
+		return {
+			...a,
+			data: {
+				...a.data,
+				[priceKey(a.type)]: q.price,
+				lastPriceUpdate: stamp
+			},
+			updatedAt: stamp
+		};
+	});
+	return changed ? next : null;
+}
+/** Un rafraîchissement automatique par tranche de 4 heures. */
+var AUTO_INTERVAL_MS = 144e5;
+/** Les cours sont-ils assez anciens pour justifier une actualisation auto ? */
+function pricesAreStale(assets) {
+	if (!pricedAssets(assets).length) return false;
+	const last = lastPriceUpdate(assets);
+	if (!last) return true;
+	return Date.now() - new Date(last).getTime() > AUTO_INTERVAL_MS;
+}
 function NotFoundComponent() {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 		className: "flex min-h-screen items-center justify-center bg-background px-4",
@@ -2263,8 +2539,18 @@ function RootComponent() {
 	});
 }
 function Shell() {
-	const { profile, ready, saveProfile, upsertAsset } = useApp();
+	const { profile, ready, saveProfile, upsertAsset, assets, setAssets } = useApp();
 	const [adding, setAdding] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		if (!ready || !pricesAreStale(assets)) return;
+		let cancelled = false;
+		refreshPrices(assets).then((next) => {
+			if (next && !cancelled) setAssets(next);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [ready]);
 	(0, import_react.useEffect)(() => {
 		const open = () => setAdding(true);
 		window.addEventListener(ADD_ASSET_EVENT, open);
@@ -2296,7 +2582,7 @@ function Shell() {
 		]
 	});
 }
-var $$splitComponentImporter$2 = () => import("./routes-CQefuaRj.mjs");
+var $$splitComponentImporter$2 = () => import("./routes-wg4v7jsk.mjs");
 var Route$4 = createFileRoute("/")({
 	head: () => ({ meta: [
 		{ title: "Accueil — Patrimoine" },
@@ -2315,7 +2601,7 @@ var Route$4 = createFileRoute("/")({
 	] }),
 	component: lazyRouteComponent($$splitComponentImporter$2, "component")
 });
-var $$splitComponentImporter$1 = () => import("./patrimoine-DZbVIq6p.mjs");
+var $$splitComponentImporter$1 = () => import("./patrimoine-Ce2EUq4f.mjs");
 var Route$3 = createFileRoute("/patrimoine")({
 	head: () => ({ meta: [
 		{ title: "Patrimoine — Actifs et passifs" },
@@ -2334,7 +2620,7 @@ var Route$3 = createFileRoute("/patrimoine")({
 	] }),
 	component: lazyRouteComponent($$splitComponentImporter$1, "component")
 });
-var $$splitComponentImporter = () => import("./profil-BcBnU0gA.mjs");
+var $$splitComponentImporter = () => import("./profil-XsR0nMaR.mjs");
 var Route$2 = createFileRoute("/profil")({
 	head: () => ({ meta: [
 		{ title: "Profil — Patrimoine" },
@@ -2359,10 +2645,13 @@ var Route$2 = createFileRoute("/profil")({
 */
 async function fetchOne(symbol) {
 	try {
-		const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`, { headers: {
-			"User-Agent": "Mozilla/5.0",
-			Accept: "application/json"
-		} });
+		const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`, {
+			headers: {
+				"User-Agent": "Mozilla/5.0",
+				Accept: "application/json"
+			},
+			signal: AbortSignal.timeout(6e3)
+		});
 		if (!res.ok) return null;
 		const meta = (await res.json()).chart?.result?.[0]?.meta;
 		if (!meta) return null;
@@ -2380,20 +2669,23 @@ async function fetchOne(symbol) {
 	}
 }
 var Route$1 = createFileRoute("/api/public/quote")({ server: { handlers: { GET: async ({ request }) => {
-	const symbols = (new URL(request.url).searchParams.get("symbols") ?? "").split(",").map((s) => s.trim()).filter(Boolean).slice(0, 25);
+	const symbols = (new URL(request.url).searchParams.get("symbols") ?? "").split(",").map((s) => s.trim().toUpperCase()).filter((s) => /^[A-Z0-9.^-]{1,20}$/.test(s)).slice(0, 25);
 	const entries = await Promise.all(symbols.map(async (s) => [s, await fetchOne(s)]));
 	const out = {};
 	for (const [s, q] of entries) if (q) out[s] = q;
-	return Response.json(out, { headers: { "Cache-Control": "public, max-age=60" } });
+	return Response.json(out, { headers: { "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=300" } });
 } } } });
 var Route = createFileRoute("/api/public/search-symbols")({ server: { handlers: { GET: async ({ request }) => {
 	const q = (new URL(request.url).searchParams.get("q") ?? "").trim();
 	if (!q) return Response.json([]);
 	try {
-		const res = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0`, { headers: {
-			"User-Agent": "Mozilla/5.0",
-			Accept: "application/json"
-		} });
+		const res = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=8&newsCount=0`, {
+			headers: {
+				"User-Agent": "Mozilla/5.0",
+				Accept: "application/json"
+			},
+			signal: AbortSignal.timeout(6e3)
+		});
 		if (!res.ok) return Response.json([]);
 		const items = ((await res.json()).quotes ?? []).filter((it) => it["symbol"]).map((it) => ({
 			symbol: it["symbol"],
@@ -2445,4 +2737,4 @@ var getRouter = () => {
 	});
 };
 //#endregion
-export { requestAddAsset as A, RISK_LABELS as C, num as D, eur as E, sinceLabel as M, uid as N, pct as O, useApp as P, INCOME_KIND_LABELS as S, TYPE_LABELS as T, fetchQuote as _, AssetModal as a, project as b, maybeNotify as c, requestNotifications as d, REGION_BUCKETS as f, diversificationScore as g, assetValue as h, restoreBackup as i, signedEur as j, rawPct as k, notificationsGranted as l, assetGain as m, daysSinceBackup as n, contributionDue as o, allocationByType as p, exportBackup as r, currentMonth as s, router_exports as t, notificationsSupported as u, lookThrough as v, TARGET_ALLOCATIONS as w, totals as x, n as y };
+export { useApp as A, totals as C, TYPE_LABELS as D, TARGET_ALLOCATIONS as E, signedEur as F, sinceLabel as I, num as M, pct as N, requestAddAsset as O, rawPct as P, project as S, RISK_LABELS as T, assetValue as _, exportBackup as a, lookThrough as b, contributionDue as c, notificationsGranted as d, notificationsSupported as f, assetGain as g, allocationByType as h, daysSinceBackup as i, eur as j, uid as k, currentMonth as l, REGION_BUCKETS as m, lastPriceUpdate as n, restoreBackup as o, requestNotifications as p, refreshPrices as r, AssetModal as s, router_exports as t, maybeNotify as u, diversificationScore as v, INCOME_KIND_LABELS as w, n as x, foreignCurrencyAssets as y };

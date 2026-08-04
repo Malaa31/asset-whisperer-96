@@ -1,10 +1,10 @@
 import { i as __toESM } from "../_runtime.mjs";
-import { n as require_jsx_runtime, r as require_react } from "../_libs/react+tanstack__react-query.mjs";
-import { D as ClipboardCheck, k as ChevronRight, m as Plus, t as X, x as Info } from "../_libs/lucide-react.mjs";
-import { n as toast } from "../_libs/sonner.mjs";
-import { D as num, E as eur, P as useApp, T as TYPE_LABELS, a as AssetModal, f as REGION_BUCKETS, g as diversificationScore, h as assetValue, j as signedEur, k as rawPct, m as assetGain, p as allocationByType, v as lookThrough, x as totals, y as n } from "./router-BqKF7lMf.mjs";
+import { n as require_react, r as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
 import { c as Pie, l as Cell, n as PieChart, u as ResponsiveContainer } from "../_libs/recharts+[...].mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/patrimoine-DZbVIq6p.js
+import { n as toast } from "../_libs/sonner.mjs";
+import { D as ClipboardCheck, k as ChevronRight, m as Plus, t as X, x as Info } from "../_libs/lucide-react.mjs";
+import { A as useApp, C as totals, D as TYPE_LABELS, F as signedEur, M as num, P as rawPct, _ as assetValue, b as lookThrough, g as assetGain, h as allocationByType, j as eur, m as REGION_BUCKETS, s as AssetModal, v as diversificationScore, x as n, y as foreignCurrencyAssets } from "./router-CPppA-3k.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/patrimoine-Ce2EUq4f.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var KEY_BY_TYPE = {
@@ -318,6 +318,7 @@ function Patrimoine() {
 	const [editing, setEditing] = (0, import_react.useState)(null);
 	const [creating, setCreating] = (0, import_react.useState)(false);
 	const [pointing, setPointing] = (0, import_react.useState)(false);
+	const foreign = (0, import_react.useMemo)(() => foreignCurrencyAssets(assets), [assets]);
 	const t = (0, import_react.useMemo)(() => totals(assets), [assets]);
 	const list = assets.filter((a) => side === "passifs" ? a.type === "credit" : a.type !== "credit");
 	const filtered = filter === "all" ? list : list.filter((a) => a.type === filter);
@@ -358,6 +359,19 @@ function Patrimoine() {
 						children: eur(s === "actifs" ? t.actifs : t.dettes)
 					})]
 				}, s))
+			}),
+			foreign.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-4 rounded-2xl border border-amber/40 bg-amber/10 p-4 text-[11px] leading-relaxed text-muted-foreground",
+				children: [
+					foreign.length,
+					" ligne",
+					foreign.length > 1 ? "s" : "",
+					" en devise étrangère",
+					" (",
+					[...new Set(foreign.map((a) => String(a.data["currency"])))].join(", "),
+					") : ",
+					"les montants sont additionnés sans conversion. Saisis la valeur en euros pour un patrimoine net juste."
+				]
 			}),
 			side === "actifs" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AllocationCard, { assets }),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {

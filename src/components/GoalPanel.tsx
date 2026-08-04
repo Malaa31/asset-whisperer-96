@@ -9,7 +9,14 @@ import {
   profileGoals,
 } from "@/lib/goals";
 import type { Goal } from "@/lib/types";
-import { TrajectoryChart, ChartLegend } from "./TrajectoryChart";
+import { lazy, Suspense } from "react";
+import { ChartLegend } from "./ChartLegend";
+
+// recharts pèse 340 Ko : il n'est téléchargé qu'à l'ouverture de la
+// feuille Objectifs, pas au premier affichage de l'accueil.
+const TrajectoryChart = lazy(() =>
+  import("./TrajectoryChart").then((m) => ({ default: m.TrajectoryChart })),
+);
 import { GoalEditor } from "./GoalEditor";
 
 /**
@@ -169,7 +176,11 @@ export function GoalPanel() {
             </div>
 
             <div className="mt-5">
-              <TrajectoryChart data={traj} />
+              <Suspense
+                fallback={<div className="h-[200px] animate-pulse rounded-xl bg-elevated" />}
+              >
+                <TrajectoryChart data={traj} />
+              </Suspense>
             </div>
             <div className="mt-3">
               <ChartLegend />

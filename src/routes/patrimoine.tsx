@@ -9,6 +9,7 @@ import { eur, num, rawPct, signedEur } from "@/lib/format";
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 import { AssetModal } from "@/components/AssetModal";
 import { AllocationCard } from "@/components/AllocationCard";
+import { foreignCurrencyAssets } from "@/lib/calc";
 
 export const Route = createFileRoute("/patrimoine")({
   head: () => ({
@@ -35,6 +36,7 @@ function Patrimoine() {
   const [editing, setEditing] = useState<Asset | null>(null);
   const [creating, setCreating] = useState(false);
   const [pointing, setPointing] = useState(false);
+  const foreign = useMemo(() => foreignCurrencyAssets(assets), [assets]);
 
   const t = useMemo(() => totals(assets), [assets]);
   const list = assets.filter((a) =>
@@ -84,6 +86,17 @@ function Patrimoine() {
           </button>
         ))}
       </div>
+
+      {foreign.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-amber/40 bg-amber/10 p-4 text-[11px] leading-relaxed text-muted-foreground">
+          {foreign.length} ligne{foreign.length > 1 ? "s" : ""} en devise étrangère
+          {" ("}
+          {[...new Set(foreign.map((a) => String(a.data["currency"])))].join(", ")}
+          {") : "}
+          les montants sont additionnés sans conversion. Saisis la valeur en euros
+          pour un patrimoine net juste.
+        </div>
+      )}
 
       {side === "actifs" && <AllocationCard assets={assets} />}
 
