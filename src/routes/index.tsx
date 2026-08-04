@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, TrendingUp } from "lucide-react";
+import { Pencil, RefreshCw, TrendingUp } from "lucide-react";
 import { useApp } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
-import { TARGET_ALLOCATIONS, type RiskProfile } from "@/lib/types";
+import { RISK_LABELS, TARGET_ALLOCATIONS, type PlanLine as ProfilePlanLine, type RiskProfile } from "@/lib/types";
+import { PlanEditor, defaultLines } from "@/components/PlanEditor";
+import { rawPct } from "@/lib/format";
 import { eur, pct, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
 import { fetchQuote } from "@/lib/market";
@@ -30,8 +32,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const { profile, assets, setAssets } = useApp();
+  const { profile, assets, setAssets, saveProfile } = useApp();
   const [refreshing, setRefreshing] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | undefined>(undefined);
 
   const t = useMemo(() => totals(assets), [assets]);
@@ -72,9 +75,11 @@ function Dashboard() {
     setLastUpdate(stamps[stamps.length - 1]);
   }, [assets]);
 
+  const risk = profile?.riskProfile ?? "equilibre";
+  const custom = Boolean(profile?.planLines?.length);
   const plan = useMemo(
-    () => buildPlan(profile?.riskProfile ?? "equilibre", goal.dca),
-    [profile?.riskProfile, goal.dca],
+    () => buildPlan(profile?.planLines?.length ? profile.planLines : defaultLines(risk), goal.dca),
+    [profile?.planLines, risk, goal.dca],
   );
 
   return (
@@ -124,10 +129,19 @@ function Dashboard() {
         <section className="mt-4 rounded-2xl border border-primary/35 bg-primary/8 p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Où mettre tes {eur(goal.dca)} ce mois-ci</h2>
-            <span className="rounded-md bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
-              AGIR
-            </span>
+            <button
+              type="button"
+              onClick={() => setEditingPlan(true)}
+              className="tap flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-[11px] font-semibold text-primary"
+            >
+              <Pencil className="size-3" /> Ajuster
+            </button>
           </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {custom
+              ? "Votre répartition personnalisée."
+              : `Plan conseillé — allocation cible du profil ${RISK_LABELS[risk].toLowerCase()} : ${TARGET_ALLOCATIONS[risk].actions} % actions · ${TARGET_ALLOCATIONS[risk].obligations} % fonds € · ${TARGET_ALLOCATIONS[risk].immo} % immo · ${TARGET_ALLOCATIONS[risk].cash} % cash.`}
+          </p>
           <ul className="mt-4 space-y-3">
             {plan.map((p) => (
               <li key={p.label}>
@@ -153,6 +167,18 @@ function Dashboard() {
         </section>
       )}
 
+      {editingPlan && profile && (
+        <PlanEditor
+          lines={profile.planLines}
+          risk={risk}
+          onClose={() => setEditingPlan(false)}
+          onSave={(lines) => {
+            const { planLines: _drop, ...rest } = profile;
+            saveProfile(lines ? { ...rest, planLines: lines } : rest);
+            setEditingPlan(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -166,27 +192,22 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: str
   );
 }
 
-interface PlanLine {
+interface PlanLineView {
   emoji: string;
   label: string;
   tag: string;
   amount: number;
 }
 
-function buildPlan(risk: RiskProfile, dca: number): PlanLine[] {
-  // Répartition alignée sur l'allocation cible du profil de risque :
-  // actions (Monde / Europe / small caps), fonds €, immo papier, cash.
-  const a = TARGET_ALLOCATIONS[risk] ?? TARGET_ALLOCATIONS.equilibre;
-  const actions = a.actions;
-  const weights: Array<[PlanLine, number]> = [
-    [{ emoji: "🌍", label: "ETF Monde", tag: "CŒUR", amount: 0 }, actions * 0.6],
-    [{ emoji: "🇪🇺", label: "Stoxx Europe 600", tag: "+", amount: 0 }, actions * 0.25],
-    [{ emoji: "🐣", label: "Small caps (Russell 2000)", tag: "+", amount: 0 }, actions * 0.15],
-    [{ emoji: "🏦", label: "Fonds € (AV)", tag: "SÉCU", amount: 0 }, a.obligations],
-    [{ emoji: "🏠", label: "SCPI / immo papier", tag: "+", amount: 0 }, a.immo],
-    [{ emoji: "💧", label: "Livret (précaution)", tag: "SÉCU", amount: 0 }, a.cash],
-  ];
-  const active = weights.filter(([, w]) => w > 0);
-  const total = active.reduce((sum, [, w]) => sum + w, 0);
-  return active.map(([line, w]) => ({ ...line, amount: Math.round((dca * w) / total) }));
+function buildPlan(lines: ProfilePlanLine[], dca: number): PlanLineView[] {
+  const total = lines.reduce((sum, l) => sum + Math.max(0, l.weight), 0);
+  if (total <= 0) return [];
+  return lines
+    .filter((l) => l.weight > 0)
+    .map((l) => ({
+      emoji: l.emoji ?? "📈",
+      label: l.label,
+      tag: rawPct((l.weight / total) * 100, 0),
+      amount: Math.round((dca * l.weight) / total),
+    }));
 }

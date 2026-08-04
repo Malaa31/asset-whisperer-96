@@ -92,6 +92,47 @@ export function lookThrough(assets: Asset[]): Record<RegionBucket, number> {
   return out;
 }
 
+// --- Répartition & diversification ---
+
+/** Valeur positive par classe d'actif (les crédits sont exclus). */
+export function allocationByType(assets: Asset[]): Array<{ type: Asset["type"]; value: number }> {
+  const map = new Map<Asset["type"], number>();
+  for (const a of assets) {
+    if (a.type === "credit") continue;
+    const v = assetValue(a);
+    if (v <= 0) continue;
+    map.set(a.type, (map.get(a.type) ?? 0) + v);
+  }
+  return [...map.entries()]
+    .map(([type, value]) => ({ type, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/** Indice de Herfindahl-Hirschman normalisé → score 0-100 (100 = réparti à parts égales sur N cases). */
+function hhiScore(values: number[], bucketCount: number): number {
+  const total = values.reduce((s, v) => s + v, 0);
+  if (total <= 0 || bucketCount < 2) return 0;
+  const hhi = values.reduce((s, v) => s + (v / total) ** 2, 0);
+  const min = 1 / bucketCount;
+  return Math.round(Math.max(0, Math.min(1, (1 - (hhi - min) / (1 - min)))) * 100);
+}
+
+export interface DiversificationScore {
+  /** Score global 0-100 (moyenne des deux composantes). */
+  global: number;
+  /** Répartition entre classes d'actifs (bourse, AV, livrets, immo…). */
+  classes: number;
+  /** Répartition géographique des actions, en transparence des ETF. */
+  regions: number;
+}
+
+export function diversificationScore(assets: Asset[]): DiversificationScore {
+  const classes = hhiScore(allocationByType(assets).map((x) => x.value), 6);
+  const lt = lookThrough(assets);
+  const regions = hhiScore(Object.values(lt).filter((v) => v > 0.01), REGION_BUCKETS.length);
+  return { classes, regions, global: Math.round((classes + regions) / 2) };
+}
+
 // --- Projection ---
 export function project(start: number, dca: number, years: number, rate = 0.075) {
   const points: Array<{ annee: number; valeur: number; verse: number }> = [];

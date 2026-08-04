@@ -24,6 +24,14 @@ export interface Goal {
   scope?: AssetType;
 }
 
+export interface PlanLine {
+  id: string;
+  label: string;
+  emoji?: string;
+  /** Poids relatif de la ligne (en %). */
+  weight: number;
+}
+
 export interface Profile {
   name: string;
   age: number;
@@ -36,6 +44,8 @@ export interface Profile {
   hideAmounts?: boolean;
   /** Date ISO du dernier export de sauvegarde. */
   lastBackup?: string;
+  /** Répartition personnalisée du versement mensuel (sinon plan conseillé). */
+  planLines?: PlanLine[];
 }
 
 

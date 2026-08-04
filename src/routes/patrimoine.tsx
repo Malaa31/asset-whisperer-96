@@ -6,6 +6,7 @@ import { assetValue, assetGain, totals, n } from "@/lib/calc";
 import { eur, num, rawPct, signedEur } from "@/lib/format";
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 import { AssetModal } from "@/components/AssetModal";
+import { AllocationCard } from "@/components/AllocationCard";
 
 export const Route = createFileRoute("/patrimoine")({
   head: () => ({
@@ -71,6 +72,8 @@ function Patrimoine() {
           </button>
         ))}
       </div>
+
+      {side === "actifs" && <AllocationCard assets={assets} />}
 
       <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">
         {(["all", ...types] as const).map((ty) => (
