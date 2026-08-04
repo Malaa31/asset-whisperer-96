@@ -37,7 +37,8 @@ export async function requestNotifications(): Promise<boolean> {
   return (await Notification.requestPermission()) === "granted";
 }
 
-const SEEN_KEY = "patrimoine.reminderShown";
+export const REMINDER_SEEN_KEY = "patrimoine.reminderShown";
+const SEEN_KEY = REMINDER_SEEN_KEY;
 
 /**
  * Affiche la notification du mois au plus une fois.

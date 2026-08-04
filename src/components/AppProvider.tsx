@@ -8,6 +8,7 @@ import {
 } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { setAmountMasking } from "@/lib/format";
+import { REMINDER_SEEN_KEY } from "@/lib/reminder";
 import type { Asset, Profile } from "@/lib/types";
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -66,6 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         storage.remove(KEYS.profile);
         storage.remove(KEYS.assets);
         storage.remove(KEYS.history);
+        storage.remove(REMINDER_SEEN_KEY);
         setHistory([]);
         setProfile(null);
         setAssetsState([]);

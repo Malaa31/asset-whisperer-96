@@ -48,6 +48,7 @@ const FIELDS: Record<AssetType, Field[]> = {
     { key: "ucDescription", label: "Support UC" },
   ],
   livret: [
+    { key: "name", label: "Nom" },
     { key: "type", label: "Type", placeholder: "Livret A, LDDS, LEP, PEL…" },
     { key: "amount", label: "Montant", type: "number" },
     { key: "taux", label: "Taux (%)", type: "number" },
@@ -63,6 +64,7 @@ const FIELDS: Record<AssetType, Field[]> = {
     { key: "loyer", label: "Loyer mensuel", type: "number" },
   ],
   crypto: [
+    { key: "name", label: "Nom" },
     { key: "ticker", label: "Ticker" },
     { key: "quantity", label: "Quantité", type: "number" },
     { key: "prixUnitaire", label: "Prix unitaire", type: "number" },
@@ -93,13 +95,16 @@ const FIELDS: Record<AssetType, Field[]> = {
 const ESSENTIAL: Record<AssetType, string[]> = {
   pea: ["name", "quantity", "pru", "currentPrice"],
   av: ["name", "fondsEurosAmount", "ucAmount"],
-  livret: ["type", "amount"],
+  livret: ["name", "type", "amount"],
   immo: ["type", "name", "valeurEstimee"],
-  crypto: ["ticker", "quantity", "prixUnitaire"],
+  crypto: ["name", "ticker", "quantity", "prixUnitaire"],
   cash: ["name", "amount"],
   autre: ["name", "amount"],
   credit: ["name", "capitalRestant", "mensualite"],
 };
+
+/** Métadonnées sans champ dédié, conservées telles quelles à l'enregistrement. */
+const PRESERVED = ["envelope", "region", "sector", "currency", "isin", "lastPriceUpdate"];
 
 const TYPE_CARDS: Array<{ type: AssetType; Icon: typeof Home; color: string }> = [
   { type: "pea", Icon: Landmark, color: "text-primary" },
@@ -192,7 +197,12 @@ export function AssetModal({
       if (v === undefined || v === "") continue;
       clean[f.key] = f.type === "number" ? Number(v.replace(",", ".")) : v;
     }
-    if (data["lastPriceUpdate"]) clean["lastPriceUpdate"] = data["lastPriceUpdate"];
+    // Sans cela, une ligne créée par recherche, par texte libre ou par dictée
+    // perdait ces informations, alors qu'une saisie manuelle n'y touche pas.
+    for (const k of PRESERVED) {
+      const v = data[k];
+      if (v !== undefined && v !== "" && clean[k] === undefined) clean[k] = v;
+    }
     onSave({
       id: asset?.id ?? uid(),
       type,

@@ -1,5 +1,6 @@
 import { KEYS, storage, type HistoryPoint } from "./storage";
 import type { Asset, Profile } from "./types";
+import { REMINDER_SEEN_KEY } from "./reminder";
 
 /**
  * Sauvegarde/restauration : tout l'état (profil, actifs, historique)
@@ -52,6 +53,8 @@ export async function restoreBackup(file: File): Promise<void> {
   else storage.remove(KEYS.profile);
   storage.set(KEYS.assets, parsed.assets);
   storage.set(KEYS.history, Array.isArray(parsed.history) ? parsed.history : []);
+  // Le rappel du mois repart à zéro : la sauvegarde importée fait foi.
+  storage.remove(REMINDER_SEEN_KEY);
   window.location.reload();
 }
 
