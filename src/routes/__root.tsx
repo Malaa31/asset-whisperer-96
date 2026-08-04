@@ -84,10 +84,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      // Plein écran une fois ajoutée à l'écran d'accueil (iOS).
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "apple-mobile-web-app-title", content: "Patrimoine" },
+      { name: "mobile-web-app-capable", content: "yes" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -143,6 +150,15 @@ function Shell() {
     // Une seule tentative par montage : `assets` change après la mise à jour.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
+
+  // Service worker : l'app s'ouvre hors ligne et devient installable.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || import.meta.env.DEV) return;
+    void navigator.serviceWorker.register("/sw.js").catch(() => {
+      // Enregistrement refusé (contexte non sécurisé, navigation privée) :
+      // l'app fonctionne normalement, sans mode hors ligne.
+    });
+  }, []);
 
   useEffect(() => {
     const open = () => setAdding(true);

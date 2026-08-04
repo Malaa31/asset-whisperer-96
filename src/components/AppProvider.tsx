@@ -9,6 +9,7 @@ import {
 import { totals } from "@/lib/calc";
 import { setAmountMasking } from "@/lib/format";
 import { toast } from "sonner";
+import { ensureFxRates } from "@/lib/fx";
 import { REMINDER_SEEN_KEY } from "@/lib/reminder";
 import type { Asset, Profile } from "@/lib/types";
 
@@ -28,11 +29,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [assets, setAssetsState] = useState<Asset[]>([]);
   const [ready, setReady] = useState(false);
+  // Force un recalcul une fois les taux du jour récupérés.
+  const [fxTick, setFxTick] = useState(0);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
 
   useEffect(() => {
     const p = storage.get<Profile>(KEYS.profile);
     const a = storage.get<Asset[]>(KEYS.assets);
+    // Taux de change : rafraîchis en arrière-plan, les derniers connus
+    // servent en attendant (et hors ligne).
+    void ensureFxRates().then(() => setFxTick((t) => t + 1));
     setProfile(p);
     setAmountMasking(Boolean(p?.hideAmounts));
     setAssetsState(a ?? []);
@@ -86,7 +92,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAssetsState([]);
       },
     }),
-    [profile, assets, ready, history, persist],
+    [profile, assets, ready, history, persist, fxTick],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

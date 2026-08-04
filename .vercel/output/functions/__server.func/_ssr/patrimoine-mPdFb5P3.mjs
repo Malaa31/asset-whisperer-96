@@ -3,8 +3,8 @@ import { n as require_react, r as require_jsx_runtime } from "../_libs/react+tan
 import { c as Pie, l as Cell, n as PieChart, u as ResponsiveContainer } from "../_libs/recharts+[...].mjs";
 import { n as toast } from "../_libs/sonner.mjs";
 import { D as ClipboardCheck, k as ChevronRight, m as Plus, t as X, x as Info } from "../_libs/lucide-react.mjs";
-import { A as useApp, C as totals, D as TYPE_LABELS, F as signedEur, M as num, P as rawPct, _ as assetValue, b as lookThrough, g as assetGain, h as allocationByType, j as eur, m as REGION_BUCKETS, s as AssetModal, v as diversificationScore, x as n, y as foreignCurrencyAssets } from "./router-CPppA-3k.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/patrimoine-Ce2EUq4f.js
+import { C as n, I as rawPct, L as signedEur, M as useApp, N as eur, P as num, S as lookThrough, T as totals, _ as assetValue, b as foreignCurrencyAssets, g as assetGain, h as allocationByType, k as TYPE_LABELS, m as REGION_BUCKETS, s as AssetModal, v as canConvert, x as fxSnapshot, y as diversificationScore } from "./router-DlQw_hyS.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/patrimoine-mPdFb5P3.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var KEY_BY_TYPE = {
@@ -319,6 +319,11 @@ function Patrimoine() {
 	const [creating, setCreating] = (0, import_react.useState)(false);
 	const [pointing, setPointing] = (0, import_react.useState)(false);
 	const foreign = (0, import_react.useMemo)(() => foreignCurrencyAssets(assets), [assets]);
+	const fx = fxSnapshot();
+	const converted = (0, import_react.useMemo)(() => assets.filter((a) => {
+		const c = String(a.data["currency"] ?? "EUR").toUpperCase();
+		return c !== "EUR" && canConvert(c);
+	}), [assets]);
 	const t = (0, import_react.useMemo)(() => totals(assets), [assets]);
 	const list = assets.filter((a) => side === "passifs" ? a.type === "credit" : a.type !== "credit");
 	const filtered = filter === "all" ? list : list.filter((a) => a.type === filter);
@@ -366,11 +371,23 @@ function Patrimoine() {
 					foreign.length,
 					" ligne",
 					foreign.length > 1 ? "s" : "",
-					" en devise étrangère",
-					" (",
+					" dans une devise sans taux connu (",
 					[...new Set(foreign.map((a) => String(a.data["currency"])))].join(", "),
-					") : ",
-					"les montants sont additionnés sans conversion. Saisis la valeur en euros pour un patrimoine net juste."
+					") : ces montants sont comptés tels quels. Saisis la valeur en euros pour un patrimoine net juste."
+				]
+			}),
+			converted.length > 0 && fx?.date && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "mt-3 text-[11px] text-muted-foreground",
+				children: [
+					converted.length,
+					" ligne",
+					converted.length > 1 ? "s" : "",
+					" convertie",
+					converted.length > 1 ? "s" : "",
+					" en euros au taux BCE du",
+					" ",
+					new Date(fx.date).toLocaleDateString("fr-FR"),
+					"."
 				]
 			}),
 			side === "actifs" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AllocationCard, { assets }),

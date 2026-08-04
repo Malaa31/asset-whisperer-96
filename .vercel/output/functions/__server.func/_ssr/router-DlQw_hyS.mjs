@@ -142,12 +142,86 @@ var INCOME_KIND_LABELS = {
 	autre: "Autre"
 };
 //#endregion
-//#region node_modules/.nitro/vite/services/ssr/assets/market-Ck3Dr32f.js
+//#region node_modules/.nitro/vite/services/ssr/assets/market-CUAi-O0q.js
+/**
+* Conversion des montants en euros.
+*
+* Principe : les montants sont stockés dans leur devise d'origine et
+* convertis au moment du calcul. L'inverse — convertir à la saisie —
+* réécrirait l'historique à chaque variation de taux.
+*
+* Les taux (BCE, une publication par jour ouvré) sont mis en cache
+* localement pour que l'app reste juste hors ligne.
+*/
+var CACHE_KEY = "patrimoine.fx";
+var MAX_AGE_MS = 432e5;
+var current = null;
+function readCache() {
+	try {
+		const raw = window.localStorage.getItem(CACHE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw);
+		return parsed.rates && typeof parsed.rates === "object" ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+/** Taux connus, éventuellement périmés. */
+function fxSnapshot() {
+	if (!current && typeof window !== "undefined") current = readCache();
+	return current;
+}
+/**
+* Convertit un montant vers l'euro. Sans taux connu pour la devise,
+* le montant est renvoyé tel quel — mieux vaut une valeur non convertie
+* qu'un zéro silencieux, et l'app signale ces lignes par ailleurs.
+*/
+function toEur(amount, currency) {
+	const code = String(currency ?? "EUR").toUpperCase();
+	if (!code || code === "EUR") return amount;
+	const rate = fxSnapshot()?.rates[code];
+	return rate && rate > 0 ? amount / rate : amount;
+}
+/** La devise est-elle convertible avec les taux disponibles ? */
+function canConvert(currency) {
+	const code = String(currency ?? "EUR").toUpperCase();
+	if (!code || code === "EUR") return true;
+	const rate = fxSnapshot()?.rates[code];
+	return Boolean(rate && rate > 0);
+}
+/** Rafraîchit les taux si le cache local a plus de douze heures. */
+async function ensureFxRates() {
+	if (typeof window === "undefined") return;
+	const cached = fxSnapshot();
+	if (cached && Date.now() - new Date(cached.fetchedAt).getTime() < MAX_AGE_MS) return;
+	try {
+		const res = await fetch("/api/public/fx");
+		if (!res.ok) return;
+		const json = await res.json();
+		if (!json.rates || !Object.keys(json.rates).length) return;
+		const snap = {
+			date: json.date,
+			rates: json.rates,
+			fetchedAt: (/* @__PURE__ */ new Date()).toISOString()
+		};
+		current = snap;
+		window.localStorage.setItem(CACHE_KEY, JSON.stringify(snap));
+	} catch {}
+}
 function n(v) {
 	const x = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
 	return Number.isFinite(x) ? x : 0;
 }
+/**
+* Valeur d'une ligne, exprimée en euros.
+* Les montants sont stockés dans leur devise d'origine : la conversion
+* se fait ici, au moment du calcul, avec les derniers taux BCE connus.
+*/
 function assetValue(a) {
+	return toEur(assetValueRaw(a), a.data["currency"]);
+}
+/** Valeur dans la devise de la ligne, sans conversion. */
+function assetValueRaw(a) {
 	const d = a.data;
 	switch (a.type) {
 		case "pea": return n(d["quantity"]) * (n(d["currentPrice"]) || n(d["pru"]));
@@ -229,10 +303,7 @@ function lookThrough(assets) {
 * On les signale plutôt que de laisser l'erreur passer inaperçue.
 */
 function foreignCurrencyAssets(assets) {
-	return assets.filter((a) => {
-		const c = String(a.data["currency"] ?? "EUR").toUpperCase();
-		return c !== "EUR" && c !== "";
-	});
+	return assets.filter((a) => !canConvert(a.data["currency"]));
 }
 /** Valeur positive par classe d'actif (les crédits sont exclus). */
 function allocationByType(assets) {
@@ -309,7 +380,7 @@ async function fetchQuote(tickers) {
 	}
 }
 //#endregion
-//#region node_modules/.nitro/vite/services/ssr/assets/router-CPppA-3k.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-DlQw_hyS.js
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
 var __exportAll = (all, no_symbols) => {
@@ -413,10 +484,12 @@ function AppProvider({ children }) {
 	const [profile, setProfile] = (0, import_react.useState)(null);
 	const [assets, setAssetsState] = (0, import_react.useState)([]);
 	const [ready, setReady] = (0, import_react.useState)(false);
+	const [fxTick, setFxTick] = (0, import_react.useState)(0);
 	const [history, setHistory] = (0, import_react.useState)([]);
 	(0, import_react.useEffect)(() => {
 		const p = storage.get(KEYS.profile);
 		const a = storage.get(KEYS.assets);
+		ensureFxRates().then(() => setFxTick((t) => t + 1));
 		setProfile(p);
 		setAmountMasking(Boolean(p?.hideAmounts));
 		setAssetsState(a ?? []);
@@ -471,7 +544,8 @@ function AppProvider({ children }) {
 		assets,
 		ready,
 		history,
-		persist
+		persist,
+		fxTick
 	]);
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AppContext.Provider, {
 		value,
@@ -2485,7 +2559,7 @@ function ErrorComponent({ error, reset }) {
 		})
 	});
 }
-var Route$5 = createRootRouteWithContext()({
+var Route$6 = createRootRouteWithContext()({
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },
@@ -2509,16 +2583,43 @@ var Route$5 = createRootRouteWithContext()({
 			{
 				name: "twitter:card",
 				content: "summary_large_image"
+			},
+			{
+				name: "apple-mobile-web-app-capable",
+				content: "yes"
+			},
+			{
+				name: "apple-mobile-web-app-status-bar-style",
+				content: "default"
+			},
+			{
+				name: "apple-mobile-web-app-title",
+				content: "Patrimoine"
+			},
+			{
+				name: "mobile-web-app-capable",
+				content: "yes"
 			}
 		],
-		links: [{
-			rel: "stylesheet",
-			href: styles_default
-		}, {
-			rel: "icon",
-			href: "/favicon.ico",
-			type: "image/x-icon"
-		}]
+		links: [
+			{
+				rel: "stylesheet",
+				href: styles_default
+			},
+			{
+				rel: "icon",
+				href: "/favicon.ico",
+				type: "image/x-icon"
+			},
+			{
+				rel: "manifest",
+				href: "/manifest.webmanifest"
+			},
+			{
+				rel: "apple-touch-icon",
+				href: "/apple-touch-icon.png"
+			}
+		]
 	}),
 	shellComponent: RootShell,
 	component: RootComponent,
@@ -2532,7 +2633,7 @@ function RootShell({ children }) {
 	});
 }
 function RootComponent() {
-	const { queryClient } = Route$5.useRouteContext();
+	const { queryClient } = Route$6.useRouteContext();
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueryClientProvider, {
 		client: queryClient,
 		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AppProvider, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Shell, {}) })
@@ -2551,6 +2652,10 @@ function Shell() {
 			cancelled = true;
 		};
 	}, [ready]);
+	(0, import_react.useEffect)(() => {
+		if (!("serviceWorker" in navigator) || false) return;
+		navigator.serviceWorker.register("/sw.js").catch(() => {});
+	}, []);
 	(0, import_react.useEffect)(() => {
 		const open = () => setAdding(true);
 		window.addEventListener(ADD_ASSET_EVENT, open);
@@ -2582,8 +2687,8 @@ function Shell() {
 		]
 	});
 }
-var $$splitComponentImporter$2 = () => import("./routes-wg4v7jsk.mjs");
-var Route$4 = createFileRoute("/")({
+var $$splitComponentImporter$2 = () => import("./routes-WQqzcfU8.mjs");
+var Route$5 = createFileRoute("/")({
 	head: () => ({ meta: [
 		{ title: "Accueil — Patrimoine" },
 		{
@@ -2601,8 +2706,8 @@ var Route$4 = createFileRoute("/")({
 	] }),
 	component: lazyRouteComponent($$splitComponentImporter$2, "component")
 });
-var $$splitComponentImporter$1 = () => import("./patrimoine-Ce2EUq4f.mjs");
-var Route$3 = createFileRoute("/patrimoine")({
+var $$splitComponentImporter$1 = () => import("./patrimoine-mPdFb5P3.mjs");
+var Route$4 = createFileRoute("/patrimoine")({
 	head: () => ({ meta: [
 		{ title: "Patrimoine — Actifs et passifs" },
 		{
@@ -2620,8 +2725,8 @@ var Route$3 = createFileRoute("/patrimoine")({
 	] }),
 	component: lazyRouteComponent($$splitComponentImporter$1, "component")
 });
-var $$splitComponentImporter = () => import("./profil-XsR0nMaR.mjs");
-var Route$2 = createFileRoute("/profil")({
+var $$splitComponentImporter = () => import("./profil-BSqk4q4s.mjs");
+var Route$3 = createFileRoute("/profil")({
 	head: () => ({ meta: [
 		{ title: "Profil — Patrimoine" },
 		{
@@ -2643,6 +2748,78 @@ var Route$2 = createFileRoute("/profil")({
 * Champ d'édition. Les champs numériques gardent la saisie en local :
 * on peut vider le champ ou taper une virgule sans que "0" s'impose.
 */
+/**
+* Garde-fou des routes publiques.
+*
+* Ces routes relaient des services tiers (cours de bourse, taux de change).
+* Sans filtre, n'importe qui peut les utiliser comme proxy gratuit.
+*
+* Un compteur en mémoire ne servirait à rien ici : chaque instance
+* serverless a la sienne et redémarre à froid. La limitation de débit
+* se règle donc au niveau de l'hébergeur (Vercel Firewall : une règle
+* de type 60 requêtes/minute par IP sur /api/public/*).
+*
+* Ce module couvre le complément applicatif : n'accepter que les
+* requêtes issues de l'app elle-même. Contournable par un attaquant
+* déterminé — l'en-tête Origin se falsifie — mais suffisant contre
+* l'usage opportuniste depuis un autre site.
+*/
+/** Domaines autorisés en plus de celui qui sert la requête. */
+var EXTRA_ORIGINS = ["http://localhost:3000", "http://localhost:5173"];
+function isAllowedOrigin(request) {
+	const origin = request.headers.get("origin");
+	if (!origin) return true;
+	try {
+		if (origin === new URL(request.url).origin) return true;
+		if (EXTRA_ORIGINS.includes(origin)) return true;
+		const host = new URL(origin).hostname;
+		return /\.(vercel\.app|lovable\.app)$/.test(host);
+	} catch {
+		return false;
+	}
+}
+function forbidden() {
+	return Response.json({ error: "origin_not_allowed" }, { status: 403 });
+}
+/**
+* Taux de change de référence de la Banque centrale européenne.
+*
+* Source officielle, gratuite, sans clé : un flux XML publié une fois par
+* jour ouvré vers 16 h CET. Les taux sont exprimés pour 1 EUR
+* (par exemple USD = 1,09 signifie 1 € = 1,09 $).
+*/
+var ECB_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
+var Route$2 = createFileRoute("/api/public/fx")({ server: { handlers: { GET: async ({ request }) => {
+	if (!isAllowedOrigin(request)) return forbidden();
+	try {
+		const res = await fetch(ECB_URL, {
+			headers: { Accept: "application/xml" },
+			signal: AbortSignal.timeout(6e3)
+		});
+		if (!res.ok) return Response.json({
+			date: "",
+			rates: {}
+		});
+		const xml = await res.text();
+		const date = xml.match(/time=['"](\d{4}-\d{2}-\d{2})['"]/)?.[1] ?? "";
+		const rates = { EUR: 1 };
+		const re = /currency=['"]([A-Z]{3})['"]\s+rate=['"]([\d.]+)['"]/g;
+		let m;
+		while (m = re.exec(xml)) {
+			const value = Number(m[2]);
+			if (m[1] && Number.isFinite(value) && value > 0) rates[m[1]] = value;
+		}
+		return Response.json({
+			date,
+			rates
+		}, { headers: { "Cache-Control": "public, max-age=3600, s-maxage=21600, stale-while-revalidate=86400" } });
+	} catch {
+		return Response.json({
+			date: "",
+			rates: {}
+		});
+	}
+} } } });
 async function fetchOne(symbol) {
 	try {
 		const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`, {
@@ -2669,6 +2846,7 @@ async function fetchOne(symbol) {
 	}
 }
 var Route$1 = createFileRoute("/api/public/quote")({ server: { handlers: { GET: async ({ request }) => {
+	if (!isAllowedOrigin(request)) return forbidden();
 	const symbols = (new URL(request.url).searchParams.get("symbols") ?? "").split(",").map((s) => s.trim().toUpperCase()).filter((s) => /^[A-Z0-9.^-]{1,20}$/.test(s)).slice(0, 25);
 	const entries = await Promise.all(symbols.map(async (s) => [s, await fetchOne(s)]));
 	const out = {};
@@ -2676,6 +2854,7 @@ var Route$1 = createFileRoute("/api/public/quote")({ server: { handlers: { GET: 
 	return Response.json(out, { headers: { "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=300" } });
 } } } });
 var Route = createFileRoute("/api/public/search-symbols")({ server: { handlers: { GET: async ({ request }) => {
+	if (!isAllowedOrigin(request)) return forbidden();
 	const q = (new URL(request.url).searchParams.get("q") ?? "").trim();
 	if (!q) return Response.json([]);
 	try {
@@ -2699,33 +2878,38 @@ var Route = createFileRoute("/api/public/search-symbols")({ server: { handlers: 
 	}
 } } } });
 var rootRouteChildren = {
-	IndexRoute: Route$4.update({
+	IndexRoute: Route$5.update({
 		id: "/",
 		path: "/",
-		getParentRoute: () => Route$5
+		getParentRoute: () => Route$6
 	}),
-	PatrimoineRoute: Route$3.update({
+	PatrimoineRoute: Route$4.update({
 		id: "/patrimoine",
 		path: "/patrimoine",
-		getParentRoute: () => Route$5
+		getParentRoute: () => Route$6
 	}),
-	ProfilRoute: Route$2.update({
+	ProfilRoute: Route$3.update({
 		id: "/profil",
 		path: "/profil",
-		getParentRoute: () => Route$5
+		getParentRoute: () => Route$6
+	}),
+	ApiPublicFxRoute: Route$2.update({
+		id: "/api/public/fx",
+		path: "/api/public/fx",
+		getParentRoute: () => Route$6
 	}),
 	ApiPublicQuoteRoute: Route$1.update({
 		id: "/api/public/quote",
 		path: "/api/public/quote",
-		getParentRoute: () => Route$5
+		getParentRoute: () => Route$6
 	}),
 	ApiPublicSearchSymbolsRoute: Route.update({
 		id: "/api/public/search-symbols",
 		path: "/api/public/search-symbols",
-		getParentRoute: () => Route$5
+		getParentRoute: () => Route$6
 	})
 };
-var routeTree = Route$5._addFileChildren(rootRouteChildren)._addFileTypes();
+var routeTree = Route$6._addFileChildren(rootRouteChildren)._addFileTypes();
 var router_exports = /* @__PURE__ */ __exportAll({ getRouter: () => getRouter });
 var getRouter = () => {
 	const queryClient = new QueryClient();
@@ -2737,4 +2921,4 @@ var getRouter = () => {
 	});
 };
 //#endregion
-export { useApp as A, totals as C, TYPE_LABELS as D, TARGET_ALLOCATIONS as E, signedEur as F, sinceLabel as I, num as M, pct as N, requestAddAsset as O, rawPct as P, project as S, RISK_LABELS as T, assetValue as _, exportBackup as a, lookThrough as b, contributionDue as c, notificationsGranted as d, notificationsSupported as f, assetGain as g, allocationByType as h, daysSinceBackup as i, eur as j, uid as k, currentMonth as l, REGION_BUCKETS as m, lastPriceUpdate as n, restoreBackup as o, requestNotifications as p, refreshPrices as r, AssetModal as s, router_exports as t, maybeNotify as u, diversificationScore as v, INCOME_KIND_LABELS as w, n as x, foreignCurrencyAssets as y };
+export { requestAddAsset as A, n as C, RISK_LABELS as D, INCOME_KIND_LABELS as E, pct as F, rawPct as I, signedEur as L, useApp as M, eur as N, TARGET_ALLOCATIONS as O, num as P, sinceLabel as R, lookThrough as S, totals as T, assetValue as _, exportBackup as a, foreignCurrencyAssets as b, contributionDue as c, notificationsGranted as d, notificationsSupported as f, assetGain as g, allocationByType as h, daysSinceBackup as i, uid as j, TYPE_LABELS as k, currentMonth as l, REGION_BUCKETS as m, lastPriceUpdate as n, restoreBackup as o, requestNotifications as p, refreshPrices as r, AssetModal as s, router_exports as t, maybeNotify as u, canConvert as v, project as w, fxSnapshot as x, diversificationScore as y };

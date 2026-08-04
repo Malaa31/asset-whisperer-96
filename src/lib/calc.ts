@@ -1,3 +1,4 @@
+import { canConvert, toEur } from "./fx";
 import type { Asset } from "./types";
 
 export function n(v: unknown): number {
@@ -5,7 +6,17 @@ export function n(v: unknown): number {
   return Number.isFinite(x) ? x : 0;
 }
 
+/**
+ * Valeur d'une ligne, exprimée en euros.
+ * Les montants sont stockés dans leur devise d'origine : la conversion
+ * se fait ici, au moment du calcul, avec les derniers taux BCE connus.
+ */
 export function assetValue(a: Asset): number {
+  return toEur(assetValueRaw(a), a.data["currency"]);
+}
+
+/** Valeur dans la devise de la ligne, sans conversion. */
+export function assetValueRaw(a: Asset): number {
   const d = a.data;
   switch (a.type) {
     case "pea":
@@ -99,10 +110,7 @@ export function lookThrough(assets: Asset[]): Record<RegionBucket, number> {
  * On les signale plutôt que de laisser l'erreur passer inaperçue.
  */
 export function foreignCurrencyAssets(assets: Asset[]): Asset[] {
-  return assets.filter((a) => {
-    const c = String(a.data["currency"] ?? "EUR").toUpperCase();
-    return c !== "EUR" && c !== "";
-  });
+  return assets.filter((a) => !canConvert(a.data["currency"]));
 }
 
 // --- Répartition & diversification ---

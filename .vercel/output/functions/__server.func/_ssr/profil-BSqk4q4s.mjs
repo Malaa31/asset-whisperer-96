@@ -1,8 +1,8 @@
 import { i as __toESM } from "../_runtime.mjs";
 import { n as require_react, r as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
 import { T as Download, f as RotateCcw, i as Upload, k as ChevronRight } from "../_libs/lucide-react.mjs";
-import { A as useApp, E as TARGET_ALLOCATIONS, T as RISK_LABELS, a as exportBackup, d as notificationsGranted, f as notificationsSupported, i as daysSinceBackup, j as eur, o as restoreBackup, p as requestNotifications, w as INCOME_KIND_LABELS } from "./router-CPppA-3k.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/profil-XsR0nMaR.js
+import { D as RISK_LABELS, E as INCOME_KIND_LABELS, M as useApp, N as eur, O as TARGET_ALLOCATIONS, a as exportBackup, d as notificationsGranted, f as notificationsSupported, i as daysSinceBackup, o as restoreBackup, p as requestNotifications } from "./router-DlQw_hyS.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/profil-BSqk4q4s.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 function ProfilPage() {

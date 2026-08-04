@@ -3,8 +3,8 @@ import { n as require_react, r as require_jsx_runtime } from "../_libs/react+tan
 import { h as Link } from "../_libs/@tanstack/react-router+[...].mjs";
 import { n as toast } from "../_libs/sonner.mjs";
 import { C as Eye, M as CalendarCheck, P as BellRing, a as TrendingUp, f as RotateCcw, g as Pencil, j as Check, k as ChevronRight, m as Plus, o as Trash2, p as RefreshCw, s as Target, t as X, w as EyeOff, x as Info } from "../_libs/lucide-react.mjs";
-import { A as useApp, C as totals, D as TYPE_LABELS, E as TARGET_ALLOCATIONS, I as sinceLabel, N as pct, O as requestAddAsset, P as rawPct, S as project, T as RISK_LABELS, _ as assetValue, c as contributionDue, h as allocationByType, i as daysSinceBackup, j as eur, k as uid, l as currentMonth, n as lastPriceUpdate, r as refreshPrices, u as maybeNotify } from "./router-CPppA-3k.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-wg4v7jsk.js
+import { A as requestAddAsset, D as RISK_LABELS, F as pct, I as rawPct, M as useApp, N as eur, O as TARGET_ALLOCATIONS, R as sinceLabel, T as totals, _ as assetValue, c as contributionDue, h as allocationByType, i as daysSinceBackup, j as uid, k as TYPE_LABELS, l as currentMonth, n as lastPriceUpdate, r as refreshPrices, u as maybeNotify, w as project } from "./router-DlQw_hyS.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-WQqzcfU8.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var GOAL_KIND_LABELS = {
