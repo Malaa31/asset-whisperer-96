@@ -5,7 +5,7 @@ import { solveTriangle } from "../../components/AmountTriangle";
  * Deux valeurs sur trois suffisent ; la troisième se déduit.
  * Lancer : `npx tsx src/lib/__tests__/triangle.cases.ts`
  */
-const show = (v: Record<string, string>) => `q=${v.quantity||"∅"} p=${v.price||"∅"} t=${v.total||"∅"}`;
+const show = (v: Record<"quantity" | "price" | "total", string>) => `q=${v.quantity||"∅"} p=${v.price||"∅"} t=${v.total||"∅"}`;
 let v = { quantity: "", price: "", total: "" };
 // Cas 1 : quantité puis montant total → prix unitaire déduit
 v = { quantity: "88", price: "", total: "" };
