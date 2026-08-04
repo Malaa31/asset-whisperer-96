@@ -1,18 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, Pencil, RefreshCw, TrendingUp } from "lucide-react";
-import { toast } from "sonner";
+import { CalendarCheck, ChevronRight, Eye, EyeOff, RefreshCw, TrendingUp } from "lucide-react";
 import { useApp } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
-import { RISK_LABELS, TARGET_ALLOCATIONS, type PlanLine as ProfilePlanLine, type RiskProfile } from "@/lib/types";
-import { PlanEditor, defaultLines } from "@/components/PlanEditor";
-import { rawPct } from "@/lib/format";
-import { eur, pct, sinceLabel } from "@/lib/format";
+import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
+import { PlanDetail, type PlanLineView } from "@/components/PlanDetail";
+import { defaultLines } from "@/components/PlanEditor";
 import { fetchQuote } from "@/lib/market";
-import type { Asset } from "@/lib/types";
+import type { Asset, PlanLine as ProfilePlanLine } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -35,13 +33,13 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const { profile, assets, setAssets, saveProfile } = useApp();
   const [refreshing, setRefreshing] = useState(false);
-  const [editingPlan, setEditingPlan] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | undefined>(undefined);
+  const [planOpen, setPlanOpen] = useState(false);
 
   const t = useMemo(() => totals(assets), [assets]);
   const goals = useMemo(() => profileGoals(profile), [profile]);
   const activeGoal = goals.find((g) => g.id === profile?.activeGoalId) ?? goals[0];
-  const goal = { dca: activeGoal?.dca ?? 0 };
+  const dca = activeGoal?.dca ?? 0;
   const backupAge = daysSinceBackup(profile);
   const needsBackup = assets.length > 0 && (backupAge === undefined || backupAge > 30);
 
@@ -76,11 +74,9 @@ function Dashboard() {
     setLastUpdate(stamps[stamps.length - 1]);
   }, [assets]);
 
-  const risk = profile?.riskProfile ?? "equilibre";
-  const custom = Boolean(profile?.planLines?.length);
   const plan = useMemo(
-    () => buildPlan(profile?.planLines?.length ? profile.planLines : defaultLines(risk), goal.dca),
-    [profile?.planLines, risk, goal.dca],
+    () => buildPlan(profile?.planLines?.length ? profile.planLines : defaultLines(profile?.riskProfile ?? "equilibre"), dca),
+    [profile?.planLines, profile?.riskProfile, dca],
   );
 
   return (
@@ -110,14 +106,6 @@ function Dashboard() {
         </div>
       </header>
 
-      {needsBackup && (
-        <div className="mt-4 rounded-2xl border border-amber/40 bg-amber/10 p-4 text-xs text-muted-foreground">
-          {backupAge === undefined
-            ? "Vos données ne vivent que sur cet appareil. Pensez à exporter une sauvegarde depuis l'onglet Profil."
-            : `Dernière sauvegarde il y a ${backupAge} jours. Un export rapide depuis l'onglet Profil vous met à l'abri.`}
-        </div>
-      )}
-
       <section className="card-surface mt-5 p-5">
         <p className="text-xs text-muted-foreground">Patrimoine net</p>
         <div className="mt-1 font-display text-4xl">{eur(t.net)}</div>
@@ -127,88 +115,49 @@ function Dashboard() {
             {eur(t.gain)} ({pct((t.gain / Math.max(1, t.actifs - t.gain)) * 100)})
           </div>
         )}
-        <div className="mt-5 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
-          <Stat label="Actifs" value={eur(t.actifs)} />
-          <Stat label="Dettes" value={eur(t.dettes)} tone="text-destructive" />
-          <Stat label="Lignes" value={String(assets.length)} />
-        </div>
+        <p className="mt-3 border-t border-border pt-3 font-mono text-[11px] text-muted-foreground">
+          Actifs {eur(t.actifs)} · Dettes {eur(t.dettes)}
+        </p>
       </section>
 
       <GoalPanel />
 
-      {goal.dca > 0 && (
-        <section className="mt-4 rounded-2xl border border-primary/35 bg-primary/8 p-5">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Où mettre tes {eur(goal.dca)} ce mois-ci</h2>
-            <button
-              type="button"
-              onClick={() => setEditingPlan(true)}
-              className="tap flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-[11px] font-semibold text-primary"
-            >
-              <Pencil className="size-3" /> Ajuster
-            </button>
-          </div>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {custom
-              ? "Votre répartition personnalisée."
-              : `Plan conseillé — allocation cible du profil ${RISK_LABELS[risk].toLowerCase()} : ${TARGET_ALLOCATIONS[risk].actions} % actions · ${TARGET_ALLOCATIONS[risk].obligations} % fonds € · ${TARGET_ALLOCATIONS[risk].immo} % immo · ${TARGET_ALLOCATIONS[risk].cash} % cash.`}
-          </p>
-          <ul className="mt-4 space-y-3">
-            {plan.map((p) => (
-              <li key={p.label}>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-2">
-                    <span>{p.emoji}</span>
-                    <span className="truncate">{p.label}</span>
-                    <span className="rounded bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                      {p.tag}
-                    </span>
-                  </span>
-                  <span className="font-mono text-sm">{eur(p.amount)}</span>
-                </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-elevated">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${(p.amount / Math.max(1, goal.dca)) * 100}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {dca > 0 && (
+        <button
+          type="button"
+          onClick={() => setPlanOpen(true)}
+          className="tap card-surface mt-4 flex w-full items-center justify-between p-4 text-left"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <CalendarCheck className="size-4 text-primary" />
+            Ton plan du mois
+          </span>
+          <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+            {eur(dca)}
+            <ChevronRight className="size-4" />
+          </span>
+        </button>
       )}
 
-      {editingPlan && profile && (
-        <PlanEditor
-          lines={profile.planLines}
-          risk={risk}
-          onClose={() => setEditingPlan(false)}
-          onSave={(lines) => {
-            const { planLines: _drop, ...rest } = profile;
-            saveProfile(lines ? { ...rest, planLines: lines } : rest);
-            setEditingPlan(false);
-            toast.success(lines ? "Plan personnalisé enregistré" : "Plan conseillé rétabli");
-          }}
+      {needsBackup && (
+        <p className="mt-4 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-muted-foreground">
+          {backupAge === undefined
+            ? "Pense à exporter une sauvegarde (Profil → Vos données)."
+            : `Dernière sauvegarde il y a ${backupAge} j — un export te met à l'abri (Profil).`}
+        </p>
+      )}
+
+      {planOpen && profile && (
+        <PlanDetail
+          plan={plan}
+          dca={dca}
+          profile={profile}
+          saveProfile={saveProfile}
+          onClose={() => setPlanOpen(false)}
         />
       )}
     </div>
   );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div>
-      <div className={`font-mono text-sm ${tone ?? ""}`}>{value}</div>
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-    </div>
-  );
-}
-
-interface PlanLineView {
-  emoji: string;
-  label: string;
-  tag: string;
-  amount: number;
 }
 
 function buildPlan(lines: ProfilePlanLine[], dca: number): PlanLineView[] {

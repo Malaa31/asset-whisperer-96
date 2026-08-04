@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Info } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { allocationByType, diversificationScore } from "@/lib/calc";
 import { eur, rawPct } from "@/lib/format";
@@ -24,6 +25,7 @@ function scoreLabel(v: number): { text: string; cls: string } {
 }
 
 export function AllocationCard({ assets }: { assets: Asset[] }) {
+  const [showInfo, setShowInfo] = useState(false);
   const alloc = useMemo(() => allocationByType(assets), [assets]);
   const score = useMemo(() => diversificationScore(assets), [assets]);
   const total = alloc.reduce((s, x) => s + x.value, 0);
@@ -81,7 +83,17 @@ export function AllocationCard({ assets }: { assets: Asset[] }) {
 
       <div className="mt-4 border-t border-border pt-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Score de diversification</h3>
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            Score de diversification
+            <button
+              type="button"
+              aria-label="Comment ce score est calculé"
+              onClick={() => setShowInfo((v) => !v)}
+              className={`tap flex size-5 items-center justify-center rounded-full ${showInfo ? "bg-primary/12 text-primary" : "bg-elevated text-muted-foreground"}`}
+            >
+              <Info className="size-3" />
+            </button>
+          </h3>
           <div className="flex items-baseline gap-1.5">
             <span className={`font-display text-xl ${label.cls}`}>{score.global}</span>
             <span className="text-[11px] text-muted-foreground">/100 · {label.text}</span>
@@ -91,11 +103,13 @@ export function AllocationCard({ assets }: { assets: Asset[] }) {
           <ScoreBar label="Classes d'actifs" value={score.classes} />
           <ScoreBar label="Zones géographiques (transparence ETF)" value={score.regions} />
         </div>
-        <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
-          Indice de Herfindahl-Hirschman normalisé : 100 = réparti à parts égales
-          entre les classes (et les régions pour la part actions), 0 = tout
-          concentré sur une seule case.
-        </p>
+        {showInfo && (
+          <p className="mt-3 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
+            Indice de Herfindahl-Hirschman normalisé : 100 = réparti à parts
+            égales entre les classes (et les régions pour la part actions,
+            en transparence des ETF), 0 = tout concentré sur une seule case.
+          </p>
+        )}
       </div>
     </section>
   );

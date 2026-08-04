@@ -174,7 +174,7 @@ function AssetRow({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
   const value = assetValue(asset);
   const gain = assetGain(asset);
   const d = asset.data;
-  const tags: string[] = [];
+  let tags: string[] = [];
 
   if (asset.type === "pea") {
     if (d["envelope"]) tags.push(String(d["envelope"]));
@@ -192,6 +192,8 @@ function AssetRow({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
   } else if (asset.type === "immo" && d["loyer"]) {
     tags.push(`loyer ${eur(n(d["loyer"]))}`);
   }
+
+  tags = tags.slice(0, 1);
 
   const rembourse =
     asset.type === "credit" && n(d["capitalInitial"])
