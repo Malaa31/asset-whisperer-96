@@ -9,7 +9,8 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:parse": "tsx src/lib/__tests__/parse.cases.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

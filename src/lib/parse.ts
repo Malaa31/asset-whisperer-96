@@ -28,25 +28,71 @@ export interface ParsedAsset {
 /** Convertit « 22 700,50 », « 22.700,50 », « 22700.5 » en nombre. */
 function toNumber(raw: string): number {
   let s = raw.replace(/[\s\u00a0\u202f]/g, "");
+  // Suffixes courants à l'oral comme à l'écrit : « 320k », « 1,5M ».
+  let mult = 1;
+  const suffix = s.match(/([kKmM])$/);
+  if (suffix) {
+    mult = suffix[1]!.toLowerCase() === "k" ? 1_000 : 1_000_000;
+    s = s.slice(0, -1);
+  }
   const hasComma = s.includes(",");
   const hasDot = s.includes(".");
   if (hasComma && hasDot) s = s.replace(/\./g, "").replace(",", ".");
   else if (hasComma) s = s.replace(",", ".");
   else if (hasDot && /\.\d{3}(\D|$)/.test(s)) s = s.replace(/\./g, "");
   const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? n * mult : 0;
 }
 
 /** Tous les nombres du texte, dans l'ordre, avec leur position. */
 function numbers(text: string): Array<{ value: number; index: number; raw: string }> {
   const out: Array<{ value: number; index: number; raw: string }> = [];
-  const re = /\d[\d\s\u00a0\u202f.]*(?:[.,]\d+)?/g;
+  const re = /\d[\d\s\u00a0\u202f.]*(?:[.,]\d+)?\s*[kKmM]?(?=\s*(?:€|euros?|\b))/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
-    const value = toNumber(m[0]);
+    const value = toNumber(m[0].replace(/\s+([kKmM])$/, "$1"));
     if (value > 0) out.push({ value, index: m.index, raw: m[0] });
   }
   return out;
+}
+
+/**
+ * Premier montant « principal » du texte : on écarte les valeurs déjà
+ * attribuées à un autre champ, les pourcentages, les durées (« sur 20 ans »)
+ * et les quantités (« 20 parts »).
+ */
+function firstAmountExcluding(
+  text: string,
+  nums: Array<{ value: number; index: number; raw: string }>,
+  used: Array<number | undefined>,
+): number | undefined {
+  for (const n of nums) {
+    if (used.some((u) => u !== undefined && Math.abs(u - n.value) < 0.001)) continue;
+    const after = text.slice(n.index + n.raw.length, n.index + n.raw.length + 14).toLowerCase();
+    if (/^\s*(%|pour ?cent)/.test(after)) continue;
+    if (/^\s*(ans?|années?|mois\b|parts?|actions?|titres?|unit[ée]s?)/.test(after)) continue;
+    return n.value;
+  }
+  return undefined;
+}
+
+/**
+ * Nombre précédant un mot-clé (« 40 000 en fonds euros »).
+ * Complète `after`, qui ne couvre que l'ordre inverse.
+ */
+function before(text: string, keys: string[]): number | undefined {
+  for (const k of keys) {
+    const re = new RegExp(
+      `(\\d[\\d\\s\\u00a0\\u202f.]*(?:[.,]\\d+)?\\s*[kKmM]?)\\s*(?:€|euros?)?\\s*(?:en|de|d'|sur|dans|au titre de)?\\s*(?:mon|ma|le|la|les)?\\s*${k}`,
+      "i",
+    );
+    const m = re.exec(text);
+    if (m?.[1]) {
+      const v = toNumber(m[1].replace(/\s+([kKmM])$/, "$1"));
+      if (v > 0) return v;
+    }
+  }
+  return undefined;
 }
 
 /** Nombre suivant un mot-clé (« mensualité de 592 », « PRU 48,48 »). */
@@ -66,9 +112,9 @@ const TYPE_HINTS: Array<{ type: AssetType; words: RegExp }> = [
   { type: "credit", words: /\b(cr[ée]dit|pr[êe]t|emprunt|dette)\b/i },
   { type: "livret", words: /\b(livret|ldds?|lep|pel|cel|codevi)\b/i },
   { type: "av", words: /\b(assurance[- ]?vie|av\b|per\b|contrat|fonds? €|fonds? euros?)\b/i },
-  { type: "immo", words: /\b(appartement|maison|studio|immobilier|bien|scpi|t[1-5]\b|r[ée]sidence|locatif)\b/i },
+  { type: "immo", words: /\b(appartement|appart|appt|maison|studio|villa|terrain|immobilier|bien|scpi|t[1-5]\b|r[ée]sidence|locatif|loft|duplex)\b/i },
   { type: "crypto", words: /\b(bitcoin|btc|ethereum|eth|solana|crypto|satoshi)\b/i },
-  { type: "cash", words: /\b(compte[- ]courant|esp[èe]ces|cash|liquidit[ée]s?)\b/i },
+  { type: "cash", words: /\b(compte[- ](?:courant|en banque|bancaire|ch[èe]ques)|compte en banque|esp[èe]ces|cash|liquidit[ée]s?)\b/i },
   { type: "pea", words: /\b(pea|cto|etf|action|titre|bourse|part[s]?\b|msci|s&p|nasdaq|stoxx)\b/i },
 ];
 
@@ -161,9 +207,13 @@ export function parseAssetText(input: string): ParsedAsset {
       summary.push(`${bare[0]!.value} × ${bare[1]!.value} €`);
     }
   } else if (type === "credit") {
-    const restant = pick(["capital restant", "restant d[uû]", "restant", "capital"]) ?? nums[0]?.value;
     const mensualite = pick(["mensualit[ée]", "par mois", "\\/mois", "[ée]ch[ée]ance"]);
     const taux = pick(["taux"]);
+    const restant =
+      pick(["capital restant", "restant d[uû]", "reste [àa] rembourser", "il reste", "reste", "restant", "capital", "emprunt[ée]? de", "emprunt[ée]?", "pr[êe]t de"]) ??
+      // À défaut, le premier montant qui n'est ni la mensualité, ni le taux,
+      // ni une durée en années.
+      firstAmountExcluding(scrubbed, nums, [mensualite, taux]);
     if (restant !== undefined) {
       data["capitalRestant"] = restant;
       summary.push(`capital restant ${restant} €`);
@@ -174,8 +224,10 @@ export function parseAssetText(input: string): ParsedAsset {
     }
     if (taux !== undefined && taux < 25) data["taux"] = taux;
   } else if (type === "immo") {
-    const valeur = pick(["estim[ée]e?", "valeur", "vaut", "prix"]) ?? nums[0]?.value;
     const loyer = pick(["lou[ée]e?", "loyer", "par mois", "\\/mois"]);
+    const valeur =
+      pick(["estim[ée]e?", "valeur", "vaut", "prix", "[àa] "]) ??
+      firstAmountExcluding(scrubbed, nums, [loyer]);
     if (valeur !== undefined) {
       data["valeurEstimee"] = valeur;
       summary.push(`valeur ${valeur} €`);
@@ -185,8 +237,13 @@ export function parseAssetText(input: string): ParsedAsset {
       summary.push(`loyer ${loyer} €/mois`);
     }
   } else if (type === "av") {
-    const fonds = pick(["fonds? €", "fonds? euros?", "s[ée]curis[ée]"]) ?? nums[0]?.value;
-    const uc = pick(["uc", "unit[ée]s? de compte"]);
+    const fondsKeys = ["fonds? €", "fonds? euros?", "s[ée]curis[ée]"];
+    const ucKeys = ["uc\\b", "unit[ée]s? de compte"];
+    const uc = before(scrubbed, ucKeys) ?? pick(ucKeys);
+    const fonds =
+      before(scrubbed, fondsKeys) ??
+      pick(fondsKeys) ??
+      firstAmountExcluding(scrubbed, nums, [uc]);
     if (fonds !== undefined) {
       data["fondsEurosAmount"] = fonds;
       summary.push(`fonds € ${fonds} €`);
