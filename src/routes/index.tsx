@@ -1,18 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, TrendingUp, Target } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-} from "recharts";
+import { RefreshCw, TrendingUp } from "lucide-react";
 import { useApp } from "@/lib/storage";
-import { project, totals } from "@/lib/calc";
-import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
+import { totals } from "@/lib/calc";
+import { eur, pct, sinceLabel } from "@/lib/format";
+import { GoalPanel } from "@/components/GoalPanel";
 import { fetchQuote } from "@/lib/market";
 import type { Asset } from "@/lib/types";
 
@@ -41,12 +33,6 @@ function Dashboard() {
 
   const t = useMemo(() => totals(assets), [assets]);
   const goal = profile?.goal ?? { amount: 0, horizon: 10, dca: 0 };
-  const progress = goal.amount ? Math.min(100, (t.net / goal.amount) * 100) : 0;
-  const traj = useMemo(
-    () => project(t.net, goal.dca, goal.horizon),
-    [t.net, goal.dca, goal.horizon],
-  );
-  const crossing = traj.find((p) => p.valeur >= goal.amount)?.annee;
 
   const refresh = async () => {
     setRefreshing(true);
@@ -109,27 +95,7 @@ function Dashboard() {
         </div>
       </section>
 
-      <section className="card-surface mt-4 p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Target className="size-4 text-amber" />
-            Objectif
-          </div>
-          <span className="font-mono text-xs text-muted-foreground">{eur(goal.amount)}</span>
-        </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-elevated">
-          <div
-            className="h-full rounded-full bg-amber transition-all duration-700"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {rawPct(progress)} atteint ·{" "}
-          {crossing !== undefined
-            ? `objectif franchi vers l'année ${crossing}`
-            : `projection ${eur(traj[traj.length - 1]?.valeur ?? 0)} dans ${goal.horizon} ans`}
-        </p>
-      </section>
+      <GoalPanel />
 
       {goal.dca > 0 && (
         <section className="mt-4 rounded-2xl border border-primary/35 bg-primary/8 p-5">
@@ -164,56 +130,6 @@ function Dashboard() {
         </section>
       )}
 
-      <section className="card-surface mt-4 p-5">
-        <h2 className="text-sm font-semibold">Trajectoire</h2>
-        <div className="mt-4 h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={traj} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
-              <defs>
-                <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="#262e2f" vertical={false} />
-              <XAxis
-                dataKey="annee"
-                tick={{ fill: "#8a9a97", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "#13191a",
-                  border: "1px solid #262e2f",
-                  borderRadius: 12,
-                  fontSize: 12,
-                }}
-                formatter={(v: number) => eur(v)}
-                labelFormatter={(l) => `Année ${l}`}
-              />
-              <ReferenceLine y={goal.amount} stroke="#e0b54a" strokeDasharray="4 4" />
-              <Area
-                type="monotone"
-                dataKey="valeur"
-                stroke="#10b981"
-                strokeWidth={2}
-                fill="url(#g)"
-                name="Valeur projetée"
-              />
-              <Area
-                type="monotone"
-                dataKey="verse"
-                stroke="#0ea5e9"
-                strokeDasharray="4 4"
-                strokeWidth={1.5}
-                fill="none"
-                name="Capital versé"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
     </div>
   );
 }

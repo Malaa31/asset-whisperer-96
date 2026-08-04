@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { AppContext, KEYS, seedAssets, storage, type AppState } from "@/lib/storage";
+import {
+  AppContext,
+  KEYS,
+  seedAssets,
+  storage,
+  type AppState,
+  type HistoryPoint,
+} from "@/lib/storage";
+import { totals } from "@/lib/calc";
 import type { Asset, Profile } from "@/lib/types";
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [assets, setAssetsState] = useState<Asset[]>([]);
   const [ready, setReady] = useState(false);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
 
   useEffect(() => {
     const p = storage.get<Profile>(KEYS.profile);
@@ -19,6 +28,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setProfile(p);
     setAssetsState(a ?? []);
+    setHistory(storage.get<HistoryPoint[]>(KEYS.history) ?? []);
     setReady(true);
   }, []);
 
@@ -27,11 +37,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     storage.set(KEYS.assets, next);
   }, []);
 
+  // Enregistre un point d'historique par jour pour la courbe "réel".
+  useEffect(() => {
+    if (!ready) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const net = totals(assets).net;
+    setHistory((prev) => {
+      const rest = prev.filter((h) => h.date.slice(0, 10) !== today);
+      const next = [...rest, { date: new Date().toISOString(), value: net }].slice(-60);
+      storage.set(KEYS.history, next);
+      return next;
+    });
+  }, [assets, ready]);
+
   const value = useMemo<AppState>(
     () => ({
       profile,
       assets,
       ready,
+      history,
       saveProfile: (p) => {
         setProfile(p);
         storage.set(KEYS.profile, p);
@@ -46,11 +70,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         storage.remove(KEYS.profile);
         storage.remove(KEYS.assets);
         storage.remove(KEYS.seeded);
+        storage.remove(KEYS.history);
+        setHistory([]);
         setProfile(null);
         setAssetsState([]);
       },
     }),
-    [profile, assets, ready, persist],
+    [profile, assets, ready, history, persist],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

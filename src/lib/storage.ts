@@ -4,6 +4,7 @@ import type { Asset, Profile } from "./types";
 const KEY_PROFILE = "patrimoine.profile";
 const KEY_ASSETS = "patrimoine.assets";
 const KEY_SEED = "patrimoine.seeded";
+const KEY_HISTORY = "patrimoine.history";
 
 export const storage = {
   get<T>(key: string): T | null {
@@ -25,7 +26,17 @@ export const storage = {
   },
 };
 
-export const KEYS = { profile: KEY_PROFILE, assets: KEY_ASSETS, seeded: KEY_SEED };
+export const KEYS = {
+  profile: KEY_PROFILE,
+  assets: KEY_ASSETS,
+  seeded: KEY_SEED,
+  history: KEY_HISTORY,
+};
+
+export interface HistoryPoint {
+  date: string;
+  value: number;
+}
 
 export function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -93,6 +104,7 @@ export interface AppState {
   upsertAsset: (a: Asset) => void;
   removeAsset: (id: string) => void;
   setAssets: (a: Asset[]) => void;
+  history: HistoryPoint[];
   reset: () => void;
 }
 

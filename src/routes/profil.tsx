@@ -1,9 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Eye, EyeOff, RotateCcw } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Eye, EyeOff, Plus, RotateCcw } from "lucide-react";
 import { useApp } from "@/lib/storage";
-import { RISK_LABELS, TARGET_ALLOCATIONS, type Profile, type RiskProfile } from "@/lib/types";
-import { eur } from "@/lib/format";
+import {
+  RISK_LABELS,
+  TARGET_ALLOCATIONS,
+  type Goal,
+  type Profile,
+  type RiskProfile,
+} from "@/lib/types";
+import { eur, rawPct } from "@/lib/format";
+import { GOAL_KIND_LABELS, goalProgress, profileGoals } from "@/lib/goals";
+import { GoalEditor } from "@/components/GoalEditor";
 
 export const Route = createFileRoute("/profil")({
   head: () => ({
@@ -24,8 +32,19 @@ export const Route = createFileRoute("/profil")({
 });
 
 function ProfilPage() {
-  const { profile, saveProfile, reset } = useApp();
+  const { profile, assets, saveProfile, reset } = useApp();
   const [form, setForm] = useState<Profile>(profile!);
+  const [editing, setEditing] = useState<Goal | null | "new">(null);
+  const goals = useMemo(() => profileGoals(form), [form]);
+
+  const persistGoals = (next: Goal[]) => {
+    update({
+      goals: next,
+      ...(next[0]
+        ? { goal: { amount: next[0].amount, horizon: next[0].horizon, dca: next[0].dca } }
+        : {}),
+    });
+  };
 
   const update = (patch: Partial<Profile>) => {
     const next = { ...form, ...patch };
@@ -82,26 +101,52 @@ function ProfilPage() {
         </div>
       </section>
 
-      <section className="card-surface mt-4 space-y-3 p-5">
-        <h2 className="text-sm font-semibold">Objectif — {eur(form.goal.amount)}</h2>
-        <Row
-          label="Montant cible (€)"
-          numeric
-          value={String(form.goal.amount)}
-          onChange={(v) => update({ goal: { ...form.goal, amount: Number(v) || 0 } })}
-        />
-        <Row
-          label="Horizon (années)"
-          numeric
-          value={String(form.goal.horizon)}
-          onChange={(v) => update({ goal: { ...form.goal, horizon: Number(v) || 1 } })}
-        />
-        <Row
-          label="Versement mensuel (€)"
-          numeric
-          value={String(form.goal.dca)}
-          onChange={(v) => update({ goal: { ...form.goal, dca: Number(v) || 0 } })}
-        />
+      <section className="card-surface mt-4 p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Mes objectifs</h2>
+          <button
+            type="button"
+            onClick={() => setEditing("new")}
+            className="tap flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground"
+          >
+            <Plus className="size-3" /> Ajouter
+          </button>
+        </div>
+        <ul className="mt-3 space-y-2">
+          {goals.map((g) => {
+            const p = goalProgress(assets, g);
+            return (
+              <li key={g.id}>
+                <button
+                  type="button"
+                  onClick={() => setEditing(g)}
+                  className="tap w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-left"
+                >
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="truncate">{g.label}</span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {eur(g.amount)}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>
+                      {GOAL_KIND_LABELS[g.kind]} · {g.horizon} ans · {eur(g.dca)}/mois
+                    </span>
+                    <span>{rawPct(p)}</span>
+                  </div>
+                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-card">
+                    <div className="h-full rounded-full bg-amber" style={{ width: `${p}%` }} />
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+          {!goals.length && (
+            <p className="text-sm text-muted-foreground">
+              Aucun objectif. Ajoute un objectif de patrimoine, d'enveloppe ou d'achat immobilier.
+            </p>
+          )}
+        </ul>
       </section>
 
       <button
@@ -117,6 +162,26 @@ function ProfilPage() {
           {form.hideAmounts ? "activé" : "désactivé"}
         </span>
       </button>
+
+      {editing !== null && (
+        <GoalEditor
+          goal={editing === "new" ? null : editing}
+          onClose={() => setEditing(null)}
+          onSave={(g) => {
+            const exists = goals.some((x) => x.id === g.id);
+            persistGoals(exists ? goals.map((x) => (x.id === g.id ? g : x)) : [...goals, g]);
+            setEditing(null);
+          }}
+          {...(editing !== "new"
+            ? {
+                onDelete: (id: string) => {
+                  persistGoals(goals.filter((x) => x.id !== id));
+                  setEditing(null);
+                },
+              }
+            : {})}
+        />
+      )}
 
       <button
         type="button"
