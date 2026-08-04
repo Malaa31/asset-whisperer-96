@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { AssetModal } from "@/components/AssetModal";
 import { Onboarding } from "@/components/Onboarding";
 import { ADD_ASSET_EVENT, useApp } from "@/lib/storage";
+import { pricesAreStale, refreshPrices } from "@/lib/prices";
 
 function NotFoundComponent() {
   return (
@@ -122,11 +123,27 @@ function RootComponent() {
 }
 
 function Shell() {
-  const { profile, ready, saveProfile, upsertAsset } = useApp();
+  const { profile, ready, saveProfile, upsertAsset, assets, setAssets } = useApp();
   // Ouvre le modal d'ajout si l'onboarding s'est terminé sur « Ajouter ma première ligne ».
   const [adding, setAdding] = useState(false);
 
   // Ouvre le modal si l'onboarding s'est terminé sur « Ajouter ma première ligne ».
+  // Actualisation automatique des cours à l'ouverture, si les derniers
+  // relevés datent de plus de quatre heures. Silencieuse : l'utilisateur
+  // garde le bouton pour forcer un rafraîchissement.
+  useEffect(() => {
+    if (!ready || !pricesAreStale(assets)) return;
+    let cancelled = false;
+    void refreshPrices(assets).then((next) => {
+      if (next && !cancelled) setAssets(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Une seule tentative par montage : `assets` change après la mise à jour.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
   useEffect(() => {
     const open = () => setAdding(true);
     window.addEventListener(ADD_ASSET_EVENT, open);

@@ -10,9 +10,9 @@ import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
 import { AssetSummary } from "@/components/AssetSummary";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
+import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
 import { PlanDetail, type PlanLineView } from "@/components/PlanDetail";
 import { defaultLines } from "@/components/PlanEditor";
-import { fetchQuote } from "@/lib/market";
 import type { Asset, PlanLine as ProfilePlanLine } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
@@ -50,19 +50,10 @@ function Dashboard() {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      const priced = assets.filter((a) => a.type === "pea" || a.type === "crypto");
-      const quotes = await fetchQuote(priced.map((a) => String(a.data["ticker"] ?? "")));
-      if (Object.keys(quotes).length) {
-        const stamp = new Date().toISOString();
-        const next: Asset[] = assets.map((a) => {
-          const ticker = String(a.data["ticker"] ?? "");
-          const q = quotes[ticker];
-          if (!q) return a;
-          const key = a.type === "crypto" ? "prixUnitaire" : "currentPrice";
-          return { ...a, data: { ...a.data, [key]: q.price, lastPriceUpdate: stamp }, updatedAt: stamp };
-        });
+      const next = await refreshPrices(assets);
+      if (next) {
         setAssets(next);
-        setLastUpdate(stamp);
+        setLastUpdate(lastPriceUpdate(next));
       }
     } finally {
       setRefreshing(false);

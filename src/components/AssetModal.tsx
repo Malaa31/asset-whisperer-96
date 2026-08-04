@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Trash2, RefreshCw, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Landmark,
@@ -14,6 +14,7 @@ import type { Asset, AssetType } from "@/lib/types";
 import { TYPE_LABELS } from "@/lib/types";
 import { uid } from "@/lib/storage";
 import { NaturalInput } from "./NaturalInput";
+import { AmountTriangle, solveTriangle, type TriangleKey } from "./AmountTriangle";
 import { SymbolSearch, type SelectedSymbol } from "./SymbolSearch";
 import { fetchQuote } from "@/lib/market";
 
@@ -104,6 +105,12 @@ const ESSENTIAL: Record<AssetType, string[]> = {
 };
 
 /** Métadonnées sans champ dédié, conservées telles quelles à l'enregistrement. */
+/** Types dont la saisie passe par le trio quantité · prix · total. */
+const TRIANGLE_KEYS: Record<string, string[] | undefined> = {
+  pea: ["quantity", "currentPrice"],
+  crypto: ["quantity", "prixUnitaire"],
+};
+
 const PRESERVED = ["envelope", "region", "sector", "currency", "isin", "lastPriceUpdate"];
 
 const TYPE_CARDS: Array<{ type: AssetType; Icon: typeof Home; color: string }> = [
@@ -136,6 +143,38 @@ export function AssetModal({
     return init;
   });
   const [fetching, setFetching] = useState(false);
+  const [marketPrice, setMarketPrice] = useState<number | undefined>(undefined);
+  const priceField = type === "crypto" ? "prixUnitaire" : "currentPrice";
+  const [totalDraft, setTotalDraft] = useState(() => {
+    const q = Number((asset?.data["quantity"] ?? 0) as number);
+    const p = Number((asset?.data[asset?.type === "crypto" ? "prixUnitaire" : "currentPrice"] ?? 0) as number);
+    return q > 0 && p > 0 ? String(Math.round(q * p * 100) / 100) : "";
+  });
+  /** Ordre de saisie du trio, pour savoir quelle valeur recalculer. */
+  const triangleOrder = useRef<TriangleKey[]>([]);
+
+  /** Va chercher le cours du marché pour le ticker saisi. */
+  const loadPrice = async () => {
+    const ticker = (data["ticker"] ?? "").trim().toUpperCase();
+    if (!ticker) return;
+    setFetching(true);
+    try {
+      const quotes = await fetchQuote([ticker]);
+      const q = quotes[ticker];
+      if (q?.price) setMarketPrice(q.price);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  // Cours proposé automatiquement à l'ouverture d'une ligne cotée.
+  useEffect(() => {
+    if (!TRIANGLE_KEYS[type ?? "autre"]) return;
+    const ticker = (data["ticker"] ?? "").trim();
+    if (!ticker || marketPrice !== undefined) return;
+    void loadPrice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, data["ticker"]]);
   // Déplié d'office en modification si un champ avancé est déjà renseigné.
   const [showMore, setShowMore] = useState(() =>
     Boolean(
@@ -295,10 +334,35 @@ export function AssetModal({
         {type && (mode === "manual" || !searchable) && (
           <div className="space-y-3">
             {FIELDS[type]
-              .filter((f) => ESSENTIAL[type].includes(f.key))
+              .filter((f) => ESSENTIAL[type].includes(f.key) && !TRIANGLE_KEYS[type]?.includes(f.key))
               .map((f) => (
                 <FieldInput key={f.key} f={f} data={data} setData={setData} />
               ))}
+
+            {TRIANGLE_KEYS[type] && (
+              <AmountTriangle
+                values={{
+                  quantity: data["quantity"] ?? "",
+                  price: data[priceField] ?? "",
+                  total: totalDraft,
+                }}
+                priceLabel={type === "crypto" ? "Prix unitaire (€)" : "Cours actuel (€)"}
+                quantityLabel={type === "crypto" ? "Quantité" : "Nombre de parts"}
+                marketPrice={marketPrice}
+                onFetchPrice={data["ticker"] ? () => void loadPrice() : undefined}
+                fetching={fetching}
+                onChange={(next, edited) => {
+                  const solved = solveTriangle(next, edited, triangleOrder.current);
+                  if (!triangleOrder.current.includes(edited)) triangleOrder.current.push(edited);
+                  setData((d) => ({
+                    ...d,
+                    quantity: solved.quantity,
+                    [priceField]: solved.price,
+                  }));
+                  setTotalDraft(solved.total);
+                }}
+              />
+            )}
 
             {FIELDS[type].some((f) => !ESSENTIAL[type].includes(f.key)) && (
               <button
