@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Sparkles, Search, ShieldCheck, Calculator } from "lucide-react";
+import { useRef, useState } from "react";
+import { Sparkles, Search, ShieldCheck, Calculator, Upload } from "lucide-react";
 import { RISK_LABELS, TARGET_ALLOCATIONS, type Profile, type RiskProfile } from "@/lib/types";
 import { eur } from "@/lib/format";
+import { restoreBackup } from "@/lib/backup";
 
 const FEATURES = [
   { Icon: Sparkles, title: "Multi-actifs", text: "Bourse, AV, immo, crypto, crédits" },
@@ -12,6 +13,8 @@ const FEATURES = [
 
 export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
   const [step, setStep] = useState(0);
+  const [restoreError, setRestoreError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [age, setAge] = useState("35");
   const [profession, setProfession] = useState("");
@@ -128,6 +131,34 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
       >
         {step === 3 ? "Entrer dans l'app" : "Continuer"}
       </button>
+
+      {step === 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="tap mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-semibold text-muted-foreground"
+          >
+            <Upload className="size-4" /> Restaurer une sauvegarde
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              restoreBackup(f).catch((err) =>
+                setRestoreError(err instanceof Error ? err.message : "Import impossible."),
+              );
+            }}
+          />
+          {restoreError && (
+            <p className="mt-2 text-center text-[11px] text-destructive">{restoreError}</p>
+          )}
+        </>
+      )}
     </div>
   );
 }

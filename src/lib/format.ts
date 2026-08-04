@@ -1,6 +1,14 @@
 const nbsp = "\u202f";
 
+// Mode discret : masque tous les montants de l'app.
+// Synchronisé avec profile.hideAmounts par l'AppProvider.
+let masked = false;
+export function setAmountMasking(on: boolean) {
+  masked = on;
+}
+
 export function eur(value: number, decimals = 0): string {
+  if (masked) return `\u2022\u2022\u2022\u2022\u2022${nbsp}\u20ac`;
   const rounded = Number.isFinite(value) ? value : 0;
   const s = Math.abs(rounded)
     .toFixed(decimals)
@@ -10,6 +18,7 @@ export function eur(value: number, decimals = 0): string {
 }
 
 export function signedEur(value: number): string {
+  if (masked) return eur(0);
   return `${value >= 0 ? "+" : "−"}${eur(Math.abs(value))}`;
 }
 

@@ -3,6 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, TrendingUp } from "lucide-react";
 import { useApp } from "@/lib/storage";
 import { totals } from "@/lib/calc";
+import { profileGoals } from "@/lib/goals";
+import { daysSinceBackup } from "@/lib/backup";
+import { TARGET_ALLOCATIONS, type RiskProfile } from "@/lib/types";
 import { eur, pct, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
 import { fetchQuote } from "@/lib/market";
@@ -32,23 +35,32 @@ function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState<string | undefined>(undefined);
 
   const t = useMemo(() => totals(assets), [assets]);
-  const goal = profile?.goal ?? { amount: 0, horizon: 10, dca: 0 };
+  const goals = useMemo(() => profileGoals(profile), [profile]);
+  const activeGoal = goals.find((g) => g.id === profile?.activeGoalId) ?? goals[0];
+  const goal = { dca: activeGoal?.dca ?? 0 };
+  const backupAge = daysSinceBackup(profile);
+  const needsBackup = assets.length > 0 && (backupAge === undefined || backupAge > 30);
 
   const refresh = async () => {
     setRefreshing(true);
-    const priced = assets.filter((a) => a.type === "pea" || a.type === "crypto");
-    const quotes = await fetchQuote(priced.map((a) => String(a.data["ticker"] ?? "")));
-    const stamp = new Date().toISOString();
-    const next: Asset[] = assets.map((a) => {
-      const ticker = String(a.data["ticker"] ?? "");
-      const q = quotes[ticker];
-      if (!q) return a;
-      const key = a.type === "crypto" ? "prixUnitaire" : "currentPrice";
-      return { ...a, data: { ...a.data, [key]: q.price, lastPriceUpdate: stamp }, updatedAt: stamp };
-    });
-    setAssets(next);
-    setLastUpdate(stamp);
-    setRefreshing(false);
+    try {
+      const priced = assets.filter((a) => a.type === "pea" || a.type === "crypto");
+      const quotes = await fetchQuote(priced.map((a) => String(a.data["ticker"] ?? "")));
+      if (Object.keys(quotes).length) {
+        const stamp = new Date().toISOString();
+        const next: Asset[] = assets.map((a) => {
+          const ticker = String(a.data["ticker"] ?? "");
+          const q = quotes[ticker];
+          if (!q) return a;
+          const key = a.type === "crypto" ? "prixUnitaire" : "currentPrice";
+          return { ...a, data: { ...a.data, [key]: q.price, lastPriceUpdate: stamp }, updatedAt: stamp };
+        });
+        setAssets(next);
+        setLastUpdate(stamp);
+      }
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -60,7 +72,10 @@ function Dashboard() {
     setLastUpdate(stamps[stamps.length - 1]);
   }, [assets]);
 
-  const plan = useMemo(() => buildPlan(assets, goal.dca), [assets, goal.dca]);
+  const plan = useMemo(
+    () => buildPlan(profile?.riskProfile ?? "equilibre", goal.dca),
+    [profile?.riskProfile, goal.dca],
+  );
 
   return (
     <div className="fade-up px-4 pt-6">
@@ -78,6 +93,14 @@ function Dashboard() {
           {sinceLabel(lastUpdate)}
         </button>
       </header>
+
+      {needsBackup && (
+        <div className="mt-4 rounded-2xl border border-amber/40 bg-amber/10 p-4 text-xs text-muted-foreground">
+          {backupAge === undefined
+            ? "Vos données ne vivent que sur cet appareil. Pensez à exporter une sauvegarde depuis l'onglet Profil."
+            : `Dernière sauvegarde il y a ${backupAge} jours. Un export rapide depuis l'onglet Profil vous met à l'abri.`}
+        </div>
+      )}
 
       <section className="card-surface mt-5 p-5">
         <p className="text-xs text-muted-foreground">Patrimoine net</p>
@@ -150,20 +173,20 @@ interface PlanLine {
   amount: number;
 }
 
-function buildPlan(assets: Asset[], dca: number): PlanLine[] {
-  const hasWorld = assets.some((a) => /world|monde/i.test(String(a.data["name"] ?? "")));
+function buildPlan(risk: RiskProfile, dca: number): PlanLine[] {
+  // Répartition alignée sur l'allocation cible du profil de risque :
+  // actions (Monde / Europe / small caps), fonds €, immo papier, cash.
+  const a = TARGET_ALLOCATIONS[risk] ?? TARGET_ALLOCATIONS.equilibre;
+  const actions = a.actions;
   const weights: Array<[PlanLine, number]> = [
-    [{ emoji: "🌍", label: "ETF Monde", tag: "CŒUR", amount: 0 }, 40],
-    [
-      { emoji: "🇺🇸", label: "S&P 500", tag: hasWorld ? "STOP" : "+", amount: 0 },
-      hasWorld ? 0 : 15,
-    ],
-    [{ emoji: "🇪🇺", label: "Stoxx Europe 600", tag: "+", amount: 0 }, 20],
-    [{ emoji: "🛢️", label: "Commodities (CMSE)", tag: "NEW", amount: 0 }, 12],
-    [{ emoji: "🏦", label: "Fonds € (AV)", tag: "NEW", amount: 0 }, 18],
-    [{ emoji: "🐣", label: "Small caps (Russell 2000)", tag: "NEW", amount: 0 }, 10],
+    [{ emoji: "🌍", label: "ETF Monde", tag: "CŒUR", amount: 0 }, actions * 0.6],
+    [{ emoji: "🇪🇺", label: "Stoxx Europe 600", tag: "+", amount: 0 }, actions * 0.25],
+    [{ emoji: "🐣", label: "Small caps (Russell 2000)", tag: "+", amount: 0 }, actions * 0.15],
+    [{ emoji: "🏦", label: "Fonds € (AV)", tag: "SÉCU", amount: 0 }, a.obligations],
+    [{ emoji: "🏠", label: "SCPI / immo papier", tag: "+", amount: 0 }, a.immo],
+    [{ emoji: "💧", label: "Livret (précaution)", tag: "SÉCU", amount: 0 }, a.cash],
   ];
   const active = weights.filter(([, w]) => w > 0);
-  const total = active.reduce((s, [, w]) => s + w, 0);
+  const total = active.reduce((sum, [, w]) => sum + w, 0);
   return active.map(([line, w]) => ({ ...line, amount: Math.round((dca * w) / total) }));
 }

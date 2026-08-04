@@ -29,7 +29,7 @@ export function GoalPanel() {
       activeGoalId: active ?? (next.some((g) => g.id === activeId) ? activeId : next[0]?.id) ?? "",
       goal: next[0]
         ? { amount: next[0].amount, horizon: next[0].horizon, dca: next[0].dca }
-        : profile.goal,
+        : { amount: 0, horizon: 10, dca: 0 },
     });
   };
 
@@ -106,7 +106,9 @@ export function GoalPanel() {
             <ChartLegend />
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            {cross !== undefined
+            {cross !== undefined && cross <= 0
+              ? "Objectif déjà atteint. Bravo — place au suivant ?"
+              : cross !== undefined
               ? `Objectif atteint dans ~${cross} an${cross > 1 ? "s" : ""} avec ${eur(goal.dca)}/mois.`
               : `Projection ${eur(traj[traj.length - 1]?.projection ?? 0)} dans ${goal.horizon} ans — il manque ${eur(Math.max(0, goal.amount - (traj[traj.length - 1]?.projection ?? 0)))}.`}
           </p>

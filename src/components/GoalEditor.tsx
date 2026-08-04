@@ -20,14 +20,19 @@ export function GoalEditor({
   const set = (patch: Partial<Goal>) => setForm((f) => ({ ...f, ...patch }));
 
   const pickKind = (k: GoalKind) => {
-    const preset = newGoal(k);
-    setForm((f) => ({
-      ...preset,
-      id: f.id,
-      label: preset.label,
-      dca: f.dca,
-      horizon: f.horizon,
-    }));
+    // Conserve la saisie en cours ; seul le libellé est remplacé,
+    // et uniquement s'il correspondait encore à un preset.
+    setForm((f) => {
+      const isPresetLabel = KINDS.some((kk) => newGoal(kk).label === f.label);
+      const preset = newGoal(k);
+      const { scope: _drop, ...rest } = f;
+      return {
+        ...rest,
+        kind: k,
+        label: isPresetLabel ? preset.label : f.label,
+        ...(k === "enveloppe" ? { scope: f.scope ?? ("pea" as const) } : {}),
+      };
+    });
   };
 
   return (

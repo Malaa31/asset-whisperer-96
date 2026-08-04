@@ -34,6 +34,8 @@ export interface Profile {
   goals?: Goal[];
   activeGoalId?: string;
   hideAmounts?: boolean;
+  /** Date ISO du dernier export de sauvegarde. */
+  lastBackup?: string;
 }
 
 

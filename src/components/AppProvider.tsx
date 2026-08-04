@@ -8,6 +8,7 @@ import {
   type HistoryPoint,
 } from "@/lib/storage";
 import { totals } from "@/lib/calc";
+import { setAmountMasking } from "@/lib/format";
 import type { Asset, Profile } from "@/lib/types";
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -27,6 +28,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }
     setProfile(p);
+    setAmountMasking(Boolean(p?.hideAmounts));
     setAssetsState(a ?? []);
     setHistory(storage.get<HistoryPoint[]>(KEYS.history) ?? []);
     setReady(true);
@@ -58,6 +60,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       history,
       saveProfile: (p) => {
         setProfile(p);
+        setAmountMasking(Boolean(p.hideAmounts));
         storage.set(KEYS.profile, p);
       },
       upsertAsset: (a) => {
@@ -67,6 +70,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       removeAsset: (id) => persist(assets.filter((x) => x.id !== id)),
       setAssets: persist,
       reset: () => {
+        setAmountMasking(false);
         storage.remove(KEYS.profile);
         storage.remove(KEYS.assets);
         storage.remove(KEYS.seeded);

@@ -122,7 +122,9 @@ export function goalProgress(assets: Asset[], goal: Goal): number {
 /** Objectifs du profil, avec migration depuis l'ancien champ `goal`. */
 export function profileGoals(profile: { goal?: { amount: number; horizon: number; dca: number }; goals?: Goal[] } | null): Goal[] {
   if (!profile) return [];
-  if (profile.goals && profile.goals.length) return profile.goals;
+  // Un tableau `goals` défini (même vide) fait foi : la migration legacy
+  // ne s'applique qu'aux anciens profils sans ce champ.
+  if (profile.goals) return profile.goals;
   const legacy = profile.goal;
   if (!legacy) return [];
   return [
