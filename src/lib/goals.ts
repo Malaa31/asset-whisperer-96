@@ -106,3 +106,22 @@ export function goalProgress(assets: Asset[], goal: Goal): number {
   if (!goal.amount) return 0;
   return Math.max(0, Math.min(100, (goalCurrent(assets, goal) / goal.amount) * 100));
 }
+
+/** Objectifs du profil, avec migration depuis l'ancien champ `goal`. */
+export function profileGoals(profile: { goal?: { amount: number; horizon: number; dca: number }; goals?: Goal[] } | null): Goal[] {
+  if (!profile) return [];
+  if (profile.goals && profile.goals.length) return profile.goals;
+  const legacy = profile.goal;
+  if (!legacy) return [];
+  return [
+    {
+      id: "legacy",
+      kind: "patrimoine",
+      label: "Patrimoine cible",
+      amount: legacy.amount,
+      horizon: legacy.horizon,
+      dca: legacy.dca,
+      rate: 7.5,
+    },
+  ];
+}
