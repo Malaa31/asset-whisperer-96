@@ -10,6 +10,20 @@ export type AssetType =
   | "autre"
   | "credit";
 
+export type GoalKind = "patrimoine" | "enveloppe" | "immo" | "libre";
+
+export interface Goal {
+  id: string;
+  kind: GoalKind;
+  label: string;
+  amount: number;
+  horizon: number;
+  dca: number;
+  rate?: number;
+  /** Type d'actif ciblé pour un objectif d'enveloppe (ex. "pea"). */
+  scope?: AssetType;
+}
+
 export interface Profile {
   name: string;
   age: number;
@@ -17,8 +31,11 @@ export interface Profile {
   incomeMonthly: number;
   riskProfile: RiskProfile;
   goal: { amount: number; horizon: number; dca: number };
+  goals?: Goal[];
+  activeGoalId?: string;
   hideAmounts?: boolean;
 }
+
 
 export interface Asset {
   id: string;
