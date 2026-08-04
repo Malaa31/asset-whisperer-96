@@ -52,7 +52,6 @@ export async function restoreBackup(file: File): Promise<void> {
   else storage.remove(KEYS.profile);
   storage.set(KEYS.assets, parsed.assets);
   storage.set(KEYS.history, Array.isArray(parsed.history) ? parsed.history : []);
-  storage.set(KEYS.seeded, true); // ne pas re-injecter les données de démo
   window.location.reload();
 }
 

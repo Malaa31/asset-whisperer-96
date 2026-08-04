@@ -17,7 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { AssetModal } from "@/components/AssetModal";
 import { Onboarding } from "@/components/Onboarding";
-import { useApp } from "@/lib/storage";
+import { ADD_ASSET_EVENT, useApp } from "@/lib/storage";
 
 function NotFoundComponent() {
   return (
@@ -127,6 +127,12 @@ function Shell() {
   const [adding, setAdding] = useState(false);
 
   // Ouvre le modal si l'onboarding s'est terminé sur « Ajouter ma première ligne ».
+  useEffect(() => {
+    const open = () => setAdding(true);
+    window.addEventListener(ADD_ASSET_EVENT, open);
+    return () => window.removeEventListener(ADD_ASSET_EVENT, open);
+  }, []);
+
   useEffect(() => {
     if (window.sessionStorage.getItem("patrimoine.openAdd") === "1") {
       window.sessionStorage.removeItem("patrimoine.openAdd");

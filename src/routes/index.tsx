@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, RefreshCw, TrendingUp } from "lucide-react";
+import { BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, Plus, RefreshCw, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
-import { useApp } from "@/lib/storage";
+import { requestAddAsset, useApp } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
@@ -119,6 +119,22 @@ function Dashboard() {
         </div>
       </header>
 
+      {assets.length === 0 ? (
+        <section className="card-surface mt-6 p-6 text-center">
+          <p className="font-display text-xl">Ton patrimoine commence ici.</p>
+          <p className="mx-auto mt-2 max-w-[17rem] text-[13px] leading-relaxed text-muted-foreground">
+            Ajoute une première ligne — un ETF, un livret, ton bien — et tout se
+            calcule : allocation, projection, plan mensuel.
+          </p>
+          <button
+            type="button"
+            onClick={requestAddAsset}
+            className="tap mt-5 inline-flex h-12 items-center gap-2 rounded-2xl bg-primary px-6 text-sm font-bold text-primary-foreground"
+          >
+            <Plus className="size-4" /> Ajouter une ligne
+          </button>
+        </section>
+      ) : (
       <section className="card-surface mt-6 p-6">
         <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Patrimoine net
@@ -138,8 +154,9 @@ function Dashboard() {
           Dettes <span className="font-mono text-destructive">{eur(t.dettes)}</span>
         </p>
       </section>
+      )}
 
-      <AssetSummary assets={assets} />
+      {assets.length > 0 && <AssetSummary assets={assets} />}
 
       <GoalPanel />
 
