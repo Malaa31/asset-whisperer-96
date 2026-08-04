@@ -1,12 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarCheck, ChevronRight, Eye, EyeOff, RefreshCw, TrendingUp } from "lucide-react";
+import { BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, RefreshCw, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
 import { useApp } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
 import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
+import { AssetSummary } from "@/components/AssetSummary";
+import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
 import { PlanDetail, type PlanLineView } from "@/components/PlanDetail";
 import { defaultLines } from "@/components/PlanEditor";
 import { fetchQuote } from "@/lib/market";
@@ -40,6 +43,7 @@ function Dashboard() {
   const goals = useMemo(() => profileGoals(profile), [profile]);
   const activeGoal = goals.find((g) => g.id === profile?.activeGoalId) ?? goals[0];
   const dca = activeGoal?.dca ?? 0;
+  const due = contributionDue(profile);
   const backupAge = daysSinceBackup(profile);
   const needsBackup = assets.length > 0 && (backupAge === undefined || backupAge > 30);
 
@@ -64,6 +68,11 @@ function Dashboard() {
       setRefreshing(false);
     }
   };
+
+  // Rappel du mois : notification si autorisée (au plus une fois par mois).
+  useEffect(() => {
+    maybeNotify(profile, dca);
+  }, [profile, dca]);
 
   useEffect(() => {
     const stamps = assets
@@ -130,7 +139,29 @@ function Dashboard() {
         </p>
       </section>
 
+      <AssetSummary assets={assets} />
+
       <GoalPanel />
+
+      {due && dca > 0 && (
+        <div className="mt-4 flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/[0.06] p-4">
+          <BellRing className="size-4 shrink-0 text-primary" />
+          <p className="min-w-0 flex-1 text-[13px] leading-snug">
+            Versement du mois : <span className="font-semibold">{eur(dca)}</span> à placer.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              if (!profile) return;
+              saveProfile({ ...profile, lastContribution: currentMonth() });
+              toast.success("Versement noté pour ce mois");
+            }}
+            className="tap flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground"
+          >
+            <Check className="size-3" /> Fait
+          </button>
+        </div>
+      )}
 
       {dca > 0 && (
         <button

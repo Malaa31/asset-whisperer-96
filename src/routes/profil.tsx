@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { Download, RotateCcw, Upload } from "lucide-react";
+import { ChevronRight, Download, RotateCcw, Upload } from "lucide-react";
+import { toast } from "sonner";
+import { eur } from "@/lib/format";
+import { IncomeEditor, totalIncome } from "@/components/IncomeEditor";
+import { INCOME_KIND_LABELS } from "@/lib/types";
+import {
+  notificationsGranted,
+  notificationsSupported,
+  requestNotifications,
+} from "@/lib/reminder";
 import { useApp } from "@/lib/storage";
 import {
   RISK_LABELS,
@@ -32,6 +41,10 @@ export const Route = createFileRoute("/profil")({
 function ProfilPage() {
   const { profile, saveProfile, reset } = useApp();
   const [importMsg, setImportMsg] = useState("");
+  const [editingIncome, setEditingIncome] = useState(false);
+  const [notifState, setNotifState] = useState<"granted" | "other">(
+    () => (notificationsGranted() ? "granted" : "other"),
+  );
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Profil absent (premier lancement ou après réinitialisation) :
@@ -47,6 +60,21 @@ function ProfilPage() {
       await restoreBackup(file);
     } catch (e) {
       setImportMsg(e instanceof Error ? e.message : "Import impossible.");
+    }
+  };
+
+  const incomes = profile.incomes ?? [];
+
+  /** Active le rappel et tente d'obtenir la permission système. */
+  const toggleReminder = async () => {
+    if (profile.monthlyReminder) {
+      update({ monthlyReminder: false });
+      return;
+    }
+    update({ monthlyReminder: true });
+    if (notificationsSupported() && !notificationsGranted()) {
+      const ok = await requestNotifications();
+      setNotifState(ok ? "granted" : "other");
     }
   };
 
@@ -69,13 +97,26 @@ function ProfilPage() {
           value={profile.profession}
           onChange={(v) => update({ profession: v })}
         />
-        <Row
-          label="Revenu net mensuel (€)"
-          value={String(profile.incomeMonthly || "")}
-          numeric
-          onChange={(v) => update({ incomeMonthly: Number(v.replace(",", ".")) || 0 })}
-        />
       </section>
+
+      <button
+        type="button"
+        onClick={() => setEditingIncome(true)}
+        className="tap card-surface mt-4 flex w-full items-center justify-between p-5 text-left"
+      >
+        <span>
+          <span className="block text-sm font-semibold">Mes revenus</span>
+          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+            {incomes.length
+              ? incomes.map((i) => INCOME_KIND_LABELS[i.kind]).join(" · ")
+              : "Salaire, locatif, dividendes…"}
+          </span>
+        </span>
+        <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+          {eur(profile.incomeMonthly)}/mois
+          <ChevronRight className="size-4" />
+        </span>
+      </button>
 
       <section className="card-surface mt-4 p-5">
         <h2 className="text-sm font-semibold">Profil de risque</h2>
@@ -95,6 +136,39 @@ function ProfilPage() {
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="card-surface mt-4 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <span>
+            <span className="block text-sm font-semibold">Rappel de versement</span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+              Un rappel en début de mois pour placer ton versement.
+            </span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={Boolean(profile.monthlyReminder)}
+            onClick={() => void toggleReminder()}
+            className={`tap relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+              profile.monthlyReminder ? "bg-primary" : "bg-elevated"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 size-6 rounded-full bg-card shadow transition-all ${
+                profile.monthlyReminder ? "left-[1.375rem]" : "left-0.5"
+              }`}
+            />
+          </button>
+        </div>
+        {profile.monthlyReminder && (
+          <p className="mt-3 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
+            {notifState === "granted"
+              ? "Notification activée. Sur iPhone, elle n'arrive que si l'app est installée sur l'écran d'accueil (Partager → Sur l'écran d'accueil)."
+              : "Le rappel s'affiche dans l'app. Pour une notification système, autorise-la ci-dessus depuis ton navigateur."}
+          </p>
+        )}
       </section>
 
       <section className="card-surface mt-4 p-5">

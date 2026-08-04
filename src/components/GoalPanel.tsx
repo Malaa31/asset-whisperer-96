@@ -39,7 +39,12 @@ export function GoalPanel() {
   };
 
   const current = goal ? goalCurrent(assets, goal) : 0;
-  const progress = goal?.amount ? Math.min(100, (current / goal.amount) * 100) : 0;
+  // Bornée à [0, 100] : un patrimoine net négatif donnerait une largeur
+  // CSS invalide (barre affichée pleine).
+  const progress = goal?.amount
+    ? Math.max(0, Math.min(100, (current / goal.amount) * 100))
+    : 0;
+  const rawProgress = goal?.amount ? (current / goal.amount) * 100 : 0;
   const traj = useMemo(
     () => (goal ? buildTrajectory(current, goal, history) : []),
     [current, goal, history],
@@ -54,7 +59,7 @@ export function GoalPanel() {
         ? "À portée immédiate."
         : cross !== undefined
           ? `Atteint dans ~${cross} an${cross > 1 ? "s" : ""} à ce rythme.`
-          : `${rawPct(progress)} du chemin parcouru.`;
+          : `${rawPct(rawProgress)} du chemin parcouru.`;
 
   return (
     <>

@@ -32,11 +32,23 @@ export interface PlanLine {
   weight: number;
 }
 
+export type IncomeKind = "salaire" | "locatif" | "dividendes" | "autre";
+
+export interface Income {
+  id: string;
+  kind: IncomeKind;
+  label: string;
+  /** Montant net mensuel. Un revenu annuel est ramené au mois à la saisie. */
+  amountMonthly: number;
+}
+
 export interface Profile {
   name: string;
   age: number;
   profession: string;
+  /** Somme des revenus mensuels — tenue à jour à partir de `incomes`. */
   incomeMonthly: number;
+  incomes?: Income[];
   riskProfile: RiskProfile;
   goal: { amount: number; horizon: number; dca: number };
   goals?: Goal[];
@@ -46,6 +58,10 @@ export interface Profile {
   lastBackup?: string;
   /** Répartition personnalisée du versement mensuel (sinon plan conseillé). */
   planLines?: PlanLine[];
+  /** Rappel de versement en début de mois. */
+  monthlyReminder?: boolean;
+  /** Dernier mois (AAAA-MM) où le versement a été marqué comme fait. */
+  lastContribution?: string;
 }
 
 
@@ -90,4 +106,18 @@ export const RISK_LABELS: Record<RiskProfile, string> = {
   equilibre: "Équilibré",
   dynamique: "Dynamique",
   offensif: "Offensif",
+};
+
+export const INCOME_KIND_LABELS: Record<IncomeKind, string> = {
+  salaire: "Salaire",
+  locatif: "Locatif",
+  dividendes: "Dividendes",
+  autre: "Autre",
+};
+
+export const INCOME_KIND_EMOJI: Record<IncomeKind, string> = {
+  salaire: "💼",
+  locatif: "🏠",
+  dividendes: "📈",
+  autre: "➕",
 };
