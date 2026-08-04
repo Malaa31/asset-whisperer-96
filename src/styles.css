@@ -43,32 +43,34 @@
 
 :root {
   --radius: 0.875rem;
-  --background: oklch(0.15 0 0);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.196 0 0);
-  --card-foreground: oklch(0.98 0 0);
-  --elevated: oklch(0.246 0 0);
-  --popover: oklch(0.196 0 0);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.68 0.16 250);
+  /* Thème clair type iOS : fond gris système, cartes blanches, bleu Apple. */
+  --background: oklch(0.965 0.003 260);          /* ~#F2F2F7 systemGroupedBackground */
+  --foreground: oklch(0.23 0.006 270);           /* ~#1C1C1E label */
+  --card: oklch(1 0 0);                          /* blanc */
+  --card-foreground: oklch(0.23 0.006 270);
+  --elevated: oklch(0.945 0.004 260);            /* ~#E9E9EE fill secondaire */
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.23 0.006 270);
+  --primary: oklch(0.58 0.19 255);               /* bleu Apple #007AFF */
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.246 0 0);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.246 0 0);
-  --muted-foreground: oklch(0.68 0 0);
-  --accent: oklch(0.246 0 0);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.63 0.2 25);
+  --secondary: oklch(0.945 0.004 260);
+  --secondary-foreground: oklch(0.23 0.006 270);
+  --muted: oklch(0.945 0.004 260);
+  --muted-foreground: oklch(0.55 0.01 270);      /* ~#6D6D72 secondaryLabel */
+  --accent: oklch(0.945 0.004 260);
+  --accent-foreground: oklch(0.23 0.006 270);
+  --destructive: oklch(0.62 0.21 27);            /* rouge Apple #FF3B30 */
   --destructive-foreground: oklch(0.99 0 0);
-  --amber: oklch(0.82 0.15 85);
-  --info: oklch(0.68 0.16 250);
-  --violet: oklch(0.65 0.17 295);
-  --orange: oklch(0.72 0.17 50);
-  --border: oklch(0.28 0 0);
-  --input: oklch(0.28 0 0);
-  --ring: oklch(0.68 0.16 250);
-  --success: oklch(0.74 0.16 152);
+  --amber: oklch(0.72 0.15 75);                  /* ambre lisible sur clair */
+  --info: oklch(0.58 0.19 255);
+  --violet: oklch(0.58 0.19 305);
+  --orange: oklch(0.7 0.17 55);
+  --border: oklch(0.915 0.004 260);              /* ~#E5E5EA separator */
+  --input: oklch(0.915 0.004 260);
+  --ring: oklch(0.58 0.19 255);
+  --success: oklch(0.65 0.17 152);               /* vert Apple */
 }
+
 
 
 @layer base {
@@ -91,6 +93,14 @@
   h2,
   .num {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* iOS zoome automatiquement sur les champs dont la police < 16px :
+     on force 16px pour garder l'aspect fixe pendant la navigation. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
 

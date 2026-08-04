@@ -11,8 +11,8 @@ import {
 import type { TrajectoryPoint } from "@/lib/goals";
 import { eur } from "@/lib/format";
 
-const AXIS = "oklch(0.68 0 0)";
-const GRID = "oklch(0.28 0 0)";
+const AXIS = "oklch(0.55 0.01 270)";
+const GRID = "oklch(0.9 0.004 260)";
 
 function compact(v: number): string {
   if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(".0", "")} M€`;
