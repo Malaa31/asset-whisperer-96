@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PatrimoineRouteImport } from './routes/patrimoine'
-import { Route as PilotageRouteImport } from './routes/pilotage'
 import { Route as ProfilRouteImport } from './routes/profil'
 import { Route as ApiPublicQuoteRouteImport } from './routes/api/public/quote'
 import { Route as ApiPublicSearchSymbolsRouteImport } from './routes/api/public/search-symbols'
@@ -24,11 +23,6 @@ const IndexRoute = IndexRouteImport.update({
 const PatrimoineRoute = PatrimoineRouteImport.update({
   id: '/patrimoine',
   path: '/patrimoine',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PilotageRoute = PilotageRouteImport.update({
-  id: '/pilotage',
-  path: '/pilotage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfilRoute = ProfilRouteImport.update({
@@ -50,7 +44,6 @@ const ApiPublicSearchSymbolsRoute = ApiPublicSearchSymbolsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/patrimoine': typeof PatrimoineRoute
-  '/pilotage': typeof PilotageRoute
   '/profil': typeof ProfilRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
@@ -58,7 +51,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/patrimoine': typeof PatrimoineRoute
-  '/pilotage': typeof PilotageRoute
   '/profil': typeof ProfilRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
@@ -67,7 +59,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/patrimoine': typeof PatrimoineRoute
-  '/pilotage': typeof PilotageRoute
   '/profil': typeof ProfilRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
@@ -77,7 +68,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/patrimoine'
-    | '/pilotage'
     | '/profil'
     | '/api/public/quote'
     | '/api/public/search-symbols'
@@ -85,7 +75,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/patrimoine'
-    | '/pilotage'
     | '/profil'
     | '/api/public/quote'
     | '/api/public/search-symbols'
@@ -93,7 +82,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/patrimoine'
-    | '/pilotage'
     | '/profil'
     | '/api/public/quote'
     | '/api/public/search-symbols'
@@ -102,7 +90,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PatrimoineRoute: typeof PatrimoineRoute
-  PilotageRoute: typeof PilotageRoute
   ProfilRoute: typeof ProfilRoute
   ApiPublicQuoteRoute: typeof ApiPublicQuoteRoute
   ApiPublicSearchSymbolsRoute: typeof ApiPublicSearchSymbolsRoute
@@ -122,13 +109,6 @@ declare module '@tanstack/react-router' {
       path: '/patrimoine'
       fullPath: '/patrimoine'
       preLoaderRoute: typeof PatrimoineRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pilotage': {
-      id: '/pilotage'
-      path: '/pilotage'
-      fullPath: '/pilotage'
-      preLoaderRoute: typeof PilotageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profil': {
@@ -158,7 +138,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PatrimoineRoute: PatrimoineRoute,
-  PilotageRoute: PilotageRoute,
   ProfilRoute: ProfilRoute,
   ApiPublicQuoteRoute: ApiPublicQuoteRoute,
   ApiPublicSearchSymbolsRoute: ApiPublicSearchSymbolsRoute,

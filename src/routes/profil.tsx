@@ -1,18 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
-import { Download, Eye, EyeOff, Plus, RotateCcw, Upload } from "lucide-react";
+import { useRef, useState } from "react";
+import { Download, RotateCcw, Upload } from "lucide-react";
 import { useApp } from "@/lib/storage";
 import {
   RISK_LABELS,
   TARGET_ALLOCATIONS,
-  type Goal,
   type Profile,
   type RiskProfile,
 } from "@/lib/types";
-import { eur, rawPct } from "@/lib/format";
-import { GOAL_KIND_LABELS, goalProgress, profileGoals } from "@/lib/goals";
+
 import { daysSinceBackup, exportBackup, restoreBackup } from "@/lib/backup";
-import { GoalEditor } from "@/components/GoalEditor";
 
 export const Route = createFileRoute("/profil")({
   head: () => ({
@@ -33,32 +30,15 @@ export const Route = createFileRoute("/profil")({
 });
 
 function ProfilPage() {
-  const { profile, assets, saveProfile, reset } = useApp();
-  const [editing, setEditing] = useState<Goal | null | "new">(null);
+  const { profile, saveProfile, reset } = useApp();
   const [importMsg, setImportMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const goals = useMemo(() => profileGoals(profile), [profile]);
 
   // Profil absent (premier lancement ou après réinitialisation) :
   // la page d'accueil affiche l'onboarding, rien à montrer ici.
   if (!profile) return null;
 
   const update = (patch: Partial<Profile>) => saveProfile({ ...profile, ...patch });
-
-  const persistGoals = (next: Goal[]) => {
-    update({
-      goals: next,
-      ...(next.some((g) => g.id === profile.activeGoalId)
-        ? {}
-        : next[0]
-          ? { activeGoalId: next[0].id }
-          : {}),
-      // Champ legacy maintenu en phase (zéros si plus aucun objectif).
-      goal: next[0]
-        ? { amount: next[0].amount, horizon: next[0].horizon, dca: next[0].dca }
-        : { amount: 0, horizon: 10, dca: 0 },
-    });
-  };
 
   const onImport = async (file: File) => {
     try {
@@ -73,8 +53,8 @@ function ProfilPage() {
   const backupAge = daysSinceBackup(profile);
 
   return (
-    <div className="fade-up px-4 pt-6">
-      <h1 className="font-display text-2xl">Profil</h1>
+    <div className="fade-up px-5 pt-8">
+      <h1 className="font-display text-[1.75rem] leading-tight tracking-tight">Profil</h1>
 
       <section className="card-surface mt-5 space-y-3 p-5">
         <Row label="Prénom" value={profile.name} onChange={(v) => update({ name: v })} />
@@ -118,54 +98,6 @@ function ProfilPage() {
       </section>
 
       <section className="card-surface mt-4 p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Mes objectifs</h2>
-          <button
-            type="button"
-            onClick={() => setEditing("new")}
-            className="tap flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground"
-          >
-            <Plus className="size-3" /> Ajouter
-          </button>
-        </div>
-        <ul className="mt-3 space-y-2">
-          {goals.map((g) => {
-            const p = goalProgress(assets, g);
-            return (
-              <li key={g.id}>
-                <button
-                  type="button"
-                  onClick={() => setEditing(g)}
-                  className="tap w-full rounded-xl border border-border bg-elevated px-3 py-2.5 text-left"
-                >
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="truncate">{g.label}</span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {eur(g.amount)}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span>
-                      {GOAL_KIND_LABELS[g.kind]} · {g.horizon} ans · {eur(g.dca)}/mois
-                    </span>
-                    <span>{rawPct(p)}</span>
-                  </div>
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-card">
-                    <div className="h-full rounded-full bg-amber" style={{ width: `${p}%` }} />
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-          {!goals.length && (
-            <p className="text-sm text-muted-foreground">
-              Aucun objectif. Ajoute un objectif de patrimoine, d'enveloppe ou d'achat immobilier.
-            </p>
-          )}
-        </ul>
-      </section>
-
-      <section className="card-surface mt-4 p-5">
         <h2 className="text-sm font-semibold">Vos données</h2>
         <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
           Tout est stocké sur cet appareil.{" "}
@@ -203,40 +135,6 @@ function ProfilPage() {
           {importMsg && <p className="text-[11px] text-destructive">{importMsg}</p>}
         </div>
       </section>
-
-      <button
-        type="button"
-        onClick={() => update({ hideAmounts: !profile.hideAmounts })}
-        className="tap mt-4 flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm"
-      >
-        <span className="flex items-center gap-2">
-          {profile.hideAmounts ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          Mode discret
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {profile.hideAmounts ? "activé" : "désactivé"}
-        </span>
-      </button>
-
-      {editing !== null && (
-        <GoalEditor
-          goal={editing === "new" ? null : editing}
-          onClose={() => setEditing(null)}
-          onSave={(g) => {
-            const exists = goals.some((x) => x.id === g.id);
-            persistGoals(exists ? goals.map((x) => (x.id === g.id ? g : x)) : [...goals, g]);
-            setEditing(null);
-          }}
-          {...(editing !== "new"
-            ? {
-                onDelete: (id: string) => {
-                  persistGoals(goals.filter((x) => x.id !== id));
-                  setEditing(null);
-                },
-              }
-            : {})}
-        />
-      )}
 
       <button
         type="button"

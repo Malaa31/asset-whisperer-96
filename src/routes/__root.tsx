@@ -124,12 +124,15 @@ function RootComponent() {
 function Shell() {
   const { profile, ready, saveProfile, upsertAsset } = useApp();
   // Ouvre le modal d'ajout si l'onboarding s'est terminé sur « Ajouter ma première ligne ».
-  const [adding, setAdding] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.sessionStorage.getItem("patrimoine.openAdd") === "1",
-  );
-  if (typeof window !== "undefined") window.sessionStorage.removeItem("patrimoine.openAdd");
+  const [adding, setAdding] = useState(false);
+
+  // Ouvre le modal si l'onboarding s'est terminé sur « Ajouter ma première ligne ».
+  useEffect(() => {
+    if (window.sessionStorage.getItem("patrimoine.openAdd") === "1") {
+      window.sessionStorage.removeItem("patrimoine.openAdd");
+      setAdding(true);
+    }
+  }, [profile]);
 
   if (!ready) return <div className="min-h-screen bg-background" />;
   if (!profile) return <Onboarding onDone={saveProfile} />;

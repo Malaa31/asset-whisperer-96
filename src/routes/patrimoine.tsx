@@ -52,9 +52,9 @@ function Patrimoine() {
     .filter((g) => g.items.length);
 
   return (
-    <div className="fade-up px-4 pt-6">
+    <div className="fade-up px-5 pt-8">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl">Patrimoine</h1>
+        <h1 className="font-display text-[1.75rem] leading-tight tracking-tight">Patrimoine</h1>
         <button
           type="button"
           onClick={() => setPointing(true)}
