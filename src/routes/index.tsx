@@ -3,12 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, Plus, RefreshCw, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { requestAddAsset, useApp } from "@/lib/storage";
-import { assetValue, diversificationScore, totals } from "@/lib/calc";
+import { assetValue, diversificationScore, foreignCurrencyAssets, totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
 import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
-import { AssetSummary } from "@/components/AssetSummary";
+import { AllocationCard } from "@/components/AllocationCard";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
 import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
 import { PlanDetail } from "@/components/PlanDetail";
@@ -45,6 +45,7 @@ function Dashboard() {
   const activeGoal = goals.find((g) => g.id === profile?.activeGoalId) ?? goals[0];
   const dca = activeGoal?.dca ?? 0;
   const due = contributionDue(profile);
+  const foreign = useMemo(() => foreignCurrencyAssets(assets), [assets]);
   // Crédits immobiliers en cours mais aucun bien valorisé : le net affiché
   // serait mécaniquement négatif sans que cela reflète la situation.
   const missingImmo = useMemo(() => {
@@ -178,7 +179,15 @@ function Dashboard() {
         </Link>
       )}
 
-      {assets.length > 0 && <AssetSummary assets={assets} />}
+      {assets.length > 0 && <AllocationCard assets={assets} />}
+
+      {foreign.length > 0 && (
+        <p className="mt-4 rounded-2xl border border-amber/40 bg-amber/10 p-3.5 text-[11px] leading-relaxed text-muted-foreground">
+          {foreign.length} ligne{foreign.length > 1 ? "s" : ""} dans une devise sans
+          taux connu ({[...new Set(foreign.map((a) => String(a.data["currency"])))].join(", ")}) :
+          ces montants sont comptés tels quels.
+        </p>
+      )}
 
       <GoalPanel />
 

@@ -8,10 +8,7 @@ import { assetValue, assetGain, totals, n } from "@/lib/calc";
 import { eur, num, rawPct, signedEur } from "@/lib/format";
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 import { AssetModal } from "@/components/AssetModal";
-import { AllocationCard } from "@/components/AllocationCard";
-import { foreignCurrencyAssets } from "@/lib/calc";
 import { useAnalyses } from "@/lib/useAnalyses";
-import { canConvert, fxSnapshot } from "@/lib/fx";
 
 export const Route = createFileRoute("/patrimoine")({
   head: () => ({
@@ -38,17 +35,7 @@ function Patrimoine() {
   const [editing, setEditing] = useState<Asset | null>(null);
   const [creating, setCreating] = useState(false);
   const [pointing, setPointing] = useState(false);
-  const foreign = useMemo(() => foreignCurrencyAssets(assets), [assets]);
   const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
-  const fx = fxSnapshot();
-  const converted = useMemo(
-    () =>
-      assets.filter((a) => {
-        const c = String(a.data["currency"] ?? "EUR").toUpperCase();
-        return c !== "EUR" && canConvert(c);
-      }),
-    [assets],
-  );
 
   const t = useMemo(() => totals(assets), [assets]);
   const list = assets.filter((a) =>
@@ -99,24 +86,6 @@ function Patrimoine() {
         ))}
       </div>
 
-      {foreign.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-amber/40 bg-amber/10 p-4 text-[11px] leading-relaxed text-muted-foreground">
-          {foreign.length} ligne{foreign.length > 1 ? "s" : ""} dans une devise sans
-          taux connu ({[...new Set(foreign.map((a) => String(a.data["currency"])))].join(", ")}) :
-          ces montants sont comptés tels quels. Saisis la valeur en euros pour un
-          patrimoine net juste.
-        </div>
-      )}
-
-      {converted.length > 0 && fx?.date && (
-        <p className="mt-3 text-[11px] text-muted-foreground">
-          {converted.length} ligne{converted.length > 1 ? "s" : ""} convertie
-          {converted.length > 1 ? "s" : ""} en euros au taux BCE du{" "}
-          {new Date(fx.date).toLocaleDateString("fr-FR")}.
-        </p>
-      )}
-
-      {side === "actifs" && <AllocationCard assets={assets} />}
 
       <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">
         {(["all", ...types] as const).map((ty) => (
