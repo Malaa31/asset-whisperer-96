@@ -173,7 +173,10 @@ function ProfilPage() {
       </section>
 
       <section className="card-surface mt-4 p-5">
-        <h2 className="text-sm font-semibold">Vos données</h2>
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold">Vos données</h2>
+          <span className="text-[10px] text-muted-foreground">{BUILD_VERSION}</span>
+        </div>
         <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
           Tout est stocké sur cet appareil.{" "}
           {backupAge === undefined
@@ -220,10 +223,6 @@ function ProfilPage() {
       >
         <RotateCcw className="size-4" /> Tout réinitialiser
       </button>
-
-      <p className="mt-6 text-center text-[10px] text-muted-foreground">
-        Version {BUILD_VERSION}
-      </p>
     </div>
   );
 }

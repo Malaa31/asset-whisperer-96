@@ -138,7 +138,7 @@ function Shell() {
   if (!profile) return <Onboarding onDone={saveProfile} />;
 
   return (
-    <div className="mx-auto min-h-screen max-w-[480px] pb-24">
+    <div className="mx-auto min-h-screen max-w-[480px] pb-[calc(7rem+env(safe-area-inset-bottom))]">
       {/* Required: nested routes render here. */}
       <Outlet />
       <BottomNav onAdd={() => setAdding(true)} />
