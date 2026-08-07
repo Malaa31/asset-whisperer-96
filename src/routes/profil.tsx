@@ -11,6 +11,7 @@ import {
   requestNotifications,
 } from "@/lib/reminder";
 import { useApp } from "@/lib/storage";
+import { BUILD_VERSION } from "@/lib/version";
 import {
   RISK_LABELS,
   TARGET_ALLOCATIONS,
@@ -219,6 +220,10 @@ function ProfilPage() {
       >
         <RotateCcw className="size-4" /> Tout réinitialiser
       </button>
+
+      <p className="mt-6 text-center text-[10px] text-muted-foreground">
+        Version {BUILD_VERSION}
+      </p>
     </div>
   );
 }

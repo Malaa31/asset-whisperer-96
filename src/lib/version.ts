@@ -1,13 +1,9 @@
 /**
- * Version du build, injectée à la compilation.
+ * Marqueur de version, affiché en bas de la page Profil.
  *
- * Sert à lever toute ambiguïté sur la version réellement servie :
- * quand un écran semble ne pas avoir changé, cette valeur dit
- * immédiatement si l'appareil exécute le dernier déploiement ou une
- * copie retenue en cache.
+ * Sert à savoir d'un coup d'œil quelle version l'appareil exécute
+ * réellement, sans avoir à comparer des captures d'écran : si le
+ * numéro affiché ne correspond pas au dernier livré, c'est que le
+ * déploiement ou le cache n'a pas suivi.
  */
-export const BUILD_ID: string =
-  (import.meta.env["VITE_BUILD_ID"] as string | undefined) ?? "dev";
-
-export const BUILD_DATE: string =
-  (import.meta.env["VITE_BUILD_DATE"] as string | undefined) ?? "";
+export const BUILD_VERSION = "2026-08-07 · v14";
