@@ -151,33 +151,17 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
-  // Service worker : l'app s'ouvre hors ligne et devient installable.
+  // Aucun service worker n'est enregistré : la version précédente mettait
+  // en cache ses propres fichiers et bloquait ses mises à jour. On se
+  // contente de désinscrire ce qui subsiste sur les appareils déjà visités.
   useEffect(() => {
-    if (!("serviceWorker" in navigator) || import.meta.env.DEV) return;
-
-    void navigator.serviceWorker
-      .register("/sw.js", { updateViaCache: "none" })
-      .then((reg) => {
-        // Recherche active d'une mise à jour à chaque ouverture : sans
-        // cela, un nouveau déploiement peut rester invisible pendant des
-        // heures derrière l'ancienne version installée.
-        void reg.update();
-        reg.addEventListener("updatefound", () => {
-          const next = reg.installing;
-          if (!next) return;
-          next.addEventListener("statechange", () => {
-            // Une nouvelle version a pris la main alors qu'une ancienne
-            // servait déjà la page : on recharge une seule fois.
-            if (next.state === "activated" && navigator.serviceWorker.controller) {
-              window.location.reload();
-            }
-          });
-        });
-      })
-      .catch(() => {
-        // Enregistrement refusé (contexte non sécurisé, navigation privée) :
-        // l'app fonctionne normalement, sans mode hors ligne.
-      });
+    if (!("serviceWorker" in navigator)) return;
+    void navigator.serviceWorker.getRegistrations().then((regs) => {
+      for (const reg of regs) void reg.unregister();
+    });
+    if ("caches" in window) {
+      void caches.keys().then((keys) => keys.forEach((k) => void caches.delete(k)));
+    }
   }, []);
 
   useEffect(() => {

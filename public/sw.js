@@ -1,76 +1,27 @@
 /**
- * Service worker minimal.
+ * Service worker neutralisé.
  *
- * Objectif : que l'app s'ouvre hors ligne. Les données vivent déjà dans
- * le stockage local, seule la coquille a besoin d'être mise en cache.
+ * La version précédente servait les ressources depuis son cache en
+ * priorité. Comme elle mettait aussi ce fichier en cache, elle empêchait
+ * l'installation de son propre correctif : les déploiements restaient
+ * invisibles sans intervention manuelle sur l'appareil.
  *
- * Point d'attention : une version antérieure gardait indéfiniment les
- * ressources en cache et ne se renouvelait jamais, si bien qu'un nouveau
- * déploiement restait invisible. D'où deux garde-fous :
- *  - la navigation passe toujours par le réseau d'abord ;
- *  - le cache ne sert de repli qu'en cas d'échec réseau, et il est purgé
- *    à chaque activation d'une nouvelle version.
+ * Ce fichier ne fait donc plus qu'une chose : purger les caches, se
+ * désinscrire et recharger les pages ouvertes. L'app redevient une
+ * application web classique, toujours installable sur l'écran d'accueil
+ * grâce au manifeste, mais sans couche de cache qui puisse la figer.
  */
 
-const CACHE = "patrimoine-shell";
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(CACHE)
-      .then((c) => c.addAll(["/", "/manifest.webmanifest"]).catch(() => undefined))
-      .then(() => self.skipWaiting()),
-  );
-});
+self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      // Purge complète : les noms de fichiers changent à chaque
-      // déploiement, garder l'ancien contenu n'a aucun intérêt.
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
-  );
-});
-
-self.addEventListener("message", (event) => {
-  if (event.data === "skip-waiting") self.skipWaiting();
-});
-
-self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  if (request.method !== "GET") return;
-
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/")) return;
-
-  // Navigation : réseau d'abord, cache en secours hors ligne uniquement.
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const copy = res.clone();
-          void caches.open(CACHE).then((c) => c.put("/", copy));
-          return res;
-        })
-        .catch(() => caches.match("/").then((r) => r ?? Response.error())),
-    );
-    return;
-  }
-
-  // Ressources : réseau d'abord également. Leur nom est versionné, mais
-  // ce choix garantit qu'aucune version périmée ne survit à un déploiement.
-  event.respondWith(
-    fetch(request)
-      .then((res) => {
-        if (res.ok && res.type === "basic") {
-          const copy = res.clone();
-          void caches.open(CACHE).then((c) => c.put(request, copy));
-        }
-        return res;
-      })
-      .catch(() => caches.match(request).then((r) => r ?? Response.error())),
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+      await self.registration.unregister();
+      const clients = await self.clients.matchAll({ type: "window" });
+      for (const client of clients) client.navigate(client.url);
+    })(),
   );
 });
