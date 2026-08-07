@@ -189,7 +189,7 @@ export function regress(
  * porte, on renforce. Nettement en dessous : on allège. Entre les deux,
  * on ne bouge pas — l'inaction est un choix valable.
  */
-export function signalOf(m: Metrics): { signal: SignalKind; reason: string } {
+function signalOf(m: Metrics): { signal: SignalKind; reason: string } {
   if (m.vsLongMa > 3 && m.last12m > 0) {
     return {
       signal: "renforcer",
@@ -228,7 +228,7 @@ function scale(value: number, low: number, high: number): number {
   return Math.max(0, Math.min(100, ((value - low) / (high - low)) * 100));
 }
 
-export function scoreOf(m: Metrics, profile: RiskProfile): number {
+function scoreOf(m: Metrics, profile: RiskProfile): number {
   const w = WEIGHTS[profile] ?? WEIGHTS.equilibre;
   // Bornes empiriques : 0 % à 15 %/an de performance, 5 % à 35 % de
   // volatilité, et un écart à la moyenne longue de -15 % à +15 %.

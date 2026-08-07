@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Info, X } from "lucide-react";
 import { eur } from "@/lib/format";
-import { SIGNAL_LABELS, type Analysis } from "@/lib/signals";
+import { SIGNAL_LABELS, VERDICT_LABELS, type Analysis } from "@/lib/signals";
 import { BUFFER_MONTHS, type PlanResult } from "@/lib/plan";
 import { RISK_LABELS, type Profile } from "@/lib/types";
 
@@ -97,14 +97,31 @@ export function PlanDetail({
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-semibold">{l.label}</p>
                     {a && (
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {a.cagr.toFixed(1)} %/an · {SIGNAL_LABELS[a.signal]} · score {l.score}
-                      </p>
+                      <>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {a.cagr.toFixed(1)} %/an · vol. {a.volatility.toFixed(0)} % ·{" "}
+                          {SIGNAL_LABELS[a.signal]}
+                        </p>
+                        <p className="mt-1 text-[11px] font-semibold">
+                          {VERDICT_LABELS[a.verdict]}
+                          {a.alpha !== undefined && (
+                            <span className="ml-1.5 font-mono font-normal text-muted-foreground">
+                              alpha {a.alpha > 0 ? "+" : ""}
+                              {a.alpha.toFixed(1)} %/an
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                          {a.verdictReason}
+                        </p>
+                      </>
                     )}
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="font-mono text-sm font-semibold">{eur(l.amount)}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">{l.weight} %</p>
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      {l.weight} % · score {l.score}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-elevated">

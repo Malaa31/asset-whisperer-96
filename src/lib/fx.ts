@@ -79,5 +79,3 @@ export async function ensureFxRates(): Promise<void> {
     // Hors ligne : on garde les derniers taux connus.
   }
 }
-
-export const FX_CACHE_KEY = CACHE_KEY;

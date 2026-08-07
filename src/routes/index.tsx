@@ -14,7 +14,7 @@ import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
 import { PlanDetail } from "@/components/PlanDetail";
 import { buildPlanFromHoldings, monthlyDecision } from "@/lib/plan";
 import { useAnalyses } from "@/lib/useAnalyses";
-import type { Asset, PlanLine as ProfilePlanLine } from "@/lib/types";
+import type { Asset } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({

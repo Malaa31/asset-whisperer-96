@@ -16,7 +16,7 @@ export const BUFFER_MONTHS = 10;
 
 const SAFE_TYPES: Array<Asset["type"]> = ["livret", "cash"];
 
-export interface BufferStatus {
+interface BufferStatus {
   /** Total livrets + cash, en euros. */
   amount: number;
   /** Équivalent en mois de revenus, si les revenus sont connus. */
@@ -25,7 +25,7 @@ export interface BufferStatus {
   sufficient: boolean;
 }
 
-export function bufferStatus(assets: Asset[], profile: Profile | null): BufferStatus {
+function bufferStatus(assets: Asset[], profile: Profile | null): BufferStatus {
   const amount = assets
     .filter((a) => SAFE_TYPES.includes(a.type))
     .reduce((s, a) => s + assetValue(a), 0);

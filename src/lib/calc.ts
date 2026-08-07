@@ -16,7 +16,7 @@ export function assetValue(a: Asset): number {
 }
 
 /** Valeur dans la devise de la ligne, sans conversion. */
-export function assetValueRaw(a: Asset): number {
+function assetValueRaw(a: Asset): number {
   const d = a.data;
   switch (a.type) {
     case "pea":

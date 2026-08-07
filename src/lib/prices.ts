@@ -2,7 +2,7 @@ import { fetchQuote } from "./market";
 import type { Asset } from "./types";
 
 /** Lignes dont le cours peut être récupéré automatiquement. */
-export function pricedAssets(assets: Asset[]): Asset[] {
+function pricedAssets(assets: Asset[]): Asset[] {
   return assets.filter(
     (a) => (a.type === "pea" || a.type === "crypto") && String(a.data["ticker"] ?? "").trim(),
   );
