@@ -223,6 +223,17 @@ function ProfilPage() {
       >
         <RotateCcw className="size-4" /> Tout réinitialiser
       </button>
+
+      {editingIncome && (
+        <IncomeEditor
+          incomes={profile.incomes}
+          onClose={() => setEditingIncome(false)}
+          onSave={(next) => {
+            update({ incomes: next, incomeMonthly: totalIncome(next) });
+            setEditingIncome(false);
+          }}
+        />
+      )}
     </div>
   );
 }
