@@ -3,8 +3,8 @@ import { Info, RefreshCw, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { useApp } from "@/lib/storage";
 import { assetValue } from "@/lib/calc";
 import { eur } from "@/lib/format";
-import { analyze, SIGNAL_LABELS, type Analysis, type SignalKind } from "@/lib/signals";
-import type { HistoryResult } from "@/routes/api/public/history";
+import { SIGNAL_LABELS, VERDICT_LABELS, type Analysis, type SignalKind } from "@/lib/signals";
+import { useAnalyses } from "@/lib/useAnalyses";
 import type { Asset } from "@/lib/types";
 
 const SIGNAL_STYLE: Record<SignalKind, { cls: string; Icon: typeof TrendingUp }> = {
@@ -29,8 +29,6 @@ interface Row {
  */
 export function MonthlyPicks() {
   const { assets, profile } = useApp();
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [loading, setLoading] = useState(false);
   const [showMethod, setShowMethod] = useState(false);
 
   const tracked = useMemo(
@@ -43,41 +41,22 @@ export function MonthlyPicks() {
 
   const risk = profile?.riskProfile ?? "equilibre";
 
-  useEffect(() => {
-    if (!tracked.length) {
-      setRows([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
+  const { analyses, loading } = useAnalyses(assets, risk);
 
-    void Promise.all(
-      tracked.map(async (asset) => {
-        try {
-          const symbol = String(asset.data["ticker"]);
-          const res = await fetch(`/api/public/history?symbol=${encodeURIComponent(symbol)}`);
-          if (!res.ok) return null;
-          const data = (await res.json()) as HistoryResult;
-          const analysis = analyze(symbol, data.points ?? [], risk);
+  const rows: Row[] = useMemo(
+    () =>
+      tracked
+        .map((asset) => {
+          const analysis = analyses.get(asset.id);
           return analysis ? { asset, analysis, value: assetValue(asset) } : null;
-        } catch {
-          return null;
-        }
-      }),
-    ).then((results) => {
-      if (cancelled) return;
-      const list = results.filter((r): r is Row => r !== null);
-      list.sort((a, b) => b.analysis.score - a.analysis.score);
-      setRows(list.slice(0, 5));
-      setLoading(false);
-    });
+        })
+        .filter((r): r is Row => r !== null)
+        .sort((a, b) => b.analysis.score - a.analysis.score)
+        .slice(0, 5),
+    [tracked, analyses],
+  );
 
-    return () => {
-      cancelled = true;
-    };
-  }, [tracked, risk]);
-
-  if (rows !== null && !rows.length && !loading) {
+  if (!rows.length && !loading) {
     return (
       <section className="card-surface mt-4 p-5">
         <h2 className="text-sm font-semibold">Valeurs du mois</h2>
@@ -125,7 +104,7 @@ export function MonthlyPicks() {
         </p>
       )}
 
-      {loading && !rows && (
+      {loading && !rows.length && (
         <div className="mt-4 space-y-2">
           {[0, 1, 2].map((i) => (
             <div key={i} className="h-16 animate-pulse rounded-xl bg-elevated" />
@@ -134,7 +113,7 @@ export function MonthlyPicks() {
       )}
 
       <ul className="mt-4 space-y-2.5">
-        {(rows ?? []).map(({ asset, analysis, value }, i) => {
+        {rows.map(({ asset, analysis, value }, i) => {
           const style = SIGNAL_STYLE[analysis.signal];
           return (
             <li key={asset.id} className="rounded-xl border border-border bg-card p-3">
@@ -166,8 +145,20 @@ export function MonthlyPicks() {
                 <Stat label="Score" value={String(analysis.score)} strong />
               </div>
 
-              <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-                {analysis.reason}
+              <p className="mt-2 text-[11px] font-semibold">
+                {VERDICT_LABELS[analysis.verdict]}
+                {analysis.alpha !== undefined && (
+                  <span className="ml-1.5 font-mono font-normal text-muted-foreground">
+                    alpha {analysis.alpha > 0 ? "+" : ""}
+                    {analysis.alpha.toFixed(1)} %/an
+                  </span>
+                )}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                {analysis.verdictReason}
+              </p>
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                Signal : {analysis.reason}
               </p>
             </li>
           );
