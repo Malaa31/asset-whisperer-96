@@ -9,6 +9,7 @@ import { eur, num, rawPct, signedEur } from "@/lib/format";
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 import { AssetModal } from "@/components/AssetModal";
 import { AllocationCard } from "@/components/AllocationCard";
+import { MonthlyPicks } from "@/components/MonthlyPicks";
 import { foreignCurrencyAssets } from "@/lib/calc";
 import { canConvert, fxSnapshot } from "@/lib/fx";
 
@@ -115,6 +116,7 @@ function Patrimoine() {
       )}
 
       {side === "actifs" && <AllocationCard assets={assets} />}
+      {side === "actifs" && <MonthlyPicks />}
 
       <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">
         {(["all", ...types] as const).map((ty) => (
