@@ -447,7 +447,7 @@ function FieldInput({
         value={data[f.key] ?? ""}
         placeholder={f.placeholder ?? ""}
         onChange={(e) => setData((d) => ({ ...d, [f.key]: e.target.value }))}
-        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 font-mono text-sm outline-none focus:border-primary"
+        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 num text-sm outline-none focus:border-primary"
       />
     </label>
   );

@@ -32,7 +32,7 @@ export function AssetAnalysis({ analysis }: { analysis: Analysis }) {
       <p className="mt-3 text-[13px] font-semibold">
         {VERDICT_LABELS[analysis.verdict]}
         {analysis.alpha !== undefined && (
-          <span className="ml-1.5 font-mono text-[11px] font-normal text-muted-foreground">
+          <span className="ml-1.5 num text-[11px] font-normal text-muted-foreground">
             alpha {analysis.alpha > 0 ? "+" : ""}
             {analysis.alpha.toFixed(1)} %/an
           </span>
@@ -68,7 +68,7 @@ export function AssetAnalysis({ analysis }: { analysis: Analysis }) {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="font-mono text-[13px]">{value}</div>
+      <div className="num text-[13px]">{value}</div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
     </div>
   );

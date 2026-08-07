@@ -141,11 +141,11 @@ export function SymbolSearch({
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                <div className="mt-0.5 truncate num text-[11px] text-muted-foreground">
                   {r.ticker} · {r.region} · {r.sector}
                 </div>
               </div>
-              <div className="shrink-0 text-right font-mono text-xs">
+              <div className="shrink-0 text-right num text-xs">
                 {prices[r.ticker] !== undefined ? (
                   <span>{num(prices[r.ticker]!)} €</span>
                 ) : (

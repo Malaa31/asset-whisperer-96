@@ -133,7 +133,7 @@ export function AllocationCard({ assets }: { assets: Asset[] }) {
                     />
                     <span className="truncate">{x.key}</span>
                   </span>
-                  <span className="shrink-0 font-mono text-muted-foreground">
+                  <span className="shrink-0 num text-muted-foreground">
                     {rawPct((x.value / total) * 100, 0)}
                   </span>
                 </li>

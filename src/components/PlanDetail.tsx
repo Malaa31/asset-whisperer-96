@@ -105,7 +105,7 @@ export function PlanDetail({
                         <p className="mt-1 text-[11px] font-semibold">
                           {VERDICT_LABELS[a.verdict]}
                           {a.alpha !== undefined && (
-                            <span className="ml-1.5 font-mono font-normal text-muted-foreground">
+                            <span className="ml-1.5 num font-normal text-muted-foreground">
                               alpha {a.alpha > 0 ? "+" : ""}
                               {a.alpha.toFixed(1)} %/an
                             </span>
@@ -118,8 +118,8 @@ export function PlanDetail({
                     )}
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="font-mono text-sm font-semibold">{eur(l.amount)}</p>
-                    <p className="font-mono text-[11px] text-muted-foreground">
+                    <p className="num text-sm font-semibold">{eur(l.amount)}</p>
+                    <p className="num text-[11px] text-muted-foreground">
                       {l.weight} % · score {l.score}
                     </p>
                   </div>

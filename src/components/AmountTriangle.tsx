@@ -103,7 +103,7 @@ export function AmountTriangle({
       {marketPrice !== undefined && marketPrice > 0 && (
         <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-elevated px-3 py-2">
           <span className="text-[11px] text-muted-foreground">
-            Cours du jour : <span className="font-mono text-foreground">{eur(marketPrice, 2)}</span>
+            Cours du jour : <span className="num text-foreground">{eur(marketPrice, 2)}</span>
           </span>
           {priceDiffers && (
             <button
@@ -148,7 +148,7 @@ function Cell({
         inputMode="decimal"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 font-mono text-sm outline-none focus:border-primary"
+        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 num text-sm outline-none focus:border-primary"
       />
     </label>
   );

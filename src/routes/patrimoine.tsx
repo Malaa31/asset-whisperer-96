@@ -92,7 +92,7 @@ function Patrimoine() {
             }`}
           >
             <div className="capitalize">{s}</div>
-            <div className={`font-mono text-sm ${s === "passifs" ? "text-destructive" : ""}`}>
+            <div className={`num text-sm ${s === "passifs" ? "text-destructive" : ""}`}>
               {eur(s === "actifs" ? t.actifs : t.dettes)}
             </div>
           </button>
@@ -142,7 +142,7 @@ function Patrimoine() {
             <section key={g.type}>
               <div className="mb-2 flex items-baseline justify-between">
                 <h2 className="text-sm font-semibold">{TYPE_LABELS[g.type]}</h2>
-                <span className="font-mono text-xs text-muted-foreground">{eur(sub)}</span>
+                <span className="num text-xs text-muted-foreground">{eur(sub)}</span>
               </div>
               <div className="space-y-2">
                 {g.items.map((a) => (
@@ -243,19 +243,19 @@ function AssetRow({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
           <div className="truncate text-sm font-semibold">
             {String(d["name"] ?? d["type"] ?? d["ticker"] ?? "Ligne")}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+          <div className="mt-0.5 truncate num text-[11px] text-muted-foreground">
             {tags.join(" · ")}
           </div>
         </div>
         <div className="shrink-0 text-right">
           <div
-            className={`font-mono text-sm ${asset.type === "credit" ? "text-destructive" : ""}`}
+            className={`num text-sm ${asset.type === "credit" ? "text-destructive" : ""}`}
           >
             {eur(Math.abs(value))}
           </div>
           {gain !== 0 && (
             <div
-              className={`font-mono text-[11px] ${gain >= 0 ? "text-primary" : "text-destructive"}`}
+              className={`num text-[11px] ${gain >= 0 ? "text-primary" : "text-destructive"}`}
             >
               {signedEur(gain)}
             </div>

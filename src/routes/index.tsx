@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, Plus, RefreshCw, TrendingUp } from "lucide-react";
+import { AlertTriangle, BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, Plus, RefreshCw, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { requestAddAsset, useApp } from "@/lib/storage";
-import { diversificationScore, totals } from "@/lib/calc";
+import { assetValue, diversificationScore, totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
 import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
@@ -45,6 +45,15 @@ function Dashboard() {
   const activeGoal = goals.find((g) => g.id === profile?.activeGoalId) ?? goals[0];
   const dca = activeGoal?.dca ?? 0;
   const due = contributionDue(profile);
+  // Crédits immobiliers en cours mais aucun bien valorisé : le net affiché
+  // serait mécaniquement négatif sans que cela reflète la situation.
+  const missingImmo = useMemo(() => {
+    const hasCredit = assets.some((a) => a.type === "credit" && assetValue(a) < 0);
+    const immoValue = assets
+      .filter((a) => a.type === "immo")
+      .reduce((s, a) => s + assetValue(a), 0);
+    return hasCredit && immoValue <= 0;
+  }, [assets]);
   const backupAge = daysSinceBackup(profile);
   const needsBackup = assets.length > 0 && (backupAge === undefined || backupAge > 30);
 
@@ -149,11 +158,24 @@ function Dashboard() {
           </div>
         )}
         <p className="mt-5 border-t border-border pt-4 text-[11px] text-muted-foreground">
-          Actifs <span className="font-mono text-foreground">{eur(t.actifs)}</span>
+          Actifs <span className="num text-foreground">{eur(t.actifs)}</span>
           {"  ·  "}
-          Dettes <span className="font-mono text-destructive">{eur(t.dettes)}</span>
+          Dettes <span className="num text-destructive">{eur(t.dettes)}</span>
         </p>
       </section>
+      )}
+
+      {missingImmo && (
+        <Link
+          to="/patrimoine"
+          className="tap mt-4 flex items-start gap-2.5 rounded-2xl border border-amber/40 bg-amber/10 p-3.5 text-left"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber" />
+          <span className="text-[12px] leading-relaxed">
+            Ton patrimoine net compte {eur(t.dettes)} de crédits sans la valeur
+            du bien en face. Renseigne-la dans Actifs pour un montant juste.
+          </span>
+        </Link>
       )}
 
       {assets.length > 0 && <AssetSummary assets={assets} />}

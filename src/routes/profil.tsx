@@ -112,7 +112,7 @@ function ProfilPage() {
               : "Salaire, locatif, dividendes…"}
           </span>
         </span>
-        <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+        <span className="flex items-center gap-1 num text-xs text-muted-foreground">
           {eur(profile.incomeMonthly)}/mois
           <ChevronRight className="size-4" />
         </span>
@@ -261,7 +261,7 @@ function Row({
             setText("");
           }
         }}
-        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 font-mono text-sm outline-none focus:border-primary"
+        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 num text-sm outline-none focus:border-primary"
       />
     </label>
   );
