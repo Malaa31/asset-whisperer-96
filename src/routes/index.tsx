@@ -77,7 +77,15 @@ function Dashboard() {
 
   const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
   const plan = useMemo(
-    () => buildPlanFromHoldings(assets, analyses, profile, dca, profile?.planExcluded ?? []),
+    () =>
+      buildPlanFromHoldings(
+        assets,
+        analyses,
+        profile,
+        dca,
+        profile?.planExcluded ?? [],
+        profile?.planWeights,
+      ),
     [assets, analyses, profile, dca],
   );
 
@@ -192,6 +200,10 @@ function Dashboard() {
             const cur = profile.planExcluded ?? [];
             const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
             saveProfile({ ...profile, planExcluded: next });
+          }}
+          onWeights={(w) => {
+            const { planWeights: _drop, ...rest } = profile;
+            saveProfile(w ? { ...rest, planWeights: w } : rest);
           }}
           onClose={() => setPlanOpen(false)}
         />

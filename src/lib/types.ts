@@ -48,6 +48,8 @@ export interface Profile {
   hideAmounts?: boolean;
   /** Lignes que l'utilisateur a écartées du plan du mois. */
   planExcluded?: string[];
+  /** Répartition fixée à la main, en pourcentage par ligne. */
+  planWeights?: Record<string, number>;
   /** Date ISO du dernier export de sauvegarde. */
   lastBackup?: string;
   /** Rappel de versement en début de mois. */

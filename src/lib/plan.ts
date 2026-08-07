@@ -51,6 +51,11 @@ export function bufferStatus(assets: Asset[], profile: Profile | null): BufferSt
   return { amount, months, sufficient: months >= BUFFER_MONTHS };
 }
 
+/** Lignes susceptibles d'entrer au plan : cotées, avec un ticker. */
+export function isPlanCandidate(a: Asset): boolean {
+  return (a.type === "pea" || a.type === "crypto") && Boolean(String(a.data["ticker"] ?? "").trim());
+}
+
 export interface PlanLine {
   assetId: string;
   label: string;
@@ -68,6 +73,8 @@ export interface PlanLine {
 export interface PlanResult {
   lines: PlanLine[];
   buffer: BufferStatus;
+  /** La répartition vient d'une saisie manuelle, pas du calcul. */
+  manual?: boolean;
   /** Explication affichée quand aucune ligne n'est proposée. */
   note?: string;
 }
@@ -91,6 +98,8 @@ export function buildPlanFromHoldings(
   dca: number,
   /** Lignes écartées manuellement du plan. */
   excluded: string[] = [],
+  /** Répartition fixée à la main, en pourcentage par ligne. */
+  manual?: Record<string, number>,
 ): PlanResult {
   const buffer = bufferStatus(assets, profile);
   const risk = profile?.riskProfile ?? "equilibre";
@@ -164,6 +173,30 @@ export function buildPlanFromHoldings(
       adjust: 0,
     })),
   ];
+
+  // Une répartition saisie à la main remplace le calcul, sur les lignes
+  // qu'elle couvre. Le modèle continue de s'appliquer aux autres.
+  const manualLines = manual
+    ? weighted.filter((w) => typeof manual[w.id] === "number" && manual[w.id]! > 0)
+    : [];
+  if (manualLines.length) {
+    const manualTotal = manualLines.reduce((s, w) => s + (manual?.[w.id] ?? 0), 0);
+    if (manualTotal > 0) {
+      return {
+        lines: manualLines.map((w) => ({
+          assetId: w.id,
+          label: w.label,
+          weight: Math.round(((manual?.[w.id] ?? 0) / manualTotal) * 100),
+          amount: Math.round((dca * (manual?.[w.id] ?? 0)) / manualTotal),
+          score: w.score,
+          signal: w.signal,
+          ...(w.currentShare !== undefined ? { currentShare: w.currentShare } : {}),
+        })),
+        buffer,
+        manual: true,
+      };
+    }
+  }
 
   const total = weighted.reduce((s, w) => s + w.weight, 0);
   const lines: PlanLine[] = weighted.map((w) => ({

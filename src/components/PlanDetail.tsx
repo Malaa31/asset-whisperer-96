@@ -1,15 +1,20 @@
 import { useState } from "react";
-import { Info, Minus, Plus, X } from "lucide-react";
+import { Check, Info, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { eur } from "@/lib/format";
 import { SIGNAL_LABELS, VERDICT_LABELS, type Analysis } from "@/lib/signals";
-import { BUFFER_MONTHS, type PlanResult } from "@/lib/plan";
+import { BUFFER_MONTHS, isPlanCandidate, type PlanResult } from "@/lib/plan";
 import { RISK_LABELS, type Asset, type Profile } from "@/lib/types";
-import { assetValue } from "@/lib/calc";
 
 /**
- * Feuille du plan du mois : seul endroit où lire le classement.
- * Les lignes viennent du portefeuille — on renforce ce qu'on détient
- * déjà, en priorité ce qui a le mieux travaillé au regard du risque.
+ * Feuille du plan du mois.
+ *
+ * Volontairement sobre : chaque ligne tient en deux informations, le
+ * montant et une qualification courte. Les critères — performance
+ * ajustée du risque, tendance, concentration, adéquation au profil —
+ * travaillent en arrière-plan et ne sont pas détaillés à l'écran.
+ *
+ * La répartition calculée peut être remplacée par une saisie manuelle,
+ * et le calcul repris à tout moment.
  */
 export function PlanDetail({
   plan,
@@ -18,6 +23,7 @@ export function PlanDetail({
   analyses,
   assets,
   onToggle,
+  onWeights,
   onClose,
 }: {
   plan: PlanResult;
@@ -26,17 +32,38 @@ export function PlanDetail({
   analyses: Map<string, Analysis>;
   assets: Asset[];
   onToggle: (assetId: string) => void;
+  onWeights: (weights: Record<string, number> | null) => void;
   onClose: () => void;
 }) {
   const [showInfo, setShowInfo] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+
   const excluded = profile.planExcluded ?? [];
-  // Lignes détenues mais absentes du plan : écartées à la main, ou sans
-  // historique suffisant, ou en signal Alléger.
   const inPlan = new Set(plan.lines.map((l) => l.assetId));
-  const others = assets.filter(
-    (a) => !inPlan.has(a.id) && a.type !== "credit" && assetValue(a) > 0,
-  );
-  const { buffer } = plan;
+  // Seules les lignes cotées peuvent entrer au plan : un livret ou une
+  // assurance vie n'a pas d'historique à analyser, il n'a rien à faire ici.
+  const others = assets.filter((a) => isPlanCandidate(a) && !inPlan.has(a.id));
+
+  const startEdit = () => {
+    setDraft(Object.fromEntries(plan.lines.map((l) => [l.assetId, String(l.weight)])));
+    setEditing(true);
+  };
+
+  const saveEdit = () => {
+    const weights: Record<string, number> = {};
+    for (const [id, v] of Object.entries(draft)) {
+      const n = Number(v.replace(",", "."));
+      if (Number.isFinite(n) && n > 0) weights[id] = n;
+    }
+    onWeights(Object.keys(weights).length ? weights : null);
+    setEditing(false);
+  };
+
+  const draftTotal = Object.values(draft).reduce((s, v) => {
+    const n = Number(v.replace(",", "."));
+    return s + (Number.isFinite(n) ? n : 0);
+  }, 0);
 
   return (
     <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
@@ -66,58 +93,69 @@ export function PlanDetail({
         <p className="font-display text-[2rem] leading-none">{eur(dca)}</p>
         <p className="mt-1 text-xs text-muted-foreground">
           à répartir ce mois-ci · profil {RISK_LABELS[profile.riskProfile].toLowerCase()}
+          {plan.manual ? " · répartition personnalisée" : ""}
         </p>
 
         {showInfo && (
           <p className="mt-4 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
-            Le plan ne propose que des lignes que vous détenez déjà, classées par
-            leur rapport rendement/risque passé (performance annualisée, Sharpe,
-            pire baisse) et leur tendance actuelle. À score comparable, une ligne
-            déjà surpondérée reçoit moins qu'une ligne sous-représentée, pour ne
-            pas dégrader la diversification. Les lignes en signal Alléger sont
-            écartées. L'épargne de précaution n'est alimentée que tant
-            qu'elle reste sous {BUFFER_MONTHS} mois de revenus. Ces indicateurs
-            décrivent le passé et ne constituent pas un conseil en investissement.
+            La répartition ne porte que sur des lignes que vous détenez déjà.
+            Elle tient compte de la performance passée rapportée au risque, de la
+            tendance récente, de la place actuelle de chaque ligne dans le
+            portefeuille et de son adéquation à votre profil. Vous pouvez retirer
+            une ligne, en ajouter une, ou fixer vous-même les pourcentages. Ces
+            indicateurs décrivent le passé et ne constituent pas un conseil en
+            investissement.
           </p>
         )}
 
-        {buffer.months !== undefined && (
-          <div
-            className={`mt-4 rounded-xl border p-3 text-[11px] leading-relaxed ${
-              buffer.sufficient
-                ? "border-primary/30 bg-primary/[0.06]"
-                : "border-amber/40 bg-amber/10"
-            }`}
-          >
-            Épargne de précaution : {eur(buffer.amount)}, soit{" "}
-            <span className="font-semibold">{buffer.months.toFixed(1)} mois</span> de
-            revenus.
-            {buffer.sufficient
-              ? ` Au-delà de ${BUFFER_MONTHS} mois, elle sort du plan : le versement va entièrement aux placements.`
-              : ` Une part du versement continue de l'alimenter jusqu'à ${BUFFER_MONTHS} mois.`}
-          </div>
-        )}
+        {buffer(plan, BUFFER_MONTHS)}
 
-        {buffer.months === undefined && (
-          <p className="mt-4 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
-            Renseignez vos revenus dans Profil pour que l'épargne de précaution
-            soit prise en compte.
-          </p>
-        )}
-
-        {plan.note && <p className="mt-4 text-sm text-muted-foreground">{plan.note}</p>}
-
-        <div className="mt-6 flex items-baseline justify-between gap-2">
+        <div className="mt-6 flex items-center justify-between gap-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Composition du plan
+            Répartition
           </p>
-          <p className="text-[10px] text-muted-foreground">modifiable ligne par ligne</p>
+          {editing ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="tap text-[11px] font-semibold text-muted-foreground"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={saveEdit}
+                className="tap flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground"
+              >
+                <Check className="size-3" /> Valider
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              {plan.manual && (
+                <button
+                  type="button"
+                  onClick={() => onWeights(null)}
+                  className="tap flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
+                >
+                  <RotateCcw className="size-3" /> Recalculer
+                </button>
+              )}
+              {plan.lines.length > 0 && (
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  className="tap flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground"
+                >
+                  <Pencil className="size-3" /> Ajuster
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-          Les parts reposent sur la performance passée ajustée du risque, la
-          tendance d'achat ou d'allègement, et la place actuelle de la ligne dans
-          votre portefeuille.
-        </p>
+
+        {plan.note && <p className="mt-3 text-sm text-muted-foreground">{plan.note}</p>}
 
         <ul className="mt-3 space-y-2.5">
           {plan.lines.map((l) => {
@@ -127,39 +165,28 @@ export function PlanDetail({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-semibold">{l.label}</p>
-                    {a && (
-                      <>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          {a.cagr.toFixed(1)} %/an · vol. {a.volatility.toFixed(0)} % ·{" "}
-                          {SIGNAL_LABELS[a.signal]}
-                        </p>
-                        <p className="mt-1 text-[11px] font-semibold">
-                          {VERDICT_LABELS[a.verdict]}
-                          {a.alpha !== undefined && (
-                            <span className="ml-1.5 num font-normal text-muted-foreground">
-                              alpha {a.alpha > 0 ? "+" : ""}
-                              {a.alpha.toFixed(1)} %/an
-                            </span>
-                          )}
-                        </p>
-                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                          {a.verdictReason}
-                        </p>
-                      </>
-                    )}
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {a
+                        ? `${SIGNAL_LABELS[a.signal]} · ${VERDICT_LABELS[a.verdict].toLowerCase()}`
+                        : "Épargne de précaution"}
+                    </p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="num text-sm font-semibold">{eur(l.amount)}</p>
-                    <p className="num text-[11px] text-muted-foreground">
-                      {l.weight} %{a ? ` · score ${l.score}` : ""}
-                    </p>
-                    {l.currentShare !== undefined && (
-                      <p className="num text-[10px] text-muted-foreground">
-                        {l.currentShare.toFixed(0)} % du portefeuille
-                        {l.diversificationAdjust
-                          ? ` · ${l.diversificationAdjust > 0 ? "+" : ""}${l.diversificationAdjust} %`
-                          : ""}
-                      </p>
+                    {editing ? (
+                      <div className="mt-1 flex items-center gap-1">
+                        <input
+                          inputMode="decimal"
+                          value={draft[l.assetId] ?? ""}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, [l.assetId]: e.target.value }))
+                          }
+                          className="num h-8 w-14 rounded-lg border border-border bg-elevated px-2 text-right text-xs outline-none focus:border-primary"
+                        />
+                        <span className="text-[11px] text-muted-foreground">%</span>
+                      </div>
+                    ) : (
+                      <p className="num text-[11px] text-muted-foreground">{l.weight} %</p>
                     )}
                   </div>
                 </div>
@@ -169,26 +196,13 @@ export function PlanDetail({
                     style={{ width: `${l.weight}%` }}
                   />
                 </div>
-                {a && (
-                  <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-                    Part calculée : score {l.score} sur 100
-                    {l.currentShare !== undefined
-                      ? ` · pèse ${l.currentShare.toFixed(0)} % du portefeuille`
-                      : ""}
-                    {l.diversificationAdjust
-                      ? l.diversificationAdjust > 0
-                        ? ` · sous-représentée, majorée de ${l.diversificationAdjust} %`
-                        : ` · surpondérée, minorée de ${Math.abs(l.diversificationAdjust)} %`
-                      : ""}
-                  </p>
-                )}
-                {a && (
+                {a && !editing && (
                   <button
                     type="button"
                     onClick={() => onToggle(l.assetId)}
                     className="tap mt-2 flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
                   >
-                    <Minus className="size-3" /> Retirer du plan
+                    <Minus className="size-3" /> Retirer
                   </button>
                 )}
               </li>
@@ -196,14 +210,26 @@ export function PlanDetail({
           })}
         </ul>
 
-        <div className="mt-6">
+        {editing && (
+          <p
+            className={`mt-3 text-center num text-[11px] ${
+              Math.round(draftTotal) === 100 ? "text-muted-foreground" : "text-amber"
+            }`}
+          >
+            Total {Math.round(draftTotal)} %
+            {Math.round(draftTotal) !== 100 && " — les montants seront proratisés"}
+          </p>
+        )}
+
+        {others.length > 0 && !editing && (
+          <div className="mt-6">
             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Autres lignes détenues
+              Ajouter au plan
             </p>
             <ul className="mt-2 space-y-2">
               {others.map((a) => {
-                const isExcluded = excluded.includes(a.id);
                 const an = analyses.get(a.id);
+                const isExcluded = excluded.includes(a.id);
                 return (
                   <li
                     key={a.id}
@@ -215,35 +241,54 @@ export function PlanDetail({
                         {isExcluded
                           ? "Retirée du plan"
                           : an
-                            ? `Signal ${SIGNAL_LABELS[an.signal]}`
-                            : "Historique insuffisant"}
+                            ? SIGNAL_LABELS[an.signal]
+                            : "Analyse indisponible"}
                       </p>
                     </div>
-                    {(isExcluded || an) && (
-                      <button
-                        type="button"
-                        onClick={() => onToggle(a.id)}
-                        className="tap flex shrink-0 items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-[11px] font-semibold text-primary"
-                      >
-                        <Plus className="size-3" /> Ajouter
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => onToggle(a.id)}
+                      className="tap flex shrink-0 items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-[11px] font-semibold text-primary"
+                    >
+                      <Plus className="size-3" /> Ajouter
+                    </button>
                   </li>
                 );
               })}
             </ul>
-          {!others.length && (
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Toutes vos lignes analysables figurent déjà dans le plan.
-            </p>
-          )}
-        </div>
+          </div>
+        )}
 
-        <p className="mt-5 text-[10px] leading-relaxed text-muted-foreground">
+        <p className="mt-6 text-[10px] leading-relaxed text-muted-foreground">
           Répartition calculée sur des données passées. Elle ne préjuge pas des
           performances futures et ne constitue pas un conseil en investissement.
         </p>
       </div>
+    </div>
+  );
+}
+
+/** Encart sur l'épargne de précaution, affiché seulement s'il apporte quelque chose. */
+function buffer(plan: PlanResult, months: number) {
+  const b = plan.buffer;
+  if (b.months === undefined) {
+    return (
+      <p className="mt-4 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
+        Renseignez vos revenus dans Profil pour que l'épargne de précaution soit
+        prise en compte.
+      </p>
+    );
+  }
+  return (
+    <div
+      className={`mt-4 rounded-xl border p-3 text-[11px] leading-relaxed ${
+        b.sufficient ? "border-primary/30 bg-primary/[0.06]" : "border-amber/40 bg-amber/10"
+      }`}
+    >
+      Épargne de précaution : {b.months.toFixed(1)} mois de revenus.
+      {b.sufficient
+        ? " Le versement va entièrement aux placements."
+        : ` Une part l'alimente jusqu'à ${months} mois.`}
     </div>
   );
 }
