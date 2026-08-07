@@ -64,3 +64,25 @@ if (Math.abs(sur.lines.reduce((s, l) => s + l.amount, 0) - 500) > 3) {
 
 console.log(errs.length ? errs.map((e) => `  \u2717 ${e}`).join("\n") : "\nRègles du plan mensuel respectées");
 if (errs.length) process.exitCode = 1;
+
+// Concentration : une ligne dont la zone pèse déjà lourd doit être freinée.
+const concentre = [
+  A("us", "pea", { name: "S&P 500", region: "États-Unis", quantity: 100, currentPrice: 100 }),
+  A("eu", "pea", { name: "Stoxx 600", region: "Europe", quantity: 10, currentPrice: 100 }),
+] as Asset[];
+const memeScore = new Map<string, Analysis>([
+  ["us", an(70, "renforcer")],
+  ["eu", an(70, "renforcer")],
+]);
+const pc = buildPlanFromHoldings(concentre, memeScore, { incomeMonthly: 5000 } as Profile, 500);
+const us = pc.lines.find((l) => l.assetId === "us");
+const eu = pc.lines.find((l) => l.assetId === "eu");
+if (!us?.concentrationNote) {
+  console.log("  \u2717 la ligne surpondérée n'est pas signalée");
+  process.exitCode = 1;
+} else if ((us.amount ?? 0) >= (eu?.amount ?? 0)) {
+  console.log("  \u2717 à score égal, la ligne concentrée devrait recevoir moins");
+  process.exitCode = 1;
+} else {
+  console.log(`Concentration prise en compte : ${us.amount} € vs ${eu?.amount} € à score égal`);
+}

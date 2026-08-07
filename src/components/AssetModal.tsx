@@ -14,6 +14,8 @@ import type { Asset, AssetType } from "@/lib/types";
 import { TYPE_LABELS } from "@/lib/types";
 import { uid } from "@/lib/storage";
 import { NaturalInput } from "./NaturalInput";
+import { AssetAnalysis } from "./AssetAnalysis";
+import type { Analysis } from "@/lib/signals";
 import { AmountTriangle, solveTriangle, type TriangleKey } from "./AmountTriangle";
 import { SymbolSearch, type SelectedSymbol } from "./SymbolSearch";
 import { fetchQuote } from "@/lib/market";
@@ -126,11 +128,14 @@ const TYPE_CARDS: Array<{ type: AssetType; Icon: typeof Home; color: string }> =
 
 export function AssetModal({
   asset,
+  analysis,
   onClose,
   onSave,
   onDelete,
 }: {
   asset: Asset | null;
+  /** Analyse de la ligne, affichée en modification. */
+  analysis?: Analysis | undefined;
   onClose: () => void;
   onSave: (a: Asset) => void;
   onDelete?: (id: string) => void;
@@ -330,6 +335,8 @@ export function AssetModal({
             onManual={() => setMode("manual")}
           />
         )}
+
+        {type && asset && analysis && <AssetAnalysis analysis={analysis} />}
 
         {type && (mode === "manual" || !searchable) && (
           <div className="space-y-3">

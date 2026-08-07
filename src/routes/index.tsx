@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, Plus, RefreshCw, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { requestAddAsset, useApp } from "@/lib/storage";
-import { totals } from "@/lib/calc";
+import { diversificationScore, totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
 import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
@@ -12,7 +12,7 @@ import { AssetSummary } from "@/components/AssetSummary";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
 import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
 import { PlanDetail } from "@/components/PlanDetail";
-import { buildPlanFromHoldings } from "@/lib/plan";
+import { buildPlanFromHoldings, monthlyDecision } from "@/lib/plan";
 import { useAnalyses } from "@/lib/useAnalyses";
 import type { Asset, PlanLine as ProfilePlanLine } from "@/lib/types";
 
@@ -79,6 +79,13 @@ function Dashboard() {
   const plan = useMemo(
     () => buildPlanFromHoldings(assets, analyses, profile, dca),
     [assets, analyses, profile, dca],
+  );
+  // Le score de diversification entre dans la décision : un plan qui
+  // ne regarde que la performance concentre le portefeuille sans le dire.
+  const diversification = useMemo(() => diversificationScore(assets).global, [assets]);
+  const decision = useMemo(
+    () => monthlyDecision(plan, dca, diversification),
+    [plan, dca, diversification],
   );
 
   return (
@@ -173,20 +180,27 @@ function Dashboard() {
         </div>
       )}
 
-      {dca > 0 && (
+      {decision && (
         <button
           type="button"
           onClick={() => setPlanOpen(true)}
-          className="tap card-surface mt-4 flex w-full items-center justify-between p-4 text-left"
+          className="tap card-surface mt-4 w-full p-5 text-left"
         >
-          <span className="flex items-center gap-2 text-sm font-semibold">
-            <CalendarCheck className="size-4 text-primary" />
-            Ton plan du mois
-          </span>
-          <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-            {eur(dca)}
-            <ChevronRight className="size-4" />
-          </span>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <CalendarCheck className="size-3.5 text-primary" />
+                Ce mois-ci
+              </p>
+              <p className="mt-1.5 text-[15px] font-semibold leading-snug">
+                {decision.headline}
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                {decision.detail}
+              </p>
+            </div>
+            <ChevronRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+          </div>
         </button>
       )}
 

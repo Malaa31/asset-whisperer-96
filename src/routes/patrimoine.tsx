@@ -9,8 +9,8 @@ import { eur, num, rawPct, signedEur } from "@/lib/format";
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 import { AssetModal } from "@/components/AssetModal";
 import { AllocationCard } from "@/components/AllocationCard";
-import { MonthlyPicks } from "@/components/MonthlyPicks";
 import { foreignCurrencyAssets } from "@/lib/calc";
+import { useAnalyses } from "@/lib/useAnalyses";
 import { canConvert, fxSnapshot } from "@/lib/fx";
 
 export const Route = createFileRoute("/patrimoine")({
@@ -32,13 +32,14 @@ export const Route = createFileRoute("/patrimoine")({
 });
 
 function Patrimoine() {
-  const { assets, upsertAsset, removeAsset, setAssets } = useApp();
+  const { assets, upsertAsset, removeAsset, setAssets, profile } = useApp();
   const [side, setSide] = useState<"actifs" | "passifs">("actifs");
   const [filter, setFilter] = useState<AssetType | "all">("all");
   const [editing, setEditing] = useState<Asset | null>(null);
   const [creating, setCreating] = useState(false);
   const [pointing, setPointing] = useState(false);
   const foreign = useMemo(() => foreignCurrencyAssets(assets), [assets]);
+  const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
   const fx = fxSnapshot();
   const converted = useMemo(
     () =>
@@ -116,7 +117,6 @@ function Patrimoine() {
       )}
 
       {side === "actifs" && <AllocationCard assets={assets} />}
-      {side === "actifs" && <MonthlyPicks />}
 
       <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">
         {(["all", ...types] as const).map((ty) => (
@@ -170,6 +170,7 @@ function Patrimoine() {
       {(editing || creating) && (
         <AssetModal
           asset={editing}
+          analysis={editing ? analyses.get(editing.id) : undefined}
           onClose={() => {
             setEditing(null);
             setCreating(false);
