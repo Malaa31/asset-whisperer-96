@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NaturalInput } from "./NaturalInput";
 import {
   AmountTriangle,
   solveTriangle,
@@ -53,6 +54,7 @@ const FIELDS: Record<AssetType, Field[]> = {
     { key: "ucDescription", label: "Support UC" },
   ],
   livret: [
+    { key: "name", label: "Nom" },
     { key: "type", label: "Type", placeholder: "Livret A, LDDS, LEP, PEL…" },
     { key: "amount", label: "Montant", type: "number" },
     { key: "taux", label: "Taux (%)", type: "number" },
@@ -68,6 +70,7 @@ const FIELDS: Record<AssetType, Field[]> = {
     { key: "loyer", label: "Loyer mensuel", type: "number" },
   ],
   crypto: [
+    { key: "name", label: "Nom" },
     { key: "ticker", label: "Ticker" },
     { key: "quantity", label: "Quantité", type: "number" },
     { key: "prixUnitaire", label: "Prix unitaire", type: "number" },
@@ -98,13 +101,16 @@ const FIELDS: Record<AssetType, Field[]> = {
 const ESSENTIAL: Record<AssetType, string[]> = {
   pea: ["name", "quantity", "pru", "currentPrice"],
   av: ["name", "fondsEurosAmount", "ucAmount"],
-  livret: ["type", "amount"],
+  livret: ["name", "type", "amount"],
   immo: ["type", "name", "valeurEstimee"],
-  crypto: ["ticker", "quantity", "prixUnitaire"],
+  crypto: ["name", "ticker", "quantity", "prixUnitaire"],
   cash: ["name", "amount"],
   autre: ["name", "amount"],
   credit: ["name", "capitalRestant", "mensualite"],
 };
+
+/** Métadonnées sans champ dédié, conservées à l'enregistrement. */
+const PRESERVED = ["envelope", "region", "sector", "currency", "isin", "lastPriceUpdate"];
 
 /** Champs pris en charge par le trio quantité · prix · total. */
 const TRIANGLE_KEYS: Record<string, string[] | undefined> = {
@@ -244,7 +250,10 @@ export function AssetModal({
       if (v === undefined || v === "") continue;
       clean[f.key] = f.type === "number" ? Number(v.replace(",", ".")) : v;
     }
-    if (data["lastPriceUpdate"]) clean["lastPriceUpdate"] = data["lastPriceUpdate"];
+    for (const k of PRESERVED) {
+      const v = data[k];
+      if (v !== undefined && v !== "" && clean[k] === undefined) clean[k] = v;
+    }
     onSave({
       id: asset?.id ?? uid(),
       type,
@@ -272,6 +281,24 @@ export function AssetModal({
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-28">
+        {!type && (
+          <div className="mb-5">
+            <NaturalInput
+              onParsed={(p) => {
+                setType(p.type);
+                setData(
+                  Object.fromEntries(Object.entries(p.data).map(([k, v]) => [k, String(v)])),
+                );
+                setMode("manual");
+                setShowMore(true);
+              }}
+            />
+            <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              ou choisis une catégorie
+            </p>
+          </div>
+        )}
+
         {!type && (
           <div className="grid grid-cols-2 gap-3">
             {TYPE_CARDS.map(({ type: t, Icon, color }) => (
