@@ -15,6 +15,8 @@ export interface HistoryPoint {
 export interface HistoryResult {
   symbol: string;
   points: HistoryPoint[];
+  /** Renseigné quand le ticker fourni était introuvable et a été remplacé. */
+  resolvedFrom?: string;
 }
 
 export const Route = createFileRoute("/api/public/history")({
@@ -46,6 +48,25 @@ export const Route = createFileRoute("/api/public/history")({
               // L'historique ne bouge pas dans la journée.
               headers: { "Cache-Control": "public, max-age=21600" },
             });
+          }
+        }
+
+        // Le ticker saisi peut être erroné ou inconnu de la source. Dans ce
+        // cas, on cherche le symbole correspondant au libellé de la ligne et
+        // on retente : l'utilisateur n'a pas à deviner le bon code.
+        const name = (url.searchParams.get("name") ?? "").trim().slice(0, 80);
+        if (name) {
+          for (const candidate of await resolveSymbols(name)) {
+            if (candidate === symbol) continue;
+            for (const query of attempts.slice(0, 2)) {
+              const points = await tryFetch(candidate, query);
+              if (points.length >= 24) {
+                return Response.json(
+                  { symbol: candidate, points, resolvedFrom: symbol } satisfies HistoryResult,
+                  { headers: { "Cache-Control": "public, max-age=21600" } },
+                );
+              }
+            }
           }
         }
 
@@ -108,4 +129,26 @@ function toMonthly(points: HistoryPoint[]): HistoryPoint[] {
     byMonth.set(new Date(p.t).toISOString().slice(0, 7), p);
   }
   return [...byMonth.values()].sort((a, b) => a.t - b.t);
+}
+
+/** Symboles candidats pour un libellé, via la recherche de la source. */
+async function resolveSymbols(name: string): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(name)}&quotesCount=6&newsCount=0`,
+      {
+        headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+        signal: AbortSignal.timeout(6000),
+      },
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as { quotes?: Array<{ symbol?: string }> };
+    const symbols = (data.quotes ?? [])
+      .map((q) => q.symbol)
+      .filter((sy): sy is string => typeof sy === "string");
+    // Les places européennes d'abord : une ligne de PEA y est cotée.
+    return [...symbols.filter((sy) => /\.(PA|AS|DE|MI|L)$/i.test(sy)), ...symbols].slice(0, 4);
+  } catch {
+    return [];
+  }
 }

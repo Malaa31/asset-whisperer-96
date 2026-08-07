@@ -48,6 +48,7 @@ export function AssetAnalysis({
   const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("5a");
   const [showInfo, setShowInfo] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [resolved, setResolved] = useState<string | undefined>(undefined);
 
   const ticker = String(asset.data["ticker"] ?? "");
 
@@ -59,11 +60,13 @@ export function AssetAnalysis({
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch(`/api/public/history?symbol=${encodeURIComponent(ticker)}`);
+        const q = new URLSearchParams({ symbol: ticker, name: String(asset.data["name"] ?? "") });
+        const res = await fetch(`/api/public/history?${q.toString()}`);
         const data = res.ok ? ((await res.json()) as HistoryResult) : null;
         if (cancelled) return;
         setPoints(data?.points ?? []);
-        setAnalysis(data?.points?.length ? analyze(ticker, data.points, risk) : null);
+        setResolved(data?.resolvedFrom ? data.symbol : undefined);
+        setAnalysis(data?.points?.length ? analyze(data.symbol, data.points, risk) : null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -71,7 +74,7 @@ export function AssetAnalysis({
     return () => {
       cancelled = true;
     };
-  }, [ticker, risk]);
+  }, [ticker, risk, asset.data]);
 
   const chart = useMemo(() => {
     if (!points?.length) return [];
@@ -113,6 +116,14 @@ export function AssetAnalysis({
           {asset.data["currentPrice"] ?? asset.data["prixUnitaire"] ?? "—"} €
           {ticker ? ` · ${ticker}` : ""}
         </p>
+
+        {resolved && (
+          <p className="mt-4 rounded-xl border border-amber/40 bg-amber/10 p-3 text-[11px] leading-relaxed text-muted-foreground">
+            Le ticker « {ticker} » est introuvable : les données affichées
+            proviennent de {resolved}. Corrigez le ticker de la ligne pour éviter
+            cette recherche à chaque ouverture.
+          </p>
+        )}
 
         {!ticker && (
           <p className="mt-5 rounded-xl bg-elevated p-3 text-[13px] text-muted-foreground">

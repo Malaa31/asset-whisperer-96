@@ -32,9 +32,12 @@ export function useAnalyses(assets: Asset[], risk: RiskProfile) {
     let cancelled = false;
     setLoading(true);
 
-    const load = async (symbol: string): Promise<HistoryResult | null> => {
+    const load = async (symbol: string, name?: string): Promise<HistoryResult | null> => {
       try {
-        const res = await fetch(`/api/public/history?symbol=${encodeURIComponent(symbol)}`);
+        const q = new URLSearchParams({ symbol });
+        // Le libellé sert de repli quand le ticker saisi est introuvable.
+        if (name) q.set("name", name);
+        const res = await fetch(`/api/public/history?${q.toString()}`);
         return res.ok ? ((await res.json()) as HistoryResult) : null;
       } catch {
         return null;
@@ -45,7 +48,10 @@ export function useAnalyses(assets: Asset[], risk: RiskProfile) {
       const bench = await load(BENCHMARK);
       const results = await Promise.all(
         tracked.map(async (asset) => {
-          const data = await load(String(asset.data["ticker"]));
+          const data = await load(
+            String(asset.data["ticker"]),
+            String(asset.data["name"] ?? ""),
+          );
           if (!data?.points?.length) return null;
           const a = analyze(String(asset.data["ticker"]), data.points, risk, bench?.points);
           return a ? ([asset.id, a] as const) : null;
