@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Check, Info, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { eur } from "@/lib/format";
-import { SIGNAL_LABELS, VERDICT_LABELS, type Analysis } from "@/lib/signals";
-import { BUFFER_MONTHS, isPlanCandidate, type PlanResult } from "@/lib/plan";
+import { SIGNAL_LABELS, type Analysis } from "@/lib/signals";
+import { BUFFER_MONTHS, POCKET_LABELS, isPlanCandidate, type PlanResult } from "@/lib/plan";
 import { RISK_LABELS, type Asset, type Profile } from "@/lib/types";
 
 /**
@@ -110,6 +110,38 @@ export function PlanDetail({
 
         {buffer(plan, BUFFER_MONTHS)}
 
+        {plan.pockets.length > 0 && !plan.manual && (
+          <div className="mt-5">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Vers votre allocation cible
+            </p>
+            <ul className="mt-2 space-y-2">
+              {plan.pockets.map((x) => (
+                <li key={x.pocket} className="flex items-center gap-3">
+                  <span className="w-20 shrink-0 text-[12px]">{POCKET_LABELS[x.pocket]}</span>
+                  <span className="relative h-2 flex-1 overflow-hidden rounded-full bg-elevated">
+                    <span
+                      className="absolute inset-y-0 left-0 rounded-full bg-primary/70"
+                      style={{ width: `${Math.min(100, x.current)}%` }}
+                    />
+                    <span
+                      className="absolute inset-y-0 w-0.5 bg-foreground"
+                      style={{ left: `${Math.min(100, x.target)}%` }}
+                    />
+                  </span>
+                  <span className="num w-24 shrink-0 text-right text-[11px] text-muted-foreground">
+                    {x.current.toFixed(0)} % / {x.target} %
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+              Le trait marque la cible de votre profil. Le versement va en
+              priorité aux poches en retard, sans jamais vendre.
+            </p>
+          </div>
+        )}
+
         <div className="mt-6 flex items-center justify-between gap-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Répartition
@@ -166,9 +198,8 @@ export function PlanDetail({
                   <div className="min-w-0">
                     <p className="truncate text-[13px] font-semibold">{l.label}</p>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {a
-                        ? `${SIGNAL_LABELS[a.signal]} · ${VERDICT_LABELS[a.verdict].toLowerCase()}`
-                        : "Épargne de précaution"}
+                      {POCKET_LABELS[l.pocket]}
+                      {a ? ` · ${SIGNAL_LABELS[a.signal].toLowerCase()}` : ""}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
