@@ -7,6 +7,7 @@ import {
   type HistoryPoint,
 } from "@/lib/storage";
 import { totals } from "@/lib/calc";
+import { pricesAreStale, refreshPrices } from "@/lib/prices";
 import { setAmountMasking } from "@/lib/format";
 import type { Asset, Profile } from "@/lib/types";
 
@@ -43,6 +44,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, [assets, ready]);
+
+  // Cours rafraîchis en arrière-plan à l'ouverture, si les derniers
+  // relevés datent de plus de quatre heures. Silencieux et sans blocage :
+  // un échec laisse simplement les cours précédents en place.
+  useEffect(() => {
+    if (!ready || !pricesAreStale(assets)) return;
+    let cancelled = false;
+    void refreshPrices(assets).then((next) => {
+      if (next && !cancelled) persist(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Une seule tentative par montage : `assets` change après la mise à jour.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   const value = useMemo<AppState>(
     () => ({

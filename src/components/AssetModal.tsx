@@ -1,4 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  AmountTriangle,
+  solveTriangle,
+  type TriangleKey,
+  type TriangleValues,
+} from "./AmountTriangle";
 import { X, Trash2, RefreshCw, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Landmark,
@@ -100,6 +106,12 @@ const ESSENTIAL: Record<AssetType, string[]> = {
   credit: ["name", "capitalRestant", "mensualite"],
 };
 
+/** Champs pris en charge par le trio quantité · prix · total. */
+const TRIANGLE_KEYS: Record<string, string[] | undefined> = {
+  pea: ["quantity", "currentPrice"],
+  crypto: ["quantity", "prixUnitaire"],
+};
+
 const TYPE_CARDS: Array<{ type: AssetType; Icon: typeof Home; color: string }> = [
   { type: "pea", Icon: Landmark, color: "text-primary" },
   { type: "av", Icon: ShieldCheck, color: "text-info" },
@@ -130,6 +142,24 @@ export function AssetModal({
     return init;
   });
   const [fetching, setFetching] = useState(false);
+  const [marketPrice, setMarketPrice] = useState<number | undefined>(undefined);
+  const priceField = type === "crypto" ? "prixUnitaire" : "currentPrice";
+  const [totalDraft, setTotalDraft] = useState(() => {
+    if (!asset) return "";
+    const q = Number(asset.data["quantity"] ?? 0);
+    const p = Number(
+      asset.data[asset.type === "crypto" ? "prixUnitaire" : "currentPrice"] ?? 0,
+    );
+    return q > 0 && p > 0 ? String(Math.round(q * p * 100) / 100) : "";
+  });
+  /** Ordre de saisie du trio, pour savoir quelle valeur recalculer. */
+  const triangleOrder = useRef<TriangleKey[]>([]);
+
+  const applyTriangle = (next: TriangleValues, edited: TriangleKey) => {
+    if (!triangleOrder.current.includes(edited)) triangleOrder.current.push(edited);
+    setData((d) => ({ ...d, quantity: next.quantity, [priceField]: next.price }));
+    setTotalDraft(next.total);
+  };
   // Déplié d'office en modification si un champ avancé est déjà renseigné.
   const [showMore, setShowMore] = useState(() =>
     Boolean(
@@ -171,17 +201,40 @@ export function AssetModal({
     const ticker = data["ticker"];
     if (!ticker) return;
     setFetching(true);
-    const q = await fetchQuote([ticker]);
-    const price = q[ticker]?.price;
-    if (price !== undefined) {
-      setData((d) => ({
-        ...d,
-        [type === "crypto" ? "prixUnitaire" : "currentPrice"]: String(price),
-        lastPriceUpdate: new Date().toISOString(),
-      }));
+    try {
+      const q = await fetchQuote([ticker]);
+      const price = q[ticker]?.price;
+      if (price !== undefined) {
+        setMarketPrice(price);
+        setData((d) => ({
+          ...d,
+          [type === "crypto" ? "prixUnitaire" : "currentPrice"]: String(price),
+          lastPriceUpdate: new Date().toISOString(),
+        }));
+      }
+    } finally {
+      // Sans ce finally, un échec réseau laissait l'indicateur tourner
+      // indéfiniment et le bouton désactivé.
+      setFetching(false);
     }
-    setFetching(false);
   };
+
+  // Cours proposé dès l'ouverture d'une ligne cotée dont le ticker est
+  // connu, pour éviter d'avoir à le chercher soi-même.
+  useEffect(() => {
+    if (!type || !TRIANGLE_KEYS[type]) return;
+    if (!data["ticker"] || marketPrice !== undefined || fetching) return;
+    void (async () => {
+      try {
+        const q = await fetchQuote([data["ticker"]!]);
+        const price = q[data["ticker"]!]?.price;
+        if (price !== undefined) setMarketPrice(price);
+      } catch {
+        // Cours indisponible : la saisie manuelle reste possible.
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, data["ticker"]]);
 
   const save = () => {
     if (!type) return;
@@ -266,10 +319,47 @@ export function AssetModal({
         {type && (mode === "manual" || !searchable) && (
           <div className="space-y-3">
             {FIELDS[type]
-              .filter((f) => ESSENTIAL[type].includes(f.key))
+              .filter(
+                (f) =>
+                  ESSENTIAL[type].includes(f.key) && !TRIANGLE_KEYS[type]?.includes(f.key),
+              )
               .map((f) => (
                 <FieldInput key={f.key} f={f} data={data} setData={setData} />
               ))}
+
+            {TRIANGLE_KEYS[type] && (
+              <AmountTriangle
+                values={{
+                  quantity: data["quantity"] ?? "",
+                  price: data[priceField] ?? "",
+                  total: totalDraft,
+                }}
+                quantityLabel={type === "crypto" ? "Quantité" : "Nombre de parts"}
+                priceLabel={type === "crypto" ? "Prix unitaire (€)" : "Cours (€)"}
+                marketPrice={marketPrice}
+                fetching={fetching}
+                onUseMarketPrice={
+                  marketPrice !== undefined
+                    ? () => {
+                        const next = solveTriangle(
+                          {
+                            quantity: data["quantity"] ?? "",
+                            price: String(marketPrice),
+                            total: totalDraft,
+                          },
+                          "price",
+                          triangleOrder.current,
+                        );
+                        applyTriangle(next, "price");
+                      }
+                    : undefined
+                }
+                onChange={(next, edited) => {
+                  const solved = solveTriangle(next, edited, triangleOrder.current);
+                  applyTriangle(solved, edited);
+                }}
+              />
+            )}
 
             {FIELDS[type].some((f) => !ESSENTIAL[type].includes(f.key)) && (
               <button
