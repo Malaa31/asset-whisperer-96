@@ -86,11 +86,11 @@ export function PlanDetail({
                 <span className="flex items-center gap-2">
                   <span>{p.emoji}</span>
                   <span className="truncate">{p.label}</span>
-                  <span className="rounded bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  <span className="rounded bg-elevated px-1.5 py-0.5 num text-[10px] text-muted-foreground">
                     {p.tag}
                   </span>
                 </span>
-                <span className="font-mono text-sm">{eur(p.amount)}</span>
+                <span className="num text-sm">{eur(p.amount)}</span>
               </div>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-elevated">
                 <div

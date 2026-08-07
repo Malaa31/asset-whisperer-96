@@ -59,7 +59,9 @@ export function GoalPanel() {
         ? "À portée immédiate."
         : cross !== undefined
           ? `Atteint dans ~${cross} an${cross > 1 ? "s" : ""} à ce rythme.`
-          : `${rawPct(rawProgress)} du chemin parcouru.`;
+          : rawProgress < 0
+            ? "Patrimoine net négatif : les crédits dépassent les actifs. Renseigne la valeur de ton bien pour une lecture juste."
+            : `${rawPct(rawProgress)} du chemin parcouru.`;
 
   return (
     <>
@@ -74,8 +76,8 @@ export function GoalPanel() {
               <Target className="size-4 text-amber" />
               {goal.label}
             </span>
-            <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              {rawPct(progress)}
+            <span className="flex items-center gap-1 num text-xs text-muted-foreground">
+              {rawProgress < 0 ? "—" : rawPct(progress)}
               <ChevronRight className="size-4" />
             </span>
           </div>

@@ -73,7 +73,7 @@ export function PlanEditor({
                     const v = Number(e.target.value.replace(",", "."));
                     set(r.id, { weight: Number.isFinite(v) ? v : 0 });
                   }}
-                  className="h-10 w-14 rounded-lg border border-border bg-elevated px-2 text-right font-mono text-sm outline-none focus:border-primary"
+                  className="h-10 w-14 rounded-lg border border-border bg-elevated px-2 text-right num text-sm outline-none focus:border-primary"
                 />
                 <span className="text-xs text-muted-foreground">%</span>
               </div>
@@ -106,7 +106,7 @@ export function PlanEditor({
         </button>
 
         <p
-          className={`text-center font-mono text-xs ${
+          className={`text-center num text-xs ${
             Math.round(total) === 100 ? "text-muted-foreground" : "text-amber"
           }`}
         >

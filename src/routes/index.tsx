@@ -133,9 +133,9 @@ function Dashboard() {
           </div>
         )}
         <p className="mt-5 border-t border-border pt-4 text-[11px] text-muted-foreground">
-          Actifs <span className="font-mono text-foreground">{eur(t.actifs)}</span>
+          Actifs <span className="num text-foreground">{eur(t.actifs)}</span>
           {"  ·  "}
-          Dettes <span className="font-mono text-destructive">{eur(t.dettes)}</span>
+          Dettes <span className="num text-destructive">{eur(t.dettes)}</span>
         </p>
       </section>
 
@@ -173,7 +173,7 @@ function Dashboard() {
             <CalendarCheck className="size-4 text-primary" />
             Ton plan du mois
           </span>
-          <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+          <span className="flex items-center gap-1 num text-xs text-muted-foreground">
             {eur(dca)}
             <ChevronRight className="size-4" />
           </span>

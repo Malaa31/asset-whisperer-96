@@ -44,7 +44,7 @@ export function AssetSummary({ assets }: { assets: Asset[] }) {
     <Link to="/patrimoine" className="tap card-surface mt-4 block p-5">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold">Synthèse des actifs</span>
-        <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+        <span className="flex items-center gap-1 num text-xs text-muted-foreground">
           {eur(total)}
           <ChevronRight className="size-4" />
         </span>
@@ -73,8 +73,8 @@ export function AssetSummary({ assets }: { assets: Asset[] }) {
               <span className="truncate">{TYPE_LABELS[x.type]}</span>
             </span>
             <span className="flex shrink-0 items-baseline gap-2">
-              <span className="font-mono">{eur(x.value)}</span>
-              <span className="w-9 text-right font-mono text-[11px] text-muted-foreground">
+              <span className="num">{eur(x.value)}</span>
+              <span className="w-9 text-right num text-[11px] text-muted-foreground">
                 {rawPct((x.value / total) * 100, 0)}
               </span>
             </span>
@@ -87,8 +87,8 @@ export function AssetSummary({ assets }: { assets: Asset[] }) {
               {rest.length} autre{rest.length > 1 ? "s" : ""}
             </span>
             <span className="flex shrink-0 items-baseline gap-2">
-              <span className="font-mono">{eur(restValue)}</span>
-              <span className="w-9 text-right font-mono text-[11px]">
+              <span className="num">{eur(restValue)}</span>
+              <span className="w-9 text-right num text-[11px]">
                 {rawPct((restValue / total) * 100, 0)}
               </span>
             </span>

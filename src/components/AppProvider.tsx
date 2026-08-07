@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import {
   AppContext,
   KEYS,
-  seedAssets,
   storage,
   type AppState,
   type HistoryPoint,
@@ -19,14 +18,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const p = storage.get<Profile>(KEYS.profile);
-    let a = storage.get<Asset[]>(KEYS.assets);
-    if (!a || a.length === 0) {
-      if (!storage.get<boolean>(KEYS.seeded)) {
-        a = seedAssets();
-        storage.set(KEYS.assets, a);
-        storage.set(KEYS.seeded, true);
-      }
-    }
+    const a = storage.get<Asset[]>(KEYS.assets);
     setProfile(p);
     setAmountMasking(Boolean(p?.hideAmounts));
     setAssetsState(a ?? []);
@@ -73,7 +65,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAmountMasking(false);
         storage.remove(KEYS.profile);
         storage.remove(KEYS.assets);
-        storage.remove(KEYS.seeded);
         storage.remove(KEYS.history);
         setHistory([]);
         setProfile(null);
