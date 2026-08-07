@@ -1,5 +1,6 @@
 import { assetValue } from "./calc";
 import type { Analysis } from "./signals";
+import { suitabilityFactor } from "./riskMatrix";
 import type { Asset, Profile } from "./types";
 
 /**
@@ -92,6 +93,7 @@ export function buildPlanFromHoldings(
   excluded: string[] = [],
 ): PlanResult {
   const buffer = bufferStatus(assets, profile);
+  const risk = profile?.riskProfile ?? "equilibre";
 
   const eligible = assets
     .map((a) => ({ asset: a, analysis: analyses.get(a.id) }))
@@ -116,9 +118,13 @@ export function buildPlanFromHoldings(
       // sous-représentée gagne autant.
       const gap = target > 0 ? (target - share) / target : 0;
       const adjust = Math.max(-0.33, Math.min(0.33, gap * 0.5));
-      return { ...c, share, adjust };
+      // Adéquation du support au profil, indépendante de la volatilité
+      // observée : une crypto ou un fonds émergent porte des aléas qu'un
+      // indice large ne porte pas. Correctif interne, non affiché.
+      const fit = suitabilityFactor(c.asset, risk);
+      return { ...c, share, adjust, fit };
     })
-    .sort((a, b) => b.analysis.score * (1 + b.adjust) - a.analysis.score * (1 + a.adjust))
+    .sort((a, b) => b.analysis.score * (1 + b.adjust) * b.fit - a.analysis.score * (1 + a.adjust) * a.fit)
     .slice(0, 5);
 
   // L'épargne de précaution n'est alimentée que tant qu'elle est
@@ -141,7 +147,7 @@ export function buildPlanFromHoldings(
       label: String(c.asset.data["name"] ?? c.analysis.symbol),
       // Le score sert de poids, corrigé de la concentration ; le plancher
       // évite qu'une ligne disparaisse complètement du plan.
-      weight: Math.max(5, c.analysis.score * (1 + c.adjust)),
+      weight: Math.max(5, c.analysis.score * (1 + c.adjust) * c.fit),
       score: c.analysis.score,
       signal: c.analysis.signal,
       currentShare: c.share,
