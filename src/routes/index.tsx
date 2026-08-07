@@ -8,12 +8,13 @@ import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
 import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
-import { AssetSummary } from "@/components/AssetSummary";
+import { AllocationCard } from "@/components/AllocationCard";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
-import { PlanDetail, type PlanLineView } from "@/components/PlanDetail";
-import { defaultLines } from "@/components/PlanEditor";
+import { PlanDetail } from "@/components/PlanDetail";
+import { buildPlanFromHoldings } from "@/lib/plan";
+import { useAnalyses } from "@/lib/useAnalyses";
 import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
-import type { Asset, PlanLine as ProfilePlanLine } from "@/lib/types";
+import type { Asset } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -74,9 +75,10 @@ function Dashboard() {
     setLastUpdate(stamps[stamps.length - 1]);
   }, [assets]);
 
+  const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
   const plan = useMemo(
-    () => buildPlan(profile?.planLines?.length ? profile.planLines : defaultLines(profile?.riskProfile ?? "equilibre"), dca),
-    [profile?.planLines, profile?.riskProfile, dca],
+    () => buildPlanFromHoldings(assets, analyses, profile, dca),
+    [assets, analyses, profile, dca],
   );
 
   return (
@@ -130,7 +132,7 @@ function Dashboard() {
         </p>
       </section>
 
-      <AssetSummary assets={assets} />
+      {assets.length > 0 && <AllocationCard assets={assets} />}
 
       <GoalPanel />
 
@@ -184,7 +186,7 @@ function Dashboard() {
           plan={plan}
           dca={dca}
           profile={profile}
-          saveProfile={saveProfile}
+          analyses={analyses}
           onClose={() => setPlanOpen(false)}
         />
       )}
@@ -192,15 +194,3 @@ function Dashboard() {
   );
 }
 
-function buildPlan(lines: ProfilePlanLine[], dca: number): PlanLineView[] {
-  const total = lines.reduce((sum, l) => sum + Math.max(0, l.weight), 0);
-  if (total <= 0) return [];
-  return lines
-    .filter((l) => l.weight > 0)
-    .map((l) => ({
-      emoji: l.emoji ?? "📈",
-      label: l.label,
-      tag: rawPct((l.weight / total) * 100, 0),
-      amount: Math.round((dca * l.weight) / total),
-    }));
-}

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PatrimoineRouteImport } from './routes/patrimoine'
 import { Route as ProfilRouteImport } from './routes/profil'
+import { Route as ApiPublicHistoryRouteImport } from './routes/api/public/history'
 import { Route as ApiPublicQuoteRouteImport } from './routes/api/public/quote'
 import { Route as ApiPublicSearchSymbolsRouteImport } from './routes/api/public/search-symbols'
 
@@ -30,6 +31,11 @@ const ProfilRoute = ProfilRouteImport.update({
   path: '/profil',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHistoryRoute = ApiPublicHistoryRouteImport.update({
+  id: '/api/public/history',
+  path: '/api/public/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicQuoteRoute = ApiPublicQuoteRouteImport.update({
   id: '/api/public/quote',
   path: '/api/public/quote',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/patrimoine': typeof PatrimoineRoute
   '/profil': typeof ProfilRoute
+  '/api/public/history': typeof ApiPublicHistoryRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/patrimoine': typeof PatrimoineRoute
   '/profil': typeof ProfilRoute
+  '/api/public/history': typeof ApiPublicHistoryRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/patrimoine': typeof PatrimoineRoute
   '/profil': typeof ProfilRoute
+  '/api/public/history': typeof ApiPublicHistoryRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
@@ -69,6 +78,7 @@ export interface FileRouteTypes {
     | '/'
     | '/patrimoine'
     | '/profil'
+    | '/api/public/history'
     | '/api/public/quote'
     | '/api/public/search-symbols'
   fileRoutesByTo: FileRoutesByTo
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
     | '/'
     | '/patrimoine'
     | '/profil'
+    | '/api/public/history'
     | '/api/public/quote'
     | '/api/public/search-symbols'
   id:
@@ -83,6 +94,7 @@ export interface FileRouteTypes {
     | '/'
     | '/patrimoine'
     | '/profil'
+    | '/api/public/history'
     | '/api/public/quote'
     | '/api/public/search-symbols'
   fileRoutesById: FileRoutesById
@@ -91,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PatrimoineRoute: typeof PatrimoineRoute
   ProfilRoute: typeof ProfilRoute
+  ApiPublicHistoryRoute: typeof ApiPublicHistoryRoute
   ApiPublicQuoteRoute: typeof ApiPublicQuoteRoute
   ApiPublicSearchSymbolsRoute: typeof ApiPublicSearchSymbolsRoute
 }
@@ -118,6 +131,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfilRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/history': {
+      id: '/api/public/history'
+      path: '/api/public/history'
+      fullPath: '/api/public/history'
+      preLoaderRoute: typeof ApiPublicHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/quote': {
       id: '/api/public/quote'
       path: '/api/public/quote'
@@ -139,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PatrimoineRoute: PatrimoineRoute,
   ProfilRoute: ProfilRoute,
+  ApiPublicHistoryRoute: ApiPublicHistoryRoute,
   ApiPublicQuoteRoute: ApiPublicQuoteRoute,
   ApiPublicSearchSymbolsRoute: ApiPublicSearchSymbolsRoute,
 }
