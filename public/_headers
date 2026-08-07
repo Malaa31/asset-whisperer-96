@@ -1,5 +1,5 @@
 # En-têtes de sécurité (Cloudflare Pages / Netlify).
-# Sur Vercel, c'est vercel.json qui fait foi — garder les deux en phase.
+# Sur Vercel, les en-têtes sont gérés par la plateforme.
 
 /*
   # Empêche l'app d'être encapsulée dans une iframe tierce : sans cela,

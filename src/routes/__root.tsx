@@ -154,10 +154,30 @@ function Shell() {
   // Service worker : l'app s'ouvre hors ligne et devient installable.
   useEffect(() => {
     if (!("serviceWorker" in navigator) || import.meta.env.DEV) return;
-    void navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Enregistrement refusé (contexte non sécurisé, navigation privée) :
-      // l'app fonctionne normalement, sans mode hors ligne.
-    });
+
+    void navigator.serviceWorker
+      .register("/sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        // Recherche active d'une mise à jour à chaque ouverture : sans
+        // cela, un nouveau déploiement peut rester invisible pendant des
+        // heures derrière l'ancienne version installée.
+        void reg.update();
+        reg.addEventListener("updatefound", () => {
+          const next = reg.installing;
+          if (!next) return;
+          next.addEventListener("statechange", () => {
+            // Une nouvelle version a pris la main alors qu'une ancienne
+            // servait déjà la page : on recharge une seule fois.
+            if (next.state === "activated" && navigator.serviceWorker.controller) {
+              window.location.reload();
+            }
+          });
+        });
+      })
+      .catch(() => {
+        // Enregistrement refusé (contexte non sécurisé, navigation privée) :
+        // l'app fonctionne normalement, sans mode hors ligne.
+      });
   }, []);
 
   useEffect(() => {
