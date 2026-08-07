@@ -1,6 +1,6 @@
 import { r as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
 import { a as Area, d as Tooltip, i as XAxis, o as Line, r as YAxis, s as CartesianGrid, t as ComposedChart, u as ResponsiveContainer } from "../_libs/recharts+[...].mjs";
-import { N as eur } from "./router-KexV0f5c.mjs";
+import { N as eur } from "./router-zm3Pr5My.mjs";
 //#region node_modules/.nitro/vite/services/ssr/assets/TrajectoryChart-DtfwZXx-.js
 var import_jsx_runtime = require_jsx_runtime();
 var AXIS = "oklch(0.55 0.01 270)";

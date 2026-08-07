@@ -478,6 +478,16 @@ var Mic = createLucideIcon("mic", [
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var Minus = createLucideIcon("minus", [["path", {
+	d: "M5 12h14",
+	key: "1ays0h"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var Package = createLucideIcon("package", [
 	["path", {
 		d: "M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z",
@@ -707,6 +717,19 @@ var Trash2 = createLucideIcon("trash-2", [
 * This source code is licensed under the ISC license.
 * See the LICENSE file in the root directory of this source tree.
 */
+var TrendingDown = createLucideIcon("trending-down", [["path", {
+	d: "M16 17h6v-6",
+	key: "t6n2it"
+}], ["path", {
+	d: "m22 17-8.5-8.5-5 5L2 7",
+	key: "x473p"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
 var TrendingUp = createLucideIcon("trending-up", [["path", {
 	d: "M16 7h6v6",
 	key: "box55l"
@@ -776,4 +799,4 @@ var X = createLucideIcon("x", [["path", {
 	key: "d8bk6v"
 }]]);
 //#endregion
-export { ChevronDown as A, Eye as C, ClipboardCheck as D, CreditCard as E, Banknote as F, ArrowRight as I, ArrowLeft as L, CalendarCheck as M, Bitcoin as N, ChevronUp as O, BellRing as P, House as S, Download as T, Package as _, TrendingUp as a, Landmark as b, Square as c, Search as d, RotateCcw as f, Pencil as g, PiggyBank as h, Upload as i, Check as j, ChevronRight as k, Sparkles as l, Plus as m, Wallet as n, Trash2 as o, RefreshCw as p, User as r, Target as s, X as t, ShieldCheck as u, Mic as v, EyeOff as w, Info as x, LoaderCircle as y };
+export { ChevronUp as A, Info as C, Download as D, EyeOff as E, Bitcoin as F, BellRing as I, Banknote as L, ChevronDown as M, Check as N, CreditCard as O, CalendarCheck as P, ArrowRight as R, Landmark as S, Eye as T, Pencil as _, TrendingUp as a, Mic as b, Target as c, ShieldCheck as d, Search as f, PiggyBank as g, Plus as h, Upload as i, ChevronRight as j, ClipboardCheck as k, Square as l, RefreshCw as m, Wallet as n, TrendingDown as o, RotateCcw as p, User as r, Trash2 as s, X as t, Sparkles as u, Package as v, House as w, LoaderCircle as x, Minus as y, ArrowLeft as z };
