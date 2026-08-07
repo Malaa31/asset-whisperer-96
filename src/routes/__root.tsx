@@ -84,17 +84,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      // Plein écran une fois ajoutée à l'écran d'accueil (iOS).
-      { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
-      { name: "apple-mobile-web-app-title", content: "Patrimoine" },
-      { name: "mobile-web-app-capable", content: "yes" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      { rel: "manifest", href: "/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,
@@ -151,9 +144,10 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
-  // Aucun service worker n'est enregistré : la version précédente mettait
-  // en cache ses propres fichiers et bloquait ses mises à jour. On se
-  // contente de désinscrire ce qui subsiste sur les appareils déjà visités.
+  // Nettoyage : une version antérieure enregistrait un service worker qui
+  // mettait l'app en cache et empêchait les mises à jour d'arriver. Il n'y
+  // en a plus aucun ; ce bloc désinstalle ce qui subsiste sur les appareils
+  // déjà visités, puis devient sans effet.
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     void navigator.serviceWorker.getRegistrations().then((regs) => {
