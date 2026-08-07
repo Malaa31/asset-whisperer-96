@@ -107,7 +107,19 @@ export function PlanDetail({
 
         {plan.note && <p className="mt-4 text-sm text-muted-foreground">{plan.note}</p>}
 
-        <ul className="mt-5 space-y-2.5">
+        <div className="mt-6 flex items-baseline justify-between gap-2">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Composition du plan
+          </p>
+          <p className="text-[10px] text-muted-foreground">modifiable ligne par ligne</p>
+        </div>
+        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+          Les parts reposent sur la performance passée ajustée du risque, la
+          tendance d'achat ou d'allègement, et la place actuelle de la ligne dans
+          votre portefeuille.
+        </p>
+
+        <ul className="mt-3 space-y-2.5">
           {plan.lines.map((l) => {
             const a = analyses.get(l.assetId);
             return (
@@ -158,6 +170,19 @@ export function PlanDetail({
                   />
                 </div>
                 {a && (
+                  <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+                    Part calculée : score {l.score} sur 100
+                    {l.currentShare !== undefined
+                      ? ` · pèse ${l.currentShare.toFixed(0)} % du portefeuille`
+                      : ""}
+                    {l.diversificationAdjust
+                      ? l.diversificationAdjust > 0
+                        ? ` · sous-représentée, majorée de ${l.diversificationAdjust} %`
+                        : ` · surpondérée, minorée de ${Math.abs(l.diversificationAdjust)} %`
+                      : ""}
+                  </p>
+                )}
+                {a && (
                   <button
                     type="button"
                     onClick={() => onToggle(l.assetId)}
@@ -171,8 +196,7 @@ export function PlanDetail({
           })}
         </ul>
 
-        {others.length > 0 && (
-          <div className="mt-6">
+        <div className="mt-6">
             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               Autres lignes détenues
             </p>
@@ -208,8 +232,12 @@ export function PlanDetail({
                 );
               })}
             </ul>
-          </div>
-        )}
+          {!others.length && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Toutes vos lignes analysables figurent déjà dans le plan.
+            </p>
+          )}
+        </div>
 
         <p className="mt-5 text-[10px] leading-relaxed text-muted-foreground">
           Répartition calculée sur des données passées. Elle ne préjuge pas des

@@ -28,52 +28,84 @@ export const Route = createFileRoute("/api/public/history")({
           return Response.json({ symbol, points: [] } satisfies HistoryResult);
         }
 
-        try {
-          const res = await fetch(
-            `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1mo&range=max`,
-            {
-              headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
-              // Sans délai d'expiration, une réponse qui ne vient jamais
-              // retiendrait la fonction jusqu'au timeout de la plateforme.
-              signal: AbortSignal.timeout(8000),
-            },
-          );
-          if (!res.ok) return Response.json({ symbol, points: [] } satisfies HistoryResult);
+        // Certains ETF européens ne repondent pas à la combinaison
+        // « range=max, interval=1mo » alors qu'ils renvoient bien un
+        // historique sur une plage bornée. On essaie donc plusieurs
+        // combinaisons avant de conclure à une absence de données.
+        const attempts = [
+          "interval=1mo&range=max",
+          "interval=1mo&range=10y",
+          "interval=1wk&range=10y",
+          "interval=1d&range=5y",
+        ];
 
-          const data = (await res.json()) as {
-            chart?: {
-              result?: Array<{
-                timestamp?: number[];
-                indicators?: {
-                  adjclose?: Array<{ adjclose?: Array<number | null> }>;
-                  quote?: Array<{ close?: Array<number | null> }>;
-                };
-              }>;
-            };
-          };
-
-          const r = data.chart?.result?.[0];
-          const ts = r?.timestamp ?? [];
-          const closes =
-            r?.indicators?.adjclose?.[0]?.adjclose ?? r?.indicators?.quote?.[0]?.close ?? [];
-
-          const points: HistoryPoint[] = [];
-          for (let i = 0; i < ts.length; i++) {
-            const c = closes[i];
-            const t = ts[i];
-            if (typeof c === "number" && c > 0 && typeof t === "number") {
-              points.push({ t: t * 1000, c });
-            }
+        for (const query of attempts) {
+          const points = await tryFetch(symbol, query);
+          if (points.length >= 24) {
+            return Response.json({ symbol, points } satisfies HistoryResult, {
+              // L'historique ne bouge pas dans la journée.
+              headers: { "Cache-Control": "public, max-age=21600" },
+            });
           }
-
-          return Response.json({ symbol, points } satisfies HistoryResult, {
-            // L'historique mensuel ne bouge pas dans la journée.
-            headers: { "Cache-Control": "public, max-age=21600" },
-          });
-        } catch {
-          return Response.json({ symbol, points: [] } satisfies HistoryResult);
         }
+
+        return Response.json({ symbol, points: [] } satisfies HistoryResult);
       },
     },
   },
 });
+
+/** Une tentative de récupération ; renvoie une liste vide en cas d'échec. */
+async function tryFetch(symbol: string, query: string): Promise<HistoryPoint[]> {
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${query}`,
+      {
+        headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+        // Sans délai d'expiration, une réponse qui ne vient jamais
+        // retiendrait la fonction jusqu'au timeout de la plateforme.
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as {
+      chart?: {
+        result?: Array<{
+          timestamp?: number[];
+          indicators?: {
+            adjclose?: Array<{ adjclose?: Array<number | null> }>;
+            quote?: Array<{ close?: Array<number | null> }>;
+          };
+        }>;
+      };
+    };
+
+    const r = data.chart?.result?.[0];
+    const ts = r?.timestamp ?? [];
+    const closes =
+      r?.indicators?.adjclose?.[0]?.adjclose ?? r?.indicators?.quote?.[0]?.close ?? [];
+
+    const raw: HistoryPoint[] = [];
+    for (let i = 0; i < ts.length; i++) {
+      const c = closes[i];
+      const t = ts[i];
+      if (typeof c === "number" && c > 0 && typeof t === "number") raw.push({ t: t * 1000, c });
+    }
+
+    // Les mesures attendent un point par mois : on ne garde que le
+    // dernier cours de chaque mois quand le pas est plus fin.
+    if (/interval=1(wk|d)/.test(query)) return toMonthly(raw);
+    return raw;
+  } catch {
+    return [];
+  }
+}
+
+function toMonthly(points: HistoryPoint[]): HistoryPoint[] {
+  const byMonth = new Map<string, HistoryPoint>();
+  for (const p of points) {
+    byMonth.set(new Date(p.t).toISOString().slice(0, 7), p);
+  }
+  return [...byMonth.values()].sort((a, b) => a.t - b.t);
+}
