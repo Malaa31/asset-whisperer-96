@@ -46,6 +46,8 @@ export interface Profile {
   goals?: Goal[];
   activeGoalId?: string;
   hideAmounts?: boolean;
+  /** Lignes que l'utilisateur a écartées du plan du mois. */
+  planExcluded?: string[];
   /** Date ISO du dernier export de sauvegarde. */
   lastBackup?: string;
   /** Rappel de versement en début de mois. */

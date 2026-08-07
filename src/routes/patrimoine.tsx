@@ -8,6 +8,7 @@ import { assetValue, assetGain, totals, n } from "@/lib/calc";
 import { eur, num, rawPct, signedEur } from "@/lib/format";
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 import { AssetModal } from "@/components/AssetModal";
+import { AssetAnalysis } from "@/components/AssetAnalysis";
 
 export const Route = createFileRoute("/patrimoine")({
   head: () => ({
@@ -28,10 +29,11 @@ export const Route = createFileRoute("/patrimoine")({
 });
 
 function Patrimoine() {
-  const { assets, upsertAsset, removeAsset, setAssets } = useApp();
+  const { assets, profile, upsertAsset, removeAsset, setAssets } = useApp();
   const [side, setSide] = useState<"actifs" | "passifs">("actifs");
   const [filter, setFilter] = useState<AssetType | "all">("all");
   const [editing, setEditing] = useState<Asset | null>(null);
+  const [analyzing, setAnalyzing] = useState<Asset | null>(null);
   const [creating, setCreating] = useState(false);
   const [pointing, setPointing] = useState(false);
 
@@ -113,7 +115,13 @@ function Patrimoine() {
               </div>
               <div className="space-y-2">
                 {g.items.map((a) => (
-                  <AssetRow key={a.id} asset={a} onOpen={() => setEditing(a)} />
+                  <AssetRow
+                    key={a.id}
+                    asset={a}
+                    onOpen={() =>
+                      a.data["ticker"] ? setAnalyzing(a) : setEditing(a)
+                    }
+                  />
                 ))}
               </div>
             </section>
@@ -162,6 +170,13 @@ function Patrimoine() {
             setPointing(false);
             toast.success("Montants mis à jour");
           }}
+        />
+      )}
+      {analyzing && (
+        <AssetAnalysis
+          asset={analyzing}
+          risk={profile?.riskProfile ?? "equilibre"}
+          onClose={() => setAnalyzing(null)}
         />
       )}
     </div>

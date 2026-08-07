@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Info, X } from "lucide-react";
+import { Info, Minus, Plus, X } from "lucide-react";
 import { eur } from "@/lib/format";
 import { SIGNAL_LABELS, VERDICT_LABELS, type Analysis } from "@/lib/signals";
 import { BUFFER_MONTHS, type PlanResult } from "@/lib/plan";
-import { RISK_LABELS, type Profile } from "@/lib/types";
+import { RISK_LABELS, type Asset, type Profile } from "@/lib/types";
+import { assetValue } from "@/lib/calc";
 
 /**
  * Feuille du plan du mois : seul endroit où lire le classement.
@@ -15,15 +16,26 @@ export function PlanDetail({
   dca,
   profile,
   analyses,
+  assets,
+  onToggle,
   onClose,
 }: {
   plan: PlanResult;
   dca: number;
   profile: Profile;
   analyses: Map<string, Analysis>;
+  assets: Asset[];
+  onToggle: (assetId: string) => void;
   onClose: () => void;
 }) {
   const [showInfo, setShowInfo] = useState(false);
+  const excluded = profile.planExcluded ?? [];
+  // Lignes détenues mais absentes du plan : écartées à la main, ou sans
+  // historique suffisant, ou en signal Alléger.
+  const inPlan = new Set(plan.lines.map((l) => l.assetId));
+  const others = assets.filter(
+    (a) => !inPlan.has(a.id) && a.type !== "credit" && assetValue(a) > 0,
+  );
   const { buffer } = plan;
 
   return (
@@ -60,8 +72,10 @@ export function PlanDetail({
           <p className="mt-4 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
             Le plan ne propose que des lignes que vous détenez déjà, classées par
             leur rapport rendement/risque passé (performance annualisée, Sharpe,
-            pire baisse) et leur tendance actuelle. Les lignes en signal Alléger
-            sont écartées. L'épargne de précaution n'est alimentée que tant
+            pire baisse) et leur tendance actuelle. À score comparable, une ligne
+            déjà surpondérée reçoit moins qu'une ligne sous-représentée, pour ne
+            pas dégrader la diversification. Les lignes en signal Alléger sont
+            écartées. L'épargne de précaution n'est alimentée que tant
             qu'elle reste sous {BUFFER_MONTHS} mois de revenus. Ces indicateurs
             décrivent le passé et ne constituent pas un conseil en investissement.
           </p>
@@ -127,6 +141,14 @@ export function PlanDetail({
                     <p className="num text-[11px] text-muted-foreground">
                       {l.weight} %{a ? ` · score ${l.score}` : ""}
                     </p>
+                    {l.currentShare !== undefined && (
+                      <p className="num text-[10px] text-muted-foreground">
+                        {l.currentShare.toFixed(0)} % du portefeuille
+                        {l.diversificationAdjust
+                          ? ` · ${l.diversificationAdjust > 0 ? "+" : ""}${l.diversificationAdjust} %`
+                          : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-elevated">
@@ -135,10 +157,59 @@ export function PlanDetail({
                     style={{ width: `${l.weight}%` }}
                   />
                 </div>
+                {a && (
+                  <button
+                    type="button"
+                    onClick={() => onToggle(l.assetId)}
+                    className="tap mt-2 flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"
+                  >
+                    <Minus className="size-3" /> Retirer du plan
+                  </button>
+                )}
               </li>
             );
           })}
         </ul>
+
+        {others.length > 0 && (
+          <div className="mt-6">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Autres lignes détenues
+            </p>
+            <ul className="mt-2 space-y-2">
+              {others.map((a) => {
+                const isExcluded = excluded.includes(a.id);
+                const an = analyses.get(a.id);
+                return (
+                  <li
+                    key={a.id}
+                    className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px]">{String(a.data["name"] ?? "Ligne")}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {isExcluded
+                          ? "Retirée du plan"
+                          : an
+                            ? `Signal ${SIGNAL_LABELS[an.signal]}`
+                            : "Historique insuffisant"}
+                      </p>
+                    </div>
+                    {(isExcluded || an) && (
+                      <button
+                        type="button"
+                        onClick={() => onToggle(a.id)}
+                        className="tap flex shrink-0 items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-[11px] font-semibold text-primary"
+                      >
+                        <Plus className="size-3" /> Ajouter
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         <p className="mt-5 text-[10px] leading-relaxed text-muted-foreground">
           Répartition calculée sur des données passées. Elle ne préjuge pas des

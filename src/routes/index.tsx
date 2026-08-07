@@ -77,7 +77,7 @@ function Dashboard() {
 
   const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
   const plan = useMemo(
-    () => buildPlanFromHoldings(assets, analyses, profile, dca),
+    () => buildPlanFromHoldings(assets, analyses, profile, dca, profile?.planExcluded ?? []),
     [assets, analyses, profile, dca],
   );
 
@@ -187,6 +187,12 @@ function Dashboard() {
           dca={dca}
           profile={profile}
           analyses={analyses}
+          assets={assets}
+          onToggle={(id) => {
+            const cur = profile.planExcluded ?? [];
+            const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+            saveProfile({ ...profile, planExcluded: next });
+          }}
           onClose={() => setPlanOpen(false)}
         />
       )}
