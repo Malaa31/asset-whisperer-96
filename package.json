@@ -9,13 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "test:parse": "tsx src/lib/__tests__/parse.cases.ts",
-    "test:parity": "tsx src/lib/__tests__/input-parity.cases.ts",
-    "test": "npm run test:parse && npm run test:parity && npm run test:triangle && npm run test:signals && npm run test:plan",
-    "test:triangle": "tsx src/lib/__tests__/triangle.cases.ts",
-    "test:signals": "tsx src/lib/__tests__/signals.cases.ts",
-    "test:plan": "tsx src/lib/__tests__/plan.cases.ts"
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

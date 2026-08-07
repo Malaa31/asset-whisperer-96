@@ -103,7 +103,7 @@ export function IncomeEditor({
                     value={drafts[r.id] ?? ""}
                     inputMode="decimal"
                     onChange={(e) => setDrafts((d) => ({ ...d, [r.id]: e.target.value }))}
-                    className="h-10 w-24 rounded-lg border border-border bg-elevated px-2 text-right num text-sm outline-none focus:border-primary"
+                    className="h-10 w-24 rounded-lg border border-border bg-elevated px-2 text-right font-mono text-sm outline-none focus:border-primary"
                   />
                   <span className="text-xs text-muted-foreground">€</span>
                 </div>

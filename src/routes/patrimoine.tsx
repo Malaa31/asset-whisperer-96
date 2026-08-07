@@ -8,7 +8,7 @@ import { assetValue, assetGain, totals, n } from "@/lib/calc";
 import { eur, num, rawPct, signedEur } from "@/lib/format";
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 import { AssetModal } from "@/components/AssetModal";
-import { useAnalyses } from "@/lib/useAnalyses";
+import { AllocationCard } from "@/components/AllocationCard";
 
 export const Route = createFileRoute("/patrimoine")({
   head: () => ({
@@ -29,13 +29,12 @@ export const Route = createFileRoute("/patrimoine")({
 });
 
 function Patrimoine() {
-  const { assets, upsertAsset, removeAsset, setAssets, profile } = useApp();
+  const { assets, upsertAsset, removeAsset, setAssets } = useApp();
   const [side, setSide] = useState<"actifs" | "passifs">("actifs");
   const [filter, setFilter] = useState<AssetType | "all">("all");
   const [editing, setEditing] = useState<Asset | null>(null);
   const [creating, setCreating] = useState(false);
   const [pointing, setPointing] = useState(false);
-  const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
 
   const t = useMemo(() => totals(assets), [assets]);
   const list = assets.filter((a) =>
@@ -79,13 +78,14 @@ function Patrimoine() {
             }`}
           >
             <div className="capitalize">{s}</div>
-            <div className={`num text-sm ${s === "passifs" ? "text-destructive" : ""}`}>
+            <div className={`font-mono text-sm ${s === "passifs" ? "text-destructive" : ""}`}>
               {eur(s === "actifs" ? t.actifs : t.dettes)}
             </div>
           </button>
         ))}
       </div>
 
+      {side === "actifs" && <AllocationCard assets={assets} />}
 
       <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4">
         {(["all", ...types] as const).map((ty) => (
@@ -111,7 +111,7 @@ function Patrimoine() {
             <section key={g.type}>
               <div className="mb-2 flex items-baseline justify-between">
                 <h2 className="text-sm font-semibold">{TYPE_LABELS[g.type]}</h2>
-                <span className="num text-xs text-muted-foreground">{eur(sub)}</span>
+                <span className="font-mono text-xs text-muted-foreground">{eur(sub)}</span>
               </div>
               <div className="space-y-2">
                 {g.items.map((a) => (
@@ -139,7 +139,6 @@ function Patrimoine() {
       {(editing || creating) && (
         <AssetModal
           asset={editing}
-          analysis={editing ? analyses.get(editing.id) : undefined}
           onClose={() => {
             setEditing(null);
             setCreating(false);
@@ -212,19 +211,19 @@ function AssetRow({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
           <div className="truncate text-sm font-semibold">
             {String(d["name"] ?? d["type"] ?? d["ticker"] ?? "Ligne")}
           </div>
-          <div className="mt-0.5 truncate num text-[11px] text-muted-foreground">
+          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
             {tags.join(" · ")}
           </div>
         </div>
         <div className="shrink-0 text-right">
           <div
-            className={`num text-sm ${asset.type === "credit" ? "text-destructive" : ""}`}
+            className={`font-mono text-sm ${asset.type === "credit" ? "text-destructive" : ""}`}
           >
             {eur(Math.abs(value))}
           </div>
           {gain !== 0 && (
             <div
-              className={`num text-[11px] ${gain >= 0 ? "text-primary" : "text-destructive"}`}
+              className={`font-mono text-[11px] ${gain >= 0 ? "text-primary" : "text-destructive"}`}
             >
               {signedEur(gain)}
             </div>

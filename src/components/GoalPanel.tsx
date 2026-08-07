@@ -9,14 +9,7 @@ import {
   profileGoals,
 } from "@/lib/goals";
 import type { Goal } from "@/lib/types";
-import { lazy, Suspense } from "react";
-import { ChartLegend } from "./ChartLegend";
-
-// recharts pèse 340 Ko : il n'est téléchargé qu'à l'ouverture de la
-// feuille Objectifs, pas au premier affichage de l'accueil.
-const TrajectoryChart = lazy(() =>
-  import("./TrajectoryChart").then((m) => ({ default: m.TrajectoryChart })),
-);
+import { TrajectoryChart, ChartLegend } from "./TrajectoryChart";
 import { GoalEditor } from "./GoalEditor";
 
 /**
@@ -66,9 +59,7 @@ export function GoalPanel() {
         ? "À portée immédiate."
         : cross !== undefined
           ? `Atteint dans ~${cross} an${cross > 1 ? "s" : ""} à ce rythme.`
-          : rawProgress < 0
-            ? "Patrimoine net négatif : les crédits dépassent les actifs. Renseigne la valeur de ton bien pour une lecture juste."
-            : `${rawPct(rawProgress)} du chemin parcouru.`;
+          : `${rawPct(rawProgress)} du chemin parcouru.`;
 
   return (
     <>
@@ -83,8 +74,8 @@ export function GoalPanel() {
               <Target className="size-4 text-amber" />
               {goal.label}
             </span>
-            <span className="flex items-center gap-1 num text-xs text-muted-foreground">
-              {rawProgress < 0 ? "—" : rawPct(progress)}
+            <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+              {rawPct(progress)}
               <ChevronRight className="size-4" />
             </span>
           </div>
@@ -178,11 +169,7 @@ export function GoalPanel() {
             </div>
 
             <div className="mt-5">
-              <Suspense
-                fallback={<div className="h-[200px] animate-pulse rounded-xl bg-elevated" />}
-              >
-                <TrajectoryChart data={traj} />
-              </Suspense>
+              <TrajectoryChart data={traj} />
             </div>
             <div className="mt-3">
               <ChartLegend />

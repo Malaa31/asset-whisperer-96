@@ -2,43 +2,31 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import {
   AppContext,
   KEYS,
+  seedAssets,
   storage,
   type AppState,
   type HistoryPoint,
 } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { setAmountMasking } from "@/lib/format";
-import { toast } from "sonner";
-import { ensureFxRates } from "@/lib/fx";
-import { REMINDER_SEEN_KEY } from "@/lib/reminder";
 import type { Asset, Profile } from "@/lib/types";
-
-/** Une seule alerte par session : inutile de harceler à chaque frappe. */
-let storageWarned = false;
-function warnStorageFull() {
-  if (storageWarned) return;
-  storageWarned = true;
-  toast.error("Enregistrement impossible", {
-    description:
-      "Le stockage du navigateur est plein ou indisponible. Exporte une sauvegarde depuis Profil avant de fermer l'app.",
-    duration: 10000,
-  });
-}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [assets, setAssetsState] = useState<Asset[]>([]);
   const [ready, setReady] = useState(false);
-  // Force un recalcul une fois les taux du jour récupérés.
-  const [fxTick, setFxTick] = useState(0);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
 
   useEffect(() => {
     const p = storage.get<Profile>(KEYS.profile);
-    const a = storage.get<Asset[]>(KEYS.assets);
-    // Taux de change : rafraîchis en arrière-plan, les derniers connus
-    // servent en attendant (et hors ligne).
-    void ensureFxRates().then(() => setFxTick((t) => t + 1));
+    let a = storage.get<Asset[]>(KEYS.assets);
+    if (!a || a.length === 0) {
+      if (!storage.get<boolean>(KEYS.seeded)) {
+        a = seedAssets();
+        storage.set(KEYS.assets, a);
+        storage.set(KEYS.seeded, true);
+      }
+    }
     setProfile(p);
     setAmountMasking(Boolean(p?.hideAmounts));
     setAssetsState(a ?? []);
@@ -48,7 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const persist = useCallback((next: Asset[]) => {
     setAssetsState(next);
-    if (!storage.set(KEYS.assets, next)) warnStorageFull();
+    storage.set(KEYS.assets, next);
   }, []);
 
   // Enregistre un point d'historique par jour pour la courbe "réel".
@@ -73,7 +61,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveProfile: (p) => {
         setProfile(p);
         setAmountMasking(Boolean(p.hideAmounts));
-        if (!storage.set(KEYS.profile, p)) warnStorageFull();
+        storage.set(KEYS.profile, p);
       },
       upsertAsset: (a) => {
         const exists = assets.some((x) => x.id === a.id);
@@ -85,14 +73,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAmountMasking(false);
         storage.remove(KEYS.profile);
         storage.remove(KEYS.assets);
+        storage.remove(KEYS.seeded);
         storage.remove(KEYS.history);
-        storage.remove(REMINDER_SEEN_KEY);
         setHistory([]);
         setProfile(null);
         setAssetsState([]);
       },
     }),
-    [profile, assets, ready, history, persist, fxTick],
+    [profile, assets, ready, history, persist],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

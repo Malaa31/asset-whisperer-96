@@ -24,6 +24,14 @@ export interface Goal {
   scope?: AssetType;
 }
 
+export interface PlanLine {
+  id: string;
+  label: string;
+  emoji?: string;
+  /** Poids relatif de la ligne (en %). */
+  weight: number;
+}
+
 export type IncomeKind = "salaire" | "locatif" | "dividendes" | "autre";
 
 export interface Income {
@@ -48,6 +56,8 @@ export interface Profile {
   hideAmounts?: boolean;
   /** Date ISO du dernier export de sauvegarde. */
   lastBackup?: string;
+  /** Répartition personnalisée du versement mensuel (sinon plan conseillé). */
+  planLines?: PlanLine[];
   /** Rappel de versement en début de mois. */
   monthlyReminder?: boolean;
   /** Dernier mois (AAAA-MM) où le versement a été marqué comme fait. */
@@ -61,6 +71,13 @@ export interface Asset {
   data: Record<string, string | number | undefined>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Snapshot {
+  date: string;
+  patrimoineNet: number;
+  totalActifs: number;
+  totalDettes: number;
 }
 
 export const TYPE_LABELS: Record<AssetType, string> = {

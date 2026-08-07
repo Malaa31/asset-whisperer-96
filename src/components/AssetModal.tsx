@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { X, Trash2, RefreshCw, ArrowLeft, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Landmark,
@@ -13,10 +13,6 @@ import {
 import type { Asset, AssetType } from "@/lib/types";
 import { TYPE_LABELS } from "@/lib/types";
 import { uid } from "@/lib/storage";
-import { NaturalInput } from "./NaturalInput";
-import { AssetAnalysis } from "./AssetAnalysis";
-import type { Analysis } from "@/lib/signals";
-import { AmountTriangle, solveTriangle, type TriangleKey } from "./AmountTriangle";
 import { SymbolSearch, type SelectedSymbol } from "./SymbolSearch";
 import { fetchQuote } from "@/lib/market";
 
@@ -51,7 +47,6 @@ const FIELDS: Record<AssetType, Field[]> = {
     { key: "ucDescription", label: "Support UC" },
   ],
   livret: [
-    { key: "name", label: "Nom" },
     { key: "type", label: "Type", placeholder: "Livret A, LDDS, LEP, PEL…" },
     { key: "amount", label: "Montant", type: "number" },
     { key: "taux", label: "Taux (%)", type: "number" },
@@ -67,7 +62,6 @@ const FIELDS: Record<AssetType, Field[]> = {
     { key: "loyer", label: "Loyer mensuel", type: "number" },
   ],
   crypto: [
-    { key: "name", label: "Nom" },
     { key: "ticker", label: "Ticker" },
     { key: "quantity", label: "Quantité", type: "number" },
     { key: "prixUnitaire", label: "Prix unitaire", type: "number" },
@@ -98,22 +92,13 @@ const FIELDS: Record<AssetType, Field[]> = {
 const ESSENTIAL: Record<AssetType, string[]> = {
   pea: ["name", "quantity", "pru", "currentPrice"],
   av: ["name", "fondsEurosAmount", "ucAmount"],
-  livret: ["name", "type", "amount"],
+  livret: ["type", "amount"],
   immo: ["type", "name", "valeurEstimee"],
-  crypto: ["name", "ticker", "quantity", "prixUnitaire"],
+  crypto: ["ticker", "quantity", "prixUnitaire"],
   cash: ["name", "amount"],
   autre: ["name", "amount"],
   credit: ["name", "capitalRestant", "mensualite"],
 };
-
-/** Métadonnées sans champ dédié, conservées telles quelles à l'enregistrement. */
-/** Types dont la saisie passe par le trio quantité · prix · total. */
-const TRIANGLE_KEYS: Record<string, string[] | undefined> = {
-  pea: ["quantity", "currentPrice"],
-  crypto: ["quantity", "prixUnitaire"],
-};
-
-const PRESERVED = ["envelope", "region", "sector", "currency", "isin", "lastPriceUpdate"];
 
 const TYPE_CARDS: Array<{ type: AssetType; Icon: typeof Home; color: string }> = [
   { type: "pea", Icon: Landmark, color: "text-primary" },
@@ -128,14 +113,11 @@ const TYPE_CARDS: Array<{ type: AssetType; Icon: typeof Home; color: string }> =
 
 export function AssetModal({
   asset,
-  analysis,
   onClose,
   onSave,
   onDelete,
 }: {
   asset: Asset | null;
-  /** Analyse de la ligne, affichée en modification. */
-  analysis?: Analysis | undefined;
   onClose: () => void;
   onSave: (a: Asset) => void;
   onDelete?: (id: string) => void;
@@ -148,38 +130,6 @@ export function AssetModal({
     return init;
   });
   const [fetching, setFetching] = useState(false);
-  const [marketPrice, setMarketPrice] = useState<number | undefined>(undefined);
-  const priceField = type === "crypto" ? "prixUnitaire" : "currentPrice";
-  const [totalDraft, setTotalDraft] = useState(() => {
-    const q = Number((asset?.data["quantity"] ?? 0) as number);
-    const p = Number((asset?.data[asset?.type === "crypto" ? "prixUnitaire" : "currentPrice"] ?? 0) as number);
-    return q > 0 && p > 0 ? String(Math.round(q * p * 100) / 100) : "";
-  });
-  /** Ordre de saisie du trio, pour savoir quelle valeur recalculer. */
-  const triangleOrder = useRef<TriangleKey[]>([]);
-
-  /** Va chercher le cours du marché pour le ticker saisi. */
-  const loadPrice = async () => {
-    const ticker = (data["ticker"] ?? "").trim().toUpperCase();
-    if (!ticker) return;
-    setFetching(true);
-    try {
-      const quotes = await fetchQuote([ticker]);
-      const q = quotes[ticker];
-      if (q?.price) setMarketPrice(q.price);
-    } finally {
-      setFetching(false);
-    }
-  };
-
-  // Cours proposé automatiquement à l'ouverture d'une ligne cotée.
-  useEffect(() => {
-    if (!TRIANGLE_KEYS[type ?? "autre"]) return;
-    const ticker = (data["ticker"] ?? "").trim();
-    if (!ticker || marketPrice !== undefined) return;
-    void loadPrice();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, data["ticker"]]);
   // Déplié d'office en modification si un champ avancé est déjà renseigné.
   const [showMore, setShowMore] = useState(() =>
     Boolean(
@@ -241,12 +191,7 @@ export function AssetModal({
       if (v === undefined || v === "") continue;
       clean[f.key] = f.type === "number" ? Number(v.replace(",", ".")) : v;
     }
-    // Sans cela, une ligne créée par recherche, par texte libre ou par dictée
-    // perdait ces informations, alors qu'une saisie manuelle n'y touche pas.
-    for (const k of PRESERVED) {
-      const v = data[k];
-      if (v !== undefined && v !== "" && clean[k] === undefined) clean[k] = v;
-    }
+    if (data["lastPriceUpdate"]) clean["lastPriceUpdate"] = data["lastPriceUpdate"];
     onSave({
       id: asset?.id ?? uid(),
       type,
@@ -274,24 +219,6 @@ export function AssetModal({
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-28">
-        {!type && (
-          <div className="mb-5">
-            <NaturalInput
-              onParsed={(p) => {
-                setType(p.type);
-                setData(
-                  Object.fromEntries(Object.entries(p.data).map(([k, v]) => [k, String(v)])),
-                );
-                setMode("manual");
-                setShowMore(true);
-              }}
-            />
-            <p className="mt-5 mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              ou choisis une catégorie
-            </p>
-          </div>
-        )}
-
         {!type && (
           <div className="grid grid-cols-2 gap-3">
             {TYPE_CARDS.map(({ type: t, Icon, color }) => (
@@ -336,40 +263,13 @@ export function AssetModal({
           />
         )}
 
-        {type && asset && analysis && <AssetAnalysis analysis={analysis} />}
-
         {type && (mode === "manual" || !searchable) && (
           <div className="space-y-3">
             {FIELDS[type]
-              .filter((f) => ESSENTIAL[type].includes(f.key) && !TRIANGLE_KEYS[type]?.includes(f.key))
+              .filter((f) => ESSENTIAL[type].includes(f.key))
               .map((f) => (
                 <FieldInput key={f.key} f={f} data={data} setData={setData} />
               ))}
-
-            {TRIANGLE_KEYS[type] && (
-              <AmountTriangle
-                values={{
-                  quantity: data["quantity"] ?? "",
-                  price: data[priceField] ?? "",
-                  total: totalDraft,
-                }}
-                priceLabel={type === "crypto" ? "Prix unitaire (€)" : "Cours actuel (€)"}
-                quantityLabel={type === "crypto" ? "Quantité" : "Nombre de parts"}
-                marketPrice={marketPrice}
-                onFetchPrice={data["ticker"] ? () => void loadPrice() : undefined}
-                fetching={fetching}
-                onChange={(next, edited) => {
-                  const solved = solveTriangle(next, edited, triangleOrder.current);
-                  if (!triangleOrder.current.includes(edited)) triangleOrder.current.push(edited);
-                  setData((d) => ({
-                    ...d,
-                    quantity: solved.quantity,
-                    [priceField]: solved.price,
-                  }));
-                  setTotalDraft(solved.total);
-                }}
-              />
-            )}
 
             {FIELDS[type].some((f) => !ESSENTIAL[type].includes(f.key)) && (
               <button
@@ -447,7 +347,7 @@ function FieldInput({
         value={data[f.key] ?? ""}
         placeholder={f.placeholder ?? ""}
         onChange={(e) => setData((d) => ({ ...d, [f.key]: e.target.value }))}
-        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 num text-sm outline-none focus:border-primary"
+        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 font-mono text-sm outline-none focus:border-primary"
       />
     </label>
   );

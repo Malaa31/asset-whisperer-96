@@ -17,8 +17,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { AssetModal } from "@/components/AssetModal";
 import { Onboarding } from "@/components/Onboarding";
-import { ADD_ASSET_EVENT, useApp } from "@/lib/storage";
-import { pricesAreStale, refreshPrices } from "@/lib/prices";
+import { useApp } from "@/lib/storage";
 
 function NotFoundComponent() {
   return (
@@ -123,47 +122,11 @@ function RootComponent() {
 }
 
 function Shell() {
-  const { profile, ready, saveProfile, upsertAsset, assets, setAssets } = useApp();
+  const { profile, ready, saveProfile, upsertAsset } = useApp();
   // Ouvre le modal d'ajout si l'onboarding s'est terminé sur « Ajouter ma première ligne ».
   const [adding, setAdding] = useState(false);
 
   // Ouvre le modal si l'onboarding s'est terminé sur « Ajouter ma première ligne ».
-  // Actualisation automatique des cours à l'ouverture, si les derniers
-  // relevés datent de plus de quatre heures. Silencieuse : l'utilisateur
-  // garde le bouton pour forcer un rafraîchissement.
-  useEffect(() => {
-    if (!ready || !pricesAreStale(assets)) return;
-    let cancelled = false;
-    void refreshPrices(assets).then((next) => {
-      if (next && !cancelled) setAssets(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // Une seule tentative par montage : `assets` change après la mise à jour.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
-
-  // Nettoyage : une version antérieure enregistrait un service worker qui
-  // mettait l'app en cache et empêchait les mises à jour d'arriver. Il n'y
-  // en a plus aucun ; ce bloc désinstalle ce qui subsiste sur les appareils
-  // déjà visités, puis devient sans effet.
-  useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-    void navigator.serviceWorker.getRegistrations().then((regs) => {
-      for (const reg of regs) void reg.unregister();
-    });
-    if ("caches" in window) {
-      void caches.keys().then((keys) => keys.forEach((k) => void caches.delete(k)));
-    }
-  }, []);
-
-  useEffect(() => {
-    const open = () => setAdding(true);
-    window.addEventListener(ADD_ASSET_EVENT, open);
-    return () => window.removeEventListener(ADD_ASSET_EVENT, open);
-  }, []);
-
   useEffect(() => {
     if (window.sessionStorage.getItem("patrimoine.openAdd") === "1") {
       window.sessionStorage.removeItem("patrimoine.openAdd");

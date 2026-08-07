@@ -131,7 +131,7 @@ export function QuickUpdate({
                       rs.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)),
                     )
                   }
-                  className="h-10 w-28 rounded-lg border border-border bg-elevated px-2 text-right num text-sm outline-none focus:border-primary"
+                  className="h-10 w-28 rounded-lg border border-border bg-elevated px-2 text-right font-mono text-sm outline-none focus:border-primary"
                 />
                 <span className="text-xs text-muted-foreground">€</span>
               </div>

@@ -111,16 +111,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/**
- * Montants et pourcentages. Les chiffres restent alignés d'une ligne à
- * l'autre sans recourir à une police à chasse fixe, qui les étirait et
- * jurait avec les libellés.
- */
-@utility num {
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
-}
-
 @utility card-surface {
   background-color: var(--card);
   border: 1px solid var(--border);

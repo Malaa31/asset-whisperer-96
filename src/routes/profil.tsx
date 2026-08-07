@@ -11,7 +11,6 @@ import {
   requestNotifications,
 } from "@/lib/reminder";
 import { useApp } from "@/lib/storage";
-import { BUILD_VERSION } from "@/lib/version";
 import {
   RISK_LABELS,
   TARGET_ALLOCATIONS,
@@ -113,7 +112,7 @@ function ProfilPage() {
               : "Salaire, locatif, dividendes…"}
           </span>
         </span>
-        <span className="flex items-center gap-1 num text-xs text-muted-foreground">
+        <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
           {eur(profile.incomeMonthly)}/mois
           <ChevronRight className="size-4" />
         </span>
@@ -220,10 +219,6 @@ function ProfilPage() {
       >
         <RotateCcw className="size-4" /> Tout réinitialiser
       </button>
-
-      <p className="mt-6 text-center text-[10px] text-muted-foreground">
-        Version {BUILD_VERSION}
-      </p>
     </div>
   );
 }
@@ -266,7 +261,7 @@ function Row({
             setText("");
           }
         }}
-        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 num text-sm outline-none focus:border-primary"
+        className="h-11 w-full rounded-xl border border-border bg-elevated px-3 font-mono text-sm outline-none focus:border-primary"
       />
     </label>
   );
