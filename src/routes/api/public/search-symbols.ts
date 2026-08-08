@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { forbidden, isAllowedOrigin } from "./_guard";
 
 export const Route = createFileRoute("/api/public/search-symbols")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAllowedOrigin(request)) return forbidden();
         const url = new URL(request.url);
         const q = (url.searchParams.get("q") ?? "").trim();
         if (!q) return Response.json([]);

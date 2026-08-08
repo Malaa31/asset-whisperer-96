@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { forbidden, isAllowedOrigin } from "./_guard";
 
 interface QuoteResult {
   price: number;
@@ -37,6 +38,7 @@ export const Route = createFileRoute("/api/public/quote")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAllowedOrigin(request)) return forbidden();
         const url = new URL(request.url);
         const symbols = (url.searchParams.get("symbols") ?? "")
           .split(",")

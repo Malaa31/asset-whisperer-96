@@ -137,7 +137,11 @@ export function pocketOf(a: Asset): Pocket | null {
 }
 
 export function isPlanCandidate(a: Asset): boolean {
-  return isContributable(a) && pocketOf(a) !== null && assetValue(a) >= 0;
+  const p = pocketOf(a);
+  // La précaution ne fait plus partie du versement : proposer d'y ajouter
+  // une ligne serait trompeur, elle ne recevrait jamais rien.
+  if (!p || p === "precaution") return false;
+  return isContributable(a) && assetValue(a) >= 0;
 }
 
 export interface BufferStatus {
@@ -363,7 +367,12 @@ export function buildPlanFromHoldings(
     const weights = pool.map((a) => {
       const an = analyses.get(a.id);
       const score = an?.score ?? 50;
-      return { asset: a, w: Math.max(5, score * suitabilityFactor(a, risk)), score, an };
+      // Le poids reste borné : la matrice d'adéquation module le score
+      // sans jamais l'annuler ni le faire exploser. Sans ce garde-fou,
+      // deux correctifs successifs peuvent se composer et faire
+      // disparaître une ligne pourtant retenue.
+      const w = Math.min(120, Math.max(10, score * suitabilityFactor(a, risk)));
+      return { asset: a, w, score, an };
     });
     const wSum = weights.reduce((s, x) => s + x.w, 0);
 

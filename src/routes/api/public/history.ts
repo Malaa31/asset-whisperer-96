@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { forbidden, isAllowedOrigin } from "./_guard";
 
 /**
  * Historique mensuel d'une valeur, depuis le début de sa cotation.
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/api/public/history")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        if (!isAllowedOrigin(request)) return forbidden();
         const url = new URL(request.url);
         const symbol = (url.searchParams.get("symbol") ?? "").trim().toUpperCase();
         // Format Yahoo : lettres, chiffres, point, tiret, accent circonflexe.

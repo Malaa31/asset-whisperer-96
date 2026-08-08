@@ -95,6 +95,14 @@ export function lookThrough(assets: Asset[]): Record<RegionBucket, number> {
 // --- Répartition & diversification ---
 
 /** Valeur positive par classe d'actif (les crédits sont exclus). */
+/**
+ * Répartition par classe, en valeurs nettes de dettes.
+ *
+ * Les crédits s'imputent sur l'actif qu'ils financent : un bien de
+ * 200 000 € grevé de 147 000 € d'encours pèse 53 000 €, pas 200 000.
+ * Sans cette imputation, la répartition affichée contredirait le plan du
+ * mois, qui raisonne déjà en net.
+ */
 export function allocationByType(assets: Asset[]): Array<{ type: Asset["type"]; value: number }> {
   const map = new Map<Asset["type"], number>();
   for (const a of assets) {
@@ -103,7 +111,28 @@ export function allocationByType(assets: Asset[]): Array<{ type: Asset["type"]; 
     if (v <= 0) continue;
     map.set(a.type, (map.get(a.type) ?? 0) + v);
   }
+
+  // Les crédits réduisent l'immobilier en priorité — ce sont très
+  // majoritairement des prêts immobiliers — puis le reste au prorata.
+  let debt = assets
+    .filter((a) => a.type === "credit")
+    .reduce((s, a) => s + Math.abs(assetValue(a)), 0);
+  if (debt > 0) {
+    const immo = map.get("immo") ?? 0;
+    const onImmo = Math.min(immo, debt);
+    if (onImmo > 0) map.set("immo", immo - onImmo);
+    debt -= onImmo;
+    if (debt > 0) {
+      const rest = [...map.entries()].filter(([, v]) => v > 0);
+      const restSum = rest.reduce((s, [, v]) => s + v, 0);
+      for (const [t, v] of rest) {
+        map.set(t, Math.max(0, v - (restSum > 0 ? (debt * v) / restSum : 0)));
+      }
+    }
+  }
+
   return [...map.entries()]
+    .filter(([, value]) => value > 0)
     .map(([type, value]) => ({ type, value }))
     .sort((a, b) => b.value - a.value);
 }
