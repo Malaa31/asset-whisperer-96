@@ -176,6 +176,21 @@ function Patrimoine() {
         <AssetAnalysis
           asset={analyzing}
           risk={profile?.riskProfile ?? "equilibre"}
+          onEdit={() => {
+            setEditing(analyzing);
+            setAnalyzing(null);
+          }}
+          onSell={() => {
+            if (
+              window.confirm(
+                `Retirer « ${String(analyzing.data["name"] ?? "cette ligne")} » de votre patrimoine ? À utiliser après une vente.`,
+              )
+            ) {
+              removeAsset(analyzing.id);
+              setAnalyzing(null);
+              toast.success("Ligne retirée");
+            }
+          }}
           onClose={() => setAnalyzing(null)}
         />
       )}

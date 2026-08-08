@@ -88,9 +88,18 @@ export function diversificationFactor(
   const sBenefit = benefitOf(sSplit, sectors, SECTOR_TARGET);
   const benefit = REGION_WEIGHT * rBenefit + (1 - REGION_WEIGHT) * sBenefit;
 
-  // Un écart de dix points vaut environ vingt pour cent de poids en plus
-  // ou en moins : sensible, sans écraser la qualité de la ligne.
-  return Math.min(1.4, Math.max(0.6, 1 + benefit * 2));
+  // Correction volontairement modérée : la diversification affine le
+  // classement, elle ne le renverse pas. Un ETF large doit rester le
+  // cœur du portefeuille même quand une zone de niche est en retard.
+  const factor = 1 + benefit * 1.1;
+
+  // Les supports largement diversifiés sont ancrés au-dessus de 0,9 :
+  // un ETF Monde couvre déjà plusieurs zones, le pénaliser au profit
+  // d'un fonds sur une seule région dégraderait la diversification qu'on
+  // cherche justement à améliorer.
+  const breadth = Object.values(rSplit).filter((w) => (w ?? 0) > 0.02).length;
+  const floor = breadth >= 3 ? 0.9 : 0.75;
+  return Math.min(1.25, Math.max(floor, factor));
 }
 
 /** Exposition du portefeuille, pour l'affichage. */

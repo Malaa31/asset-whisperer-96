@@ -4,8 +4,6 @@ import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import {
   allocationByType,
   diversificationScore,
-  lookThrough,
-  REGION_BUCKETS,
 } from "@/lib/calc";
 import { eur, rawPct } from "@/lib/format";
 import { portfolioExposure } from "@/lib/diversification";
@@ -78,11 +76,13 @@ export function AllocationCard({
 
   const byType = useMemo(() => allocationByType(assets), [assets]);
   const byRegion = useMemo(() => {
-    const lt = lookThrough(assets);
-    return REGION_BUCKETS.filter((r) => lt[r] > 0.5)
-      .map((r) => ({ key: r as string, value: lt[r], color: REGION_COLORS[r] ?? "#8E8E93" }))
+    const { regions } = portfolioExposure(assets, realSectors as never);
+    return Object.entries(regions)
+      .filter(([, v]) => v > 0.5)
+      .map(([key, value], i) => ({ key, value, color: REGION_COLORS[key] ?? SECTOR_COLORS[i % SECTOR_COLORS.length]! }))
       .sort((a, b) => b.value - a.value);
-  }, [assets]);
+  }, [assets, realSectors]);
+
   const score = useMemo(() => diversificationScore(assets), [assets]);
   const bySector = useMemo(() => {
     const { sectors } = portfolioExposure(assets, realSectors as never);

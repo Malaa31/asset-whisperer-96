@@ -238,7 +238,10 @@ export function sectorSplit(a: Asset, real?: Map<string, Split<Sector>>): Split<
 
 function estimatedSectorSplit(a: Asset): Split<Sector> {
   if (a.type === "crypto") return { Diversifié: 1 };
-  if (a.type === "immo") return { Immobilier: 1 };
+  // Un bien détenu en direct n'a pas de secteur de cotation : l'inclure
+  // écraserait la lecture, sa valeur dépassant de loin celle des lignes
+  // financières. Il figure dans la répartition par classe, pas ici.
+  if (a.type === "immo") return {};
   if (a.type === "av") {
     const uc = Number(a.data["ucAmount"] ?? 0);
     return uc > 0 ? normalize(SECTOR_MSCI_WORLD) : {};

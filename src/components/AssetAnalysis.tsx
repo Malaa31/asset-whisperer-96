@@ -37,10 +37,14 @@ function riskLevel(vol: number): { level: number; label: string; cls: string } {
 export function AssetAnalysis({
   asset,
   risk,
+  onEdit,
+  onSell,
   onClose,
 }: {
   asset: Asset;
   risk: RiskProfile;
+  onEdit: () => void;
+  onSell: () => void;
   onClose: () => void;
 }) {
   const [points, setPoints] = useState<HistoryPoint[] | null>(null);
@@ -89,6 +93,13 @@ export function AssetAnalysis({
   }, [points, range]);
 
   const periodPerf = chart.length ? chart[chart.length - 1]!.perf : 0;
+  const months = chart.length;
+  const periodLabel =
+    months >= 24
+      ? `${Math.round(months / 12)} ans`
+      : months > 1
+        ? `${months} mois`
+        : "la période";
   const up = periodPerf >= 0;
   const color = up ? "#1e5c48" : "#b3402e";
 
@@ -145,7 +156,9 @@ export function AssetAnalysis({
                 {periodPerf.toFixed(1)} %
               </span>
               <span className="text-[11px] text-muted-foreground">
-                sur {RANGES.find((r) => r.key === range)?.label.toLowerCase()}
+                {/* Période réellement couverte : l'historique disponible est
+                    parfois plus court que la plage demandée. */}
+                sur {periodLabel}
               </span>
             </div>
 
@@ -304,6 +317,23 @@ export function AssetAnalysis({
           </>
         )}
       </div>
+
+      <footer className="sticky bottom-0 flex gap-2 border-t border-border bg-card px-5 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="tap h-12 flex-1 rounded-xl border border-border text-sm font-semibold"
+        >
+          Modifier
+        </button>
+        <button
+          type="button"
+          onClick={onSell}
+          className="tap h-12 flex-1 rounded-xl border border-destructive/40 text-sm font-semibold text-destructive"
+        >
+          Vendre / retirer
+        </button>
+      </footer>
     </div>
   );
 }

@@ -36,10 +36,14 @@ export function exportBackup(): void {
   const a = document.createElement("a");
   a.href = url;
   a.download = `patrimoine-${stamp.slice(0, 10)}.json`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
-  // Recharge pour refléter lastBackup dans l'UI.
-  window.location.reload();
+  // Le lien doit rester le temps que le navigateur prenne le fichier :
+  // le retirer ou recharger la page trop tôt annule le téléchargement.
+  setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 2000);
 }
 
 /** Restaure une sauvegarde puis recharge l'app. Lance une erreur si invalide. */
