@@ -48,6 +48,13 @@ const BUFFER_SHARE = 0.35;
 /** Dosage écart / qualité dans la répartition entre poches. */
 const GAP_WEIGHT = 0.7;
 
+/**
+ * Part maximale d'une poche dans un versement mensuel.
+ * Sans ce plafond, une poche partant de presque rien absorbe tout le
+ * versement pendant des mois : le rattrapage doit s'étaler.
+ */
+const MAX_POCKET_SHARE = 0.5;
+
 /** En dessous, un versement ne vaut pas les frais d'ordre. */
 const MIN_TICKET = 20;
 
@@ -262,7 +269,7 @@ export function buildPlanFromHoldings(
   const valueOf = (p: Pocket): number =>
     p === "reels" ? Math.max(0, grossOf(p) - debtTotal) : grossOf(p);
 
-  const ALL: Pocket[] = ["actions", "securise", "reels", "precaution"];
+  const ALL: Pocket[] = ["actions", "securise", "reels"];
   const invested = ALL.reduce((s, p) => s + valueOf(p), 0);
 
   // La cible s'applique à toutes les poches où l'utilisateur détient
@@ -271,25 +278,20 @@ export function buildPlanFromHoldings(
   const held = ALL.filter((p) => allByPocket.has(p) || byPocket.has(p));
   const target = targetOf(risk, held);
 
-  // ── 1. Précaution servie en priorité tant qu'elle est incomplète ──
-  let remaining = dca;
+  // L'épargne de précaution n'entre pas dans le versement : c'est une
+  // réserve à constituer, pas un placement à arbitrer. L'app se contente
+  // de signaler si elle est insuffisante, et le versement va entièrement
+  // aux supports d'investissement.
+  const remaining = dca;
   const reserved = new Map<Pocket, number>();
-  // Le matelas se complète via la poche sécurisée, qui porte livrets et
-  // fonds euros — les supports qui le constituent.
-  if (!buffer.sufficient && buffer.months !== undefined && byPocket.has("securise")) {
-    const need = Math.max(0, (buffer.threshold - buffer.months) * (profile?.incomeMonthly ?? 0));
-    const part = Math.min(dca * BUFFER_SHARE, need);
-    if (part >= MIN_TICKET) {
-      reserved.set("securise", part);
-      remaining -= part;
-    }
-  }
 
   // ── 2. Écart à la cible, tempéré par la qualité des supports ──
   // Seules les poches disposant d'un support abondable peuvent recevoir.
   const investable = (["actions", "securise", "reels"] as Pocket[]).filter((p) =>
     byPocket.has(p),
   );
+  const currentOf = (p: Pocket): number => (invested > 0 ? (valueOf(p) / invested) * 100 : 0);
+
   const gaps = investable.map((p) => {
     const current = invested > 0 ? (valueOf(p) / invested) * 100 : 0;
     const scores = (byPocket.get(p) ?? [])
@@ -298,18 +300,54 @@ export function buildPlanFromHoldings(
     // Sans analyse, qualité neutre : un fonds euros n'a pas d'historique
     // de cours, il ne doit pas être écarté pour autant.
     const quality = scores.length ? scores.reduce((s, x) => s + x, 0) / scores.length : 50;
-    return { pocket: p, current, gap: Math.max(0, target[p] - current), quality };
+    // Le fonds euros et les livrets remplissent la même fonction
+    // défensive. Un matelas déjà excédentaire couvre donc le besoin de
+    // sécurisé : sans cette lecture, l'app ferait verser sur une
+    // assurance vie alors que le Livret A déborde déjà.
+    const defensiveNeed =
+      p === "securise"
+        ? Math.max(
+            0,
+            target["securise"] + target["precaution"] - current - currentOf("precaution"),
+          )
+        : Math.max(0, target[p] - current);
+    return { pocket: p, current, gap: defensiveNeed, quality };
   });
 
-  const gapSum = gaps.reduce((s, g) => s + g.gap, 0);
-  const qualSum = gaps.reduce((s, g) => s + g.quality, 0);
-  for (const g of gaps) {
+  // Une poche déjà au-dessus de sa cible ne reçoit rien : la qualité de
+  // ses supports ne justifie pas d'aggraver une surexposition. Elle ne
+  // départage que les poches réellement en retard.
+  const behind = gaps.filter((g) => g.gap > 0);
+  const pool = behind.length ? behind : gaps;
+  const gapSum = pool.reduce((s, g) => s + g.gap, 0);
+  const qualSum = pool.reduce((s, g) => s + g.quality, 0);
+  for (const g of pool) {
     const gapShare = gapSum > 0 ? g.gap / gapSum : 0;
-    const qualShare = qualSum > 0 ? g.quality / qualSum : 1 / Math.max(1, gaps.length);
+    const qualShare = qualSum > 0 ? g.quality / qualSum : 1 / Math.max(1, pool.length);
     // Aucune poche en retard : la qualité décide seule.
     const share = gapSum > 0 ? GAP_WEIGHT * gapShare + (1 - GAP_WEIGHT) * qualShare : qualShare;
-    reserved.set(g.pocket, (reserved.get(g.pocket) ?? 0) + remaining * share);
+    reserved.set(g.pocket, share);
   }
+
+  // Plafonnement, puis renormalisation sur les poches restantes.
+  if (reserved.size > 1) {
+    let excess = 0;
+    for (const [p, share] of reserved) {
+      if (share > MAX_POCKET_SHARE) {
+        excess += share - MAX_POCKET_SHARE;
+        reserved.set(p, MAX_POCKET_SHARE);
+      }
+    }
+    if (excess > 0) {
+      const room = [...reserved.entries()].filter(([, sh]) => sh < MAX_POCKET_SHARE);
+      const roomSum = room.reduce((s2, [, sh]) => s2 + (MAX_POCKET_SHARE - sh), 0);
+      for (const [p, sh] of room) {
+        const add = roomSum > 0 ? (excess * (MAX_POCKET_SHARE - sh)) / roomSum : 0;
+        reserved.set(p, sh + add);
+      }
+    }
+  }
+  for (const [p, share] of reserved) reserved.set(p, remaining * share);
 
   // ── 3. Répartition dans chaque poche ──
   const lines: PlanLine[] = [];

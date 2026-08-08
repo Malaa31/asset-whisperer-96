@@ -114,7 +114,7 @@ const PRESERVED = ["envelope", "region", "sector", "currency", "isin", "lastPric
 
 /** Champs pris en charge par le trio quantité · prix · total. */
 const TRIANGLE_KEYS: Record<string, string[] | undefined> = {
-  pea: ["quantity", "currentPrice"],
+  pea: ["quantity", "pru"],
   crypto: ["quantity", "prixUnitaire"],
 };
 
@@ -149,13 +149,12 @@ export function AssetModal({
   });
   const [fetching, setFetching] = useState(false);
   const [marketPrice, setMarketPrice] = useState<number | undefined>(undefined);
-  const priceField = type === "crypto" ? "prixUnitaire" : "currentPrice";
+  // Le trio porte sur le prix de revient, pas sur le cours du jour.
+  const priceField = type === "crypto" ? "prixUnitaire" : "pru";
   const [totalDraft, setTotalDraft] = useState(() => {
     if (!asset) return "";
     const q = Number(asset.data["quantity"] ?? 0);
-    const p = Number(
-      asset.data[asset.type === "crypto" ? "prixUnitaire" : "currentPrice"] ?? 0,
-    );
+    const p = Number(asset.data[asset.type === "crypto" ? "prixUnitaire" : "pru"] ?? 0);
     return q > 0 && p > 0 ? String(Math.round(q * p * 100) / 100) : "";
   });
   /** Ordre de saisie du trio, pour savoir quelle valeur recalculer. */
@@ -362,7 +361,7 @@ export function AssetModal({
                   total: totalDraft,
                 }}
                 quantityLabel={type === "crypto" ? "Quantité" : "Nombre de parts"}
-                priceLabel={type === "crypto" ? "Prix unitaire (€)" : "Cours (€)"}
+                priceLabel={type === "crypto" ? "Prix unitaire (€)" : "PRU (€)"}
                 marketPrice={marketPrice}
                 fetching={fetching}
                 onUseMarketPrice={
