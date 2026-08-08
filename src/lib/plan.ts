@@ -21,8 +21,26 @@ import { TARGET_ALLOCATIONS, type Asset, type Profile, type RiskProfile } from "
  *     ajustée du risque, leur tendance et leur adéquation au profil.
  */
 
-/** Seuil de l'épargne de précaution, en mois de revenus. */
-export const BUFFER_MONTHS = 10;
+/**
+ * Seuil de l'épargne de précaution, en mois de revenus.
+ * Il dépend du profil : accepter plus de risque suppose d'être moins
+ * exposé à devoir vendre au mauvais moment, donc un matelas plus épais
+ * pour un prudent qui vit mal la volatilité, plus mince pour un offensif
+ * qui l'assume.
+ */
+export const BUFFER_BY_PROFILE: Record<RiskProfile, number> = {
+  prudent: 12,
+  equilibre: 9,
+  dynamique: 6,
+  offensif: 4,
+};
+
+/** Valeur par défaut, utilisée hors contexte de profil. */
+export const BUFFER_MONTHS = 6;
+
+export function bufferMonthsFor(risk: RiskProfile): number {
+  return BUFFER_BY_PROFILE[risk] ?? BUFFER_MONTHS;
+}
 
 /** Part du versement réservée à la précaution tant qu'elle est incomplète. */
 const BUFFER_SHARE = 0.35;
@@ -33,14 +51,29 @@ const GAP_WEIGHT = 0.7;
 /** En dessous, un versement ne vaut pas les frais d'ordre. */
 const MIN_TICKET = 20;
 
-export type Pocket = "actions" | "securise" | "immo" | "precaution";
+export type Pocket = "actions" | "securise" | "reels" | "precaution";
 
 export const POCKET_LABELS: Record<Pocket, string> = {
   actions: "Actions",
   securise: "Sécurisé",
-  immo: "Immobilier",
+  reels: "Actifs réels",
   precaution: "Précaution",
 };
+
+/**
+ * Allocation cible par profil, sur les seules poches où l'on verse.
+ * Les cibles sont renormalisées sur les poches réellement détenues :
+ * l'app ne suggère jamais d'ouvrir un support absent du patrimoine.
+ */
+const POCKET_TARGETS: Record<RiskProfile, Record<Pocket, number>> = {
+  prudent: { actions: 25, securise: 45, reels: 10, precaution: 20 },
+  equilibre: { actions: 50, securise: 30, reels: 10, precaution: 10 },
+  dynamique: { actions: 70, securise: 15, reels: 10, precaution: 5 },
+  offensif: { actions: 85, securise: 8, reels: 5, precaution: 2 },
+};
+
+/** Or, argent et autres métaux, quel que soit le type de ligne choisi. */
+const METALS = /\b(or\b|gold|argent m[ée]tal|silver|platine|palladium|m[ée]taux|lingot)\b/i;
 
 /**
  * Épargne de précaution : livrets réglementés et fonds euros d'assurance
@@ -50,19 +83,26 @@ export const POCKET_LABELS: Record<Pocket, string> = {
  */
 export function isEmergencySavings(a: Asset): boolean {
   const label = `${a.data["name"] ?? ""} ${a.data["envelope"] ?? ""}`.toLowerCase();
+  // Les liquidités en attente sur un PEA ou un CTO sont destinées au
+  // marché, pas à couvrir un imprévu. Les titres de ces enveloppes, eux,
+  // relèvent de la poche actions.
   if (/\b(pea|cto|pee|per|compte[- ]titres?)\b/.test(label)) return false;
-  if (a.type === "livret") return true;
+  if (a.type === "livret" || a.type === "cash") return true;
   if (a.type === "av") return Number(a.data["fondsEurosAmount"] ?? 0) > 0;
   return false;
 }
 
 /** Poche d'une ligne, ou null si elle ne peut pas recevoir de versement. */
 export function pocketOf(a: Asset): Pocket | null {
+  const label = `${a.data["name"] ?? ""} ${a.data["sector"] ?? ""}`;
+  if (METALS.test(label)) return "reels";
   if (a.type === "pea" || a.type === "crypto") return "actions";
-  if (a.type === "immo") return "immo";
+  if (a.type === "immo") return "reels";
   if (a.type === "livret") return "precaution";
   if (a.type === "av") return Number(a.data["fondsEurosAmount"] ?? 0) > 0 ? "securise" : "actions";
-  // Crédit, compte courant, divers : trésorerie ou passif, pas une destination.
+  if (a.type === "autre") return "reels";
+  // Compte courant et crédits : trésorerie ou passif, jamais une
+  // destination de versement même s'ils comptent dans le matelas.
   return null;
 }
 
@@ -73,15 +113,18 @@ export function isPlanCandidate(a: Asset): boolean {
 export interface BufferStatus {
   amount: number;
   months?: number;
+  /** Seuil retenu pour ce profil, en mois de revenus. */
+  threshold: number;
   sufficient: boolean;
 }
 
 export function bufferStatus(assets: Asset[], profile: Profile | null): BufferStatus {
   const amount = assets.filter(isEmergencySavings).reduce((s, a) => s + assetValue(a), 0);
+  const threshold = bufferMonthsFor(profile?.riskProfile ?? "equilibre");
   const income = profile?.incomeMonthly ?? 0;
-  if (income <= 0) return { amount, sufficient: false };
+  if (income <= 0) return { amount, threshold, sufficient: false };
   const months = amount / income;
-  return { amount, months, sufficient: months >= BUFFER_MONTHS };
+  return { amount, months, threshold, sufficient: months >= threshold };
 }
 
 export interface PlanLine {
@@ -109,9 +152,17 @@ export interface PlanResult {
   note?: string;
 }
 
-function targetOf(risk: RiskProfile): Record<Pocket, number> {
-  const t = TARGET_ALLOCATIONS[risk] ?? TARGET_ALLOCATIONS.equilibre;
-  return { actions: t.actions, securise: t.obligations, immo: t.immo, precaution: t.cash };
+/**
+ * Cibles du profil, renormalisées sur les poches réellement détenues.
+ * Sans cela, une cible immobilier papier chez quelqu'un qui n'a aucune
+ * SCPI laisserait une part du versement sans destination.
+ */
+function targetOf(risk: RiskProfile, held: Pocket[]): Record<Pocket, number> {
+  const base = POCKET_TARGETS[risk] ?? POCKET_TARGETS.equilibre;
+  const sum = held.reduce((s, p) => s + base[p], 0);
+  const out: Record<Pocket, number> = { actions: 0, securise: 0, reels: 0, precaution: 0 };
+  for (const p of held) out[p] = sum > 0 ? (base[p] / sum) * 100 : 100 / held.length;
+  return out;
 }
 
 export function buildPlanFromHoldings(
@@ -167,24 +218,31 @@ export function buildPlanFromHoldings(
   const valueOf = (p: Pocket): number =>
     (byPocket.get(p) ?? []).reduce((s, a) => s + Math.max(0, assetValue(a)), 0);
 
-  const ALL: Pocket[] = ["actions", "securise", "immo", "precaution"];
+  const ALL: Pocket[] = ["actions", "securise", "reels", "precaution"];
   const invested = ALL.reduce((s, p) => s + valueOf(p), 0);
-  const target = targetOf(risk);
+
+  // La cible du profil se répartit sur les seules poches où l'utilisateur
+  // détient un support : on ne lui suggère pas d'ouvrir une SCPI ou
+  // d'acheter du métal, on ajuste ce qu'il a déjà.
+  const held = ALL.filter((p) => byPocket.has(p));
+  const target = targetOf(risk, held);
 
   // ── 1. Précaution servie en priorité tant qu'elle est incomplète ──
   let remaining = dca;
   const reserved = new Map<Pocket, number>();
-  if (!buffer.sufficient && buffer.months !== undefined && byPocket.has("precaution")) {
-    const need = Math.max(0, (BUFFER_MONTHS - buffer.months) * (profile?.incomeMonthly ?? 0));
+  // Le matelas se complète via la poche sécurisée, qui porte livrets et
+  // fonds euros — les supports qui le constituent.
+  if (!buffer.sufficient && buffer.months !== undefined && byPocket.has("securise")) {
+    const need = Math.max(0, (buffer.threshold - buffer.months) * (profile?.incomeMonthly ?? 0));
     const part = Math.min(dca * BUFFER_SHARE, need);
     if (part >= MIN_TICKET) {
-      reserved.set("precaution", part);
+      reserved.set("securise", part);
       remaining -= part;
     }
   }
 
   // ── 2. Écart à la cible, tempéré par la qualité des supports ──
-  const investable = (["actions", "securise", "immo"] as Pocket[]).filter((p) => byPocket.has(p));
+  const investable = (["actions", "securise", "reels"] as Pocket[]).filter((p) => byPocket.has(p));
   const gaps = investable.map((p) => {
     const current = invested > 0 ? (valueOf(p) / invested) * 100 : 0;
     const scores = (byPocket.get(p) ?? [])
@@ -243,7 +301,7 @@ export function buildPlanFromHoldings(
   for (const l of lines) l.weight = total > 0 ? Math.round((l.amount / total) * 100) : 0;
   lines.sort((a, b) => b.amount - a.amount);
 
-  const pockets: PocketView[] = ALL.filter((p) => byPocket.has(p) || target[p] > 0).map((p) => ({
+  const pockets: PocketView[] = held.map((p) => ({
     pocket: p,
     current: invested > 0 ? (valueOf(p) / invested) * 100 : 0,
     target: target[p],
