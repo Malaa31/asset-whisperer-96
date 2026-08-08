@@ -5,6 +5,8 @@ import { analyze, SIGNAL_LABELS, VERDICT_LABELS, type Analysis, type SignalKind 
 import type { HistoryPoint, HistoryResult } from "@/routes/api/public/history";
 import { eur } from "@/lib/format";
 import { assetValue } from "@/lib/calc";
+import { regionSplit, sectorSplit } from "@/lib/classify";
+import { useSectors } from "@/lib/useSectors";
 import type { Asset, RiskProfile } from "@/lib/types";
 
 const RANGES = [
@@ -55,6 +57,22 @@ export function AssetAnalysis({
   const [resolved, setResolved] = useState<string | undefined>(undefined);
 
   const ticker = String(asset.data["ticker"] ?? "");
+
+  // Composition de la ligne : la pondération publiée prime, l'estimation
+  // par indice sert de repli.
+  const realSectors = useSectors([asset]);
+  const sectorsAreReal = realSectors.size > 0;
+  const toRows = (split: Record<string, number | undefined>) =>
+    Object.entries(split)
+      .filter(([, v]) => (v ?? 0) > 0.005)
+      .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+      .map(([key, v]) => ({ key, value: (v ?? 0) * 100 }));
+  const regions = useMemo(() => toRows(regionSplit(asset)), [asset]);
+  const sectors = useMemo(
+    () => toRows(sectorSplit(asset, realSectors as never)),
+    [asset, realSectors],
+  );
+
 
   useEffect(() => {
     if (!ticker) {
@@ -229,6 +247,33 @@ export function AssetAnalysis({
           </p>
         )}
 
+        {(regions.length > 0 || sectors.length > 0) && (
+          <div className="card-surface mt-5 p-4">
+            <p className="text-sm font-semibold">Composition</p>
+            {regions.length > 0 && (
+              <>
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Régions
+                </p>
+                <Bars rows={regions} />
+              </>
+            )}
+            {sectors.length > 0 && (
+              <>
+                <p className="mt-4 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Secteurs
+                </p>
+                <Bars rows={sectors} />
+              </>
+            )}
+            <p className="mt-3 text-[10px] leading-relaxed text-muted-foreground">
+              {sectorsAreReal
+                ? "Pondérations sectorielles publiées par l'émetteur."
+                : "Répartition estimée à partir de l'indice suivi."}
+            </p>
+          </div>
+        )}
+
         {analysis && (
           <>
             <div className="card-surface mt-5 p-4">
@@ -335,6 +380,28 @@ export function AssetAnalysis({
         </button>
       </footer>
     </div>
+  );
+}
+
+/** Barres de composition, une ligne par poste. */
+function Bars({ rows }: { rows: Array<{ key: string; value: number }> }) {
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {rows.map((r) => (
+        <li key={r.key} className="flex items-center gap-2.5">
+          <span className="w-24 shrink-0 truncate text-[11px]">{r.key}</span>
+          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated">
+            <span
+              className="block h-full rounded-full bg-primary"
+              style={{ width: `${Math.min(100, r.value)}%` }}
+            />
+          </span>
+          <span className="num w-9 shrink-0 text-right text-[11px] text-muted-foreground">
+            {r.value.toFixed(0)} %
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

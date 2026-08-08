@@ -2,7 +2,7 @@ import { assetValue } from "./calc";
 import { diversificationFactor } from "./diversification";
 import { suitabilityFactor } from "./riskMatrix";
 import type { Analysis } from "./signals";
-import type { Sector } from "./classify";
+import { regionSplit, type Sector } from "./classify";
 import type { Asset, Profile, RiskProfile } from "./types";
 
 /**
@@ -329,10 +329,19 @@ export function buildPlan(
         // Sans historique exploitable — un fonds euros n'en a pas —, la
         // ligne reçoit une qualité neutre plutôt que d'être écartée.
         const quality = an?.score ?? 50;
+        // Ancrage du cœur de portefeuille : un support couvrant plusieurs
+        // zones prime sur un fonds de niche. Sans ce poids, un fonds
+        // émergent bien noté passait devant un ETF Monde, ce qui inverse
+        // la logique d'un portefeuille cœur-satellite.
+        const breadth = Object.values(regionSplit(a)).filter((x) => (x ?? 0) > 0.02).length;
+        const core = breadth >= 4 ? 1.5 : breadth === 3 ? 1.25 : 1;
         const w = clamp(
-          quality * suitabilityFactor(a, risk) * diversificationFactor(a, assets, realSectors),
+          quality *
+            core *
+            suitabilityFactor(a, risk) *
+            diversificationFactor(a, assets, realSectors),
           10,
-          120,
+          200,
         );
         return { asset: a, w };
       })
