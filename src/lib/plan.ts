@@ -93,6 +93,29 @@ export function isEmergencySavings(a: Asset): boolean {
 }
 
 /** Poche d'une ligne, ou null si elle ne peut pas recevoir de versement. */
+/**
+ * Supports d'immobilier papier : parts de SCPI, OPCI, SCI. Contrairement
+ * à un bien détenu en direct, ils s'achètent par fractions et peuvent
+ * donc recevoir un versement mensuel.
+ */
+const PAPER_REALESTATE = /\b(scpi|opci|sci\b|pierre[- ]papier|papier|parts?)\b/i;
+
+/**
+ * Une ligne peut-elle recevoir un versement ?
+ *
+ * Un appartement, une maison, un terrain pèsent dans l'allocation mais
+ * ne s'abondent pas : on n'ajoute pas cinquante euros par mois à un bien
+ * détenu en direct. Seuls les supports divisibles sont des destinations.
+ */
+export function isContributable(a: Asset): boolean {
+  if (a.type === "credit" || a.type === "cash" || a.type === "autre") return false;
+  if (a.type === "immo") {
+    const label = `${a.data["name"] ?? ""} ${a.data["type"] ?? ""} ${a.data["sector"] ?? ""}`;
+    return PAPER_REALESTATE.test(label);
+  }
+  return pocketOf(a) !== null;
+}
+
 export function pocketOf(a: Asset): Pocket | null {
   const label = `${a.data["name"] ?? ""} ${a.data["sector"] ?? ""}`;
   if (METALS.test(label)) return "reels";
@@ -107,7 +130,7 @@ export function pocketOf(a: Asset): Pocket | null {
 }
 
 export function isPlanCandidate(a: Asset): boolean {
-  return pocketOf(a) !== null && assetValue(a) >= 0;
+  return isContributable(a) && pocketOf(a) !== null && assetValue(a) >= 0;
 }
 
 export interface BufferStatus {
@@ -176,6 +199,14 @@ export function buildPlanFromHoldings(
   const risk = profile?.riskProfile ?? "equilibre";
   const buffer = bufferStatus(assets, profile);
 
+  // Deux ensembles distincts : tout ce qui pèse dans l'allocation, et le
+  // sous-ensemble qui peut réellement recevoir le versement.
+  const allByPocket = new Map<Pocket, Asset[]>();
+  for (const a of assets) {
+    const p = pocketOf(a);
+    if (p && assetValue(a) > 0) allByPocket.set(p, [...(allByPocket.get(p) ?? []), a]);
+  }
+
   const candidates = assets.filter((a) => isPlanCandidate(a) && !excluded.includes(a.id));
   if (!candidates.length || dca <= 0) {
     return {
@@ -210,21 +241,34 @@ export function buildPlanFromHoldings(
     }
   }
 
+  /**
+   * Valeur nette d'une poche : les crédits sont déduits de l'actif qu'ils
+   * financent. Un bien de 200 000 € grevé de 147 000 € d'encours ne pèse
+   * pas 200 000 € dans l'allocation, mais 53 000 €. Raisonner en brut
+   * surestime massivement l'immobilier et fausse tout le plan.
+   */
+  const debts = assets.filter((a) => a.type === "credit");
+  const debtTotal = debts.reduce((s2, a) => s2 + Math.abs(assetValue(a)), 0);
+
   const byPocket = new Map<Pocket, Asset[]>();
   for (const a of candidates) {
     const p = pocketOf(a)!;
     byPocket.set(p, [...(byPocket.get(p) ?? []), a]);
   }
+  // Les crédits immobiliers s'imputent sur la poche des actifs réels ;
+  // au-delà, l'excédent réduit le patrimoine sans creuser une poche.
+  const grossOf = (p: Pocket): number =>
+    (allByPocket.get(p) ?? []).reduce((s2, a) => s2 + Math.max(0, assetValue(a)), 0);
   const valueOf = (p: Pocket): number =>
-    (byPocket.get(p) ?? []).reduce((s, a) => s + Math.max(0, assetValue(a)), 0);
+    p === "reels" ? Math.max(0, grossOf(p) - debtTotal) : grossOf(p);
 
   const ALL: Pocket[] = ["actions", "securise", "reels", "precaution"];
   const invested = ALL.reduce((s, p) => s + valueOf(p), 0);
 
-  // La cible du profil se répartit sur les seules poches où l'utilisateur
-  // détient un support : on ne lui suggère pas d'ouvrir une SCPI ou
-  // d'acheter du métal, on ajuste ce qu'il a déjà.
-  const held = ALL.filter((p) => byPocket.has(p));
+  // La cible s'applique à toutes les poches où l'utilisateur détient
+  // quelque chose, qu'elles soient abondables ou non : un bien immobilier
+  // pèse dans l'allocation même s'il ne peut recevoir aucun versement.
+  const held = ALL.filter((p) => allByPocket.has(p) || byPocket.has(p));
   const target = targetOf(risk, held);
 
   // ── 1. Précaution servie en priorité tant qu'elle est incomplète ──
@@ -242,7 +286,10 @@ export function buildPlanFromHoldings(
   }
 
   // ── 2. Écart à la cible, tempéré par la qualité des supports ──
-  const investable = (["actions", "securise", "reels"] as Pocket[]).filter((p) => byPocket.has(p));
+  // Seules les poches disposant d'un support abondable peuvent recevoir.
+  const investable = (["actions", "securise", "reels"] as Pocket[]).filter((p) =>
+    byPocket.has(p),
+  );
   const gaps = investable.map((p) => {
     const current = invested > 0 ? (valueOf(p) / invested) * 100 : 0;
     const scores = (byPocket.get(p) ?? [])
