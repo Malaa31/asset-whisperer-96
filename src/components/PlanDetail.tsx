@@ -137,7 +137,10 @@ export function PlanDetail({
             </ul>
             <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
               Le trait marque la cible de votre profil. Le versement va en
-              priorité aux poches en retard, sans jamais vendre.
+              priorité aux poches en retard, sans jamais vendre. À l'intérieur
+              d'une poche, les lignes sont pondérées en transparence : un ETF
+              Monde contenant déjà des actions européennes et américaines, le
+              plan évite de doubler une zone déjà bien représentée.
             </p>
           </div>
         )}

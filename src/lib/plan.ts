@@ -1,4 +1,5 @@
 import { assetValue } from "./calc";
+import { diversificationFactor } from "./diversification";
 import { suitabilityFactor } from "./riskMatrix";
 import type { Analysis } from "./signals";
 import { TARGET_ALLOCATIONS, type Asset, type Profile, type RiskProfile } from "./types";
@@ -371,7 +372,14 @@ export function buildPlanFromHoldings(
       // sans jamais l'annuler ni le faire exploser. Sans ce garde-fou,
       // deux correctifs successifs peuvent se composer et faire
       // disparaître une ligne pourtant retenue.
-      const w = Math.min(120, Math.max(10, score * suitabilityFactor(a, risk)));
+      // Le poids combine la qualité de la ligne, son adéquation au profil
+      // et son effet sur la répartition géographique en transparence :
+      // renforcer un ETF Monde déjà très américain n'apporte pas la même
+      // chose qu'un support sur une zone sous-représentée.
+      const w = Math.min(
+        120,
+        Math.max(10, score * suitabilityFactor(a, risk) * diversificationFactor(a, assets)),
+      );
       return { asset: a, w, score, an };
     });
     const wSum = weights.reduce((s, x) => s + x.w, 0);
