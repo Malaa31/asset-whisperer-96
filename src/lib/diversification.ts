@@ -1,26 +1,26 @@
-import { assetValue, lookThrough, REGION_BUCKETS, type RegionBucket } from "./calc";
+import { assetValue } from "./calc";
+import { exposure, regionSplit, sectorSplit, type Region, type Sector } from "./classify";
 import type { Asset } from "./types";
 
 /**
- * Diversification géographique en transparence.
+ * Diversification en transparence, sur deux axes : géographique et
+ * sectoriel.
  *
- * Une ligne ne s'apprécie pas isolément : un ETF Monde contient déjà
- * environ 71 % d'actions américaines et 18 % d'européennes. Renforcer
- * Monde et Europe en même temps double l'exposition européenne sans que
- * cela se voie, et concentre encore davantage sur les États-Unis.
+ * Une ligne ne s'apprécie pas isolément. Un ETF Monde contient déjà
+ * environ 71 % d'actions américaines et 26 % de technologie : le
+ * renforcer aux côtés d'un S&P 500 et d'un fonds technologique concentre
+ * trois fois la même exposition sans que cela se voie.
  *
- * On mesure donc l'effet marginal de chaque euro versé sur une ligne :
- * rapproche-t-il la répartition géographique de la cible, ou l'en
- * éloigne-t-il ?
+ * On mesure donc l'effet marginal de chaque euro versé : rapproche-t-il
+ * la répartition des cibles, ou l'en éloigne-t-il ?
  */
 
 /**
  * Cible géographique, à la pondération des marchés mondiaux, avec une
- * part émergente légèrement relevée : leur poids boursier sous-estime
- * leur poids économique, et l'écart de valorisation les rend moins
- * corrélés au reste.
+ * part émergente relevée : leur poids boursier sous-estime leur poids
+ * économique et leur valorisation les rend moins corrélés.
  */
-const REGION_TARGET: Partial<Record<RegionBucket, number>> = {
+const REGION_TARGET: Partial<Record<Region, number>> = {
   "États-Unis": 0.6,
   Europe: 0.18,
   Émergents: 0.14,
@@ -28,49 +28,68 @@ const REGION_TARGET: Partial<Record<RegionBucket, number>> = {
   "Autres dév.": 0.03,
 };
 
-/** Régions prises en compte dans l'écart : les poches actions seulement. */
-const EQUITY_REGIONS: RegionBucket[] = REGION_BUCKETS.filter(
-  (r) => r !== "Fonds €" && r !== "Commodities",
-);
+/**
+ * Cible sectorielle, proche de la répartition mondiale mais avec la
+ * technologie ramenée sous son poids de marché : elle y dépasse le quart
+ * de l'indice, ce qui constitue une concentration en soi.
+ */
+const SECTOR_TARGET: Partial<Record<Sector, number>> = {
+  Technologie: 0.22,
+  Finance: 0.17,
+  Santé: 0.13,
+  Consommation: 0.18,
+  Industrie: 0.12,
+  Énergie: 0.05,
+  Matériaux: 0.05,
+  "Services publics": 0.04,
+  Immobilier: 0.04,
+};
 
-/** Répartition géographique d'une ligne, en parts sommant à 1. */
-export function regionSplitOf(asset: Asset): Partial<Record<RegionBucket, number>> {
-  const one = { ...asset, data: { ...asset.data } };
-  const lt = lookThrough([one]);
-  const total = EQUITY_REGIONS.reduce((s, r) => s + lt[r], 0);
-  if (total <= 0) return {};
-  return Object.fromEntries(EQUITY_REGIONS.map((r) => [r, lt[r] / total]));
+/** Poids de l'axe géographique face à l'axe sectoriel. */
+const REGION_WEIGHT = 0.6;
+
+/**
+ * Écart pondéré d'une ligne à une cible : positif si elle comble un
+ * manque, négatif si elle renforce une zone déjà surreprésentée.
+ */
+function benefitOf(
+  split: Record<string, number | undefined>,
+  current: Record<string, number>,
+  target: Record<string, number | undefined>,
+): number {
+  const total = Object.values(current).reduce((s, v) => s + v, 0);
+  if (total <= 0) return 0;
+  let benefit = 0;
+  for (const [key, share] of Object.entries(split)) {
+    if (!share) continue;
+    benefit += share * ((target[key] ?? 0) - (current[key] ?? 0) / total);
+  }
+  return benefit;
 }
 
 /**
  * Coefficient de diversification d'une ligne, entre 0,6 et 1,4.
  *
- * Au-dessus de 1, la ligne comble un manque géographique ; en dessous,
- * elle renforce une zone déjà surreprésentée. Le facteur module le poids
- * de la ligne dans sa poche, sans jamais l'exclure : une ligne de qualité
- * reste retenue, elle reçoit simplement moins.
+ * Au-dessus de 1, elle comble un manque ; en dessous, elle renforce une
+ * exposition déjà pleine. Le facteur module le poids sans jamais exclure
+ * la ligne : un bon support reste retenu, il reçoit simplement moins.
  */
 export function diversificationFactor(asset: Asset, portfolio: Asset[]): number {
-  const split = regionSplitOf(asset);
-  if (!Object.keys(split).length) return 1;
+  const rSplit = regionSplit(asset);
+  const sSplit = sectorSplit(asset);
+  if (!Object.keys(rSplit).length && !Object.keys(sSplit).length) return 1;
 
-  const lt = lookThrough(portfolio);
-  const total = EQUITY_REGIONS.reduce((s, r) => s + lt[r], 0);
-  // Portefeuille actions encore vide : aucune concentration à corriger.
-  if (total <= 0) return 1;
+  const { regions, sectors } = exposure(portfolio, (a) => Math.max(0, assetValue(a)));
+  const rBenefit = benefitOf(rSplit, regions, REGION_TARGET);
+  const sBenefit = benefitOf(sSplit, sectors, SECTOR_TARGET);
+  const benefit = REGION_WEIGHT * rBenefit + (1 - REGION_WEIGHT) * sBenefit;
 
-  // Somme, pondérée par l'exposition de la ligne, des écarts à la cible.
-  // Un écart positif signifie que la région manque au portefeuille.
-  let benefit = 0;
-  for (const r of EQUITY_REGIONS) {
-    const share = split[r] ?? 0;
-    if (share <= 0) continue;
-    const current = lt[r] / total;
-    const target = REGION_TARGET[r] ?? 0;
-    benefit += share * (target - current);
-  }
-
-  // Un écart de dix points se traduit par environ vingt pour cent de
-  // poids en plus ou en moins : sensible, sans écraser la qualité.
+  // Un écart de dix points vaut environ vingt pour cent de poids en plus
+  // ou en moins : sensible, sans écraser la qualité de la ligne.
   return Math.min(1.4, Math.max(0.6, 1 + benefit * 2));
+}
+
+/** Exposition du portefeuille, pour l'affichage. */
+export function portfolioExposure(assets: Asset[]) {
+  return exposure(assets, (a) => Math.max(0, assetValue(a)));
 }

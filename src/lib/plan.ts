@@ -269,6 +269,25 @@ export function buildPlan(
   const shares = new Map<InvestClass, number>();
   for (const g of pool) shares.set(g.cls, gapSum > 0 ? g.gap / gapSum : 1 / pool.length);
 
+  // Une seule classe en retard ne doit pas rafler tout le versement : le
+  // reste va aux autres classes ouvertes, au prorata de leur cible. On
+  // continue ainsi d'alimenter le cœur du portefeuille pendant qu'un
+  // écart se comble.
+  if (shares.size === 1 && open.length > 1) {
+    const [only] = [...shares.keys()];
+    if (only) {
+      shares.set(only, MAX_CLASS_SHARE);
+      const rest = open.filter((c) => c !== only);
+      const restSum = rest.reduce((s2, c) => s2 + target(c), 0);
+      for (const c of rest) {
+        shares.set(
+          c,
+          (1 - MAX_CLASS_SHARE) * (restSum > 0 ? target(c) / restSum : 1 / rest.length),
+        );
+      }
+    }
+  }
+
   // Aucune classe n'absorbe la totalité quand plusieurs sont ouvertes :
   // combler un écart en plusieurs mois vaut mieux que tout concentrer.
   if (shares.size > 1) {

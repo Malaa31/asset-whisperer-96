@@ -8,6 +8,21 @@ import {
   REGION_BUCKETS,
 } from "@/lib/calc";
 import { eur, rawPct } from "@/lib/format";
+import { portfolioExposure } from "@/lib/diversification";
+
+/** Palette des secteurs, dans l'ordre d'affichage. */
+const SECTOR_COLORS = [
+  "#007AFF",
+  "#34C759",
+  "#AF52DE",
+  "#FF9500",
+  "#5AC8FA",
+  "#FFCC00",
+  "#FF3B30",
+  "#5856D6",
+  "#8E8E93",
+  "#00C7BE",
+];
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 
 /** Palette système (type iOS). */
@@ -44,7 +59,7 @@ function scoreText(v: number): string {
   return "Faible";
 }
 
-type View = "classes" | "regions";
+type View = "classes" | "regions" | "sectors";
 
 /**
  * Une seule carte pour comprendre où va l'argent : répartition par
@@ -63,9 +78,18 @@ export function AllocationCard({ assets }: { assets: Asset[] }) {
       .sort((a, b) => b.value - a.value);
   }, [assets]);
   const score = useMemo(() => diversificationScore(assets), [assets]);
+  const bySector = useMemo(() => {
+    const { sectors } = portfolioExposure(assets);
+    return Object.entries(sectors)
+      .filter(([, v]) => v > 0.5)
+      .map(([key, value], i) => ({ key, value, color: SECTOR_COLORS[i % SECTOR_COLORS.length]! }))
+      .sort((a, b) => b.value - a.value);
+  }, [assets]);
 
   const slices =
-    view === "classes"
+    view === "sectors"
+      ? bySector
+      : view === "classes"
       ? byType.map((x) => ({ key: TYPE_LABELS[x.type], value: x.value, color: TYPE_COLORS[x.type] }))
       : byRegion;
   const total = slices.reduce((s, x) => s + x.value, 0);
@@ -75,8 +99,8 @@ export function AllocationCard({ assets }: { assets: Asset[] }) {
 
   return (
     <section className="card-surface mt-4 overflow-hidden">
-      <div className="grid grid-cols-2 gap-1 border-b border-border bg-elevated p-1">
-        {(["classes", "regions"] as const).map((v) => (
+      <div className="grid grid-cols-3 gap-1 border-b border-border bg-elevated p-1">
+        {(["classes", "regions", "sectors"] as const).map((v) => (
           <button
             key={v}
             type="button"
@@ -85,7 +109,7 @@ export function AllocationCard({ assets }: { assets: Asset[] }) {
               view === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
             }`}
           >
-            {v === "classes" ? "Par classe" : "Par région"}
+            {v === "classes" ? "Par classe" : v === "regions" ? "Par région" : "Par secteur"}
           </button>
         ))}
       </div>
