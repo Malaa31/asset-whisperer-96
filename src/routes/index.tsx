@@ -11,7 +11,7 @@ import { GoalPanel } from "@/components/GoalPanel";
 import { AllocationCard } from "@/components/AllocationCard";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
 import { PlanDetail } from "@/components/PlanDetail";
-import { buildPlanFromHoldings } from "@/lib/plan";
+import { buildPlan } from "@/lib/plan";
 import { useAnalyses } from "@/lib/useAnalyses";
 import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
 import type { Asset } from "@/lib/types";
@@ -78,7 +78,7 @@ function Dashboard() {
   const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
   const plan = useMemo(
     () =>
-      buildPlanFromHoldings(
+      buildPlan(
         assets,
         analyses,
         profile,
