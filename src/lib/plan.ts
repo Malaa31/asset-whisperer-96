@@ -76,17 +76,17 @@ const POCKET_TARGETS: Record<RiskProfile, Record<Pocket, number>> = {
 const METALS = /\b(or\b|gold|argent m[ée]tal|silver|platine|palladium|m[ée]taux|lingot)\b/i;
 
 /**
- * Épargne de précaution : livrets réglementés et fonds euros d'assurance
- * vie. Le compte courant en est exclu — c'est de la trésorerie courante,
- * pas une réserve. Les liquidités d'un PEA ou d'un CTO non plus : elles
- * sont bloquées fiscalement et destinées au marché.
+ * Épargne de précaution : tout ce qui est mobilisable sans délai ni
+ * perte — livrets réglementés, comptes courants, fonds euros d'assurance
+ * vie, espèces d'un compte-titres ordinaire.
+ *
+ * Seules les liquidités d'un PEA, d'un PEE ou d'un PER en sont écartées :
+ * un retrait anticipé y clôture le plan ou suppose un cas de déblocage,
+ * elles ne couvrent donc pas un imprévu.
  */
 export function isEmergencySavings(a: Asset): boolean {
   const label = `${a.data["name"] ?? ""} ${a.data["envelope"] ?? ""}`.toLowerCase();
-  // Les liquidités en attente sur un PEA ou un CTO sont destinées au
-  // marché, pas à couvrir un imprévu. Les titres de ces enveloppes, eux,
-  // relèvent de la poche actions.
-  if (/\b(pea|cto|pee|per|compte[- ]titres?)\b/.test(label)) return false;
+  if (/\b(pea|pee|per)\b/.test(label)) return false;
   if (a.type === "livret" || a.type === "cash") return true;
   if (a.type === "av") return Number(a.data["fondsEurosAmount"] ?? 0) > 0;
   return false;
