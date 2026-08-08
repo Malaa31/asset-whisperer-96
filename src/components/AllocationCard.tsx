@@ -66,7 +66,13 @@ type View = "classes" | "regions" | "sectors";
  * classe d'actif ou par zone géographique (en transparence des ETF),
  * plus le score de diversification correspondant.
  */
-export function AllocationCard({ assets }: { assets: Asset[] }) {
+export function AllocationCard({
+  assets,
+  realSectors,
+}: {
+  assets: Asset[];
+  realSectors?: Map<string, Partial<Record<string, number>>>;
+}) {
   const [view, setView] = useState<View>("classes");
   const [showInfo, setShowInfo] = useState(false);
 
@@ -79,12 +85,12 @@ export function AllocationCard({ assets }: { assets: Asset[] }) {
   }, [assets]);
   const score = useMemo(() => diversificationScore(assets), [assets]);
   const bySector = useMemo(() => {
-    const { sectors } = portfolioExposure(assets);
+    const { sectors } = portfolioExposure(assets, realSectors as never);
     return Object.entries(sectors)
       .filter(([, v]) => v > 0.5)
       .map(([key, value], i) => ({ key, value, color: SECTOR_COLORS[i % SECTOR_COLORS.length]! }))
       .sort((a, b) => b.value - a.value);
-  }, [assets]);
+  }, [assets, realSectors]);
 
   const slices =
     view === "sectors"

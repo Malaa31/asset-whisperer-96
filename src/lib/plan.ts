@@ -2,6 +2,7 @@ import { assetValue } from "./calc";
 import { diversificationFactor } from "./diversification";
 import { suitabilityFactor } from "./riskMatrix";
 import type { Analysis } from "./signals";
+import type { Sector } from "./classify";
 import type { Asset, Profile, RiskProfile } from "./types";
 
 /**
@@ -181,6 +182,8 @@ export function buildPlan(
   dca: number,
   excluded: string[] = [],
   manual?: Record<string, number>,
+  /** Compositions sectorielles publiées, par ticker. */
+  realSectors?: Map<string, Partial<Record<Sector, number>>>,
 ): PlanResult {
   const risk = profile?.riskProfile ?? "equilibre";
   const buffer = bufferStatus(assets, profile);
@@ -327,7 +330,7 @@ export function buildPlan(
         // ligne reçoit une qualité neutre plutôt que d'être écartée.
         const quality = an?.score ?? 50;
         const w = clamp(
-          quality * suitabilityFactor(a, risk) * diversificationFactor(a, assets),
+          quality * suitabilityFactor(a, risk) * diversificationFactor(a, assets, realSectors),
           10,
           120,
         );

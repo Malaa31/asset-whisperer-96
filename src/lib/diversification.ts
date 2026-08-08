@@ -74,12 +74,16 @@ function benefitOf(
  * exposition déjà pleine. Le facteur module le poids sans jamais exclure
  * la ligne : un bon support reste retenu, il reçoit simplement moins.
  */
-export function diversificationFactor(asset: Asset, portfolio: Asset[]): number {
+export function diversificationFactor(
+  asset: Asset,
+  portfolio: Asset[],
+  real?: Map<string, Partial<Record<Sector, number>>>,
+): number {
   const rSplit = regionSplit(asset);
-  const sSplit = sectorSplit(asset);
+  const sSplit = sectorSplit(asset, real);
   if (!Object.keys(rSplit).length && !Object.keys(sSplit).length) return 1;
 
-  const { regions, sectors } = exposure(portfolio, (a) => Math.max(0, assetValue(a)));
+  const { regions, sectors } = exposure(portfolio, (a) => Math.max(0, assetValue(a)), real);
   const rBenefit = benefitOf(rSplit, regions, REGION_TARGET);
   const sBenefit = benefitOf(sSplit, sectors, SECTOR_TARGET);
   const benefit = REGION_WEIGHT * rBenefit + (1 - REGION_WEIGHT) * sBenefit;
@@ -90,6 +94,9 @@ export function diversificationFactor(asset: Asset, portfolio: Asset[]): number 
 }
 
 /** Exposition du portefeuille, pour l'affichage. */
-export function portfolioExposure(assets: Asset[]) {
-  return exposure(assets, (a) => Math.max(0, assetValue(a)));
+export function portfolioExposure(
+  assets: Asset[],
+  real?: Map<string, Partial<Record<Sector, number>>>,
+) {
+  return exposure(assets, (a) => Math.max(0, assetValue(a)), real);
 }

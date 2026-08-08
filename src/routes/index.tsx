@@ -13,6 +13,7 @@ import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
 import { PlanDetail } from "@/components/PlanDetail";
 import { buildPlan } from "@/lib/plan";
 import { useAnalyses } from "@/lib/useAnalyses";
+import { useSectors } from "@/lib/useSectors";
 import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
 import type { Asset } from "@/lib/types";
 
@@ -76,6 +77,7 @@ function Dashboard() {
   }, [assets]);
 
   const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
+  const realSectors = useSectors(assets);
   const plan = useMemo(
     () =>
       buildPlan(
@@ -85,8 +87,9 @@ function Dashboard() {
         dca,
         profile?.planExcluded ?? [],
         profile?.planWeights,
+        realSectors,
       ),
-    [assets, analyses, profile, dca],
+    [assets, analyses, profile, dca, realSectors],
   );
 
   return (
@@ -140,7 +143,7 @@ function Dashboard() {
         </p>
       </section>
 
-      {assets.length > 0 && <AllocationCard assets={assets} />}
+      {assets.length > 0 && <AllocationCard assets={assets} realSectors={realSectors} />}
 
       <GoalPanel />
 

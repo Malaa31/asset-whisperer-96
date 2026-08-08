@@ -221,8 +221,22 @@ export function regionSplit(a: Asset): Split<Region> {
   return normalize(hit ? hit.region : REGION_WORLD);
 }
 
-/** Répartition sectorielle d'une ligne, en parts sommant à 1. */
-export function sectorSplit(a: Asset): Split<Sector> {
+/**
+ * Répartition sectorielle d'une ligne, en parts sommant à 1.
+ *
+ * `real` porte les compositions publiées par la source de données,
+ * indexées par ticker. Quand elle en contient une, elle prime sur
+ * l'estimation par indice : une pondération publiée vaut mieux qu'un
+ * ordre de grandeur.
+ */
+export function sectorSplit(a: Asset, real?: Map<string, Split<Sector>>): Split<Sector> {
+  const ticker = String(a.data["ticker"] ?? "").toUpperCase();
+  const published = ticker ? real?.get(ticker) : undefined;
+  if (published && Object.keys(published).length) return normalize(published);
+  return estimatedSectorSplit(a);
+}
+
+function estimatedSectorSplit(a: Asset): Split<Sector> {
   if (a.type === "crypto") return { Diversifié: 1 };
   if (a.type === "immo") return { Immobilier: 1 };
   if (a.type === "av") {
@@ -241,6 +255,7 @@ export function sectorSplit(a: Asset): Split<Sector> {
 export function exposure(
   assets: Asset[],
   value: (a: Asset) => number,
+  real?: Map<string, Split<Sector>>,
 ): { regions: Record<string, number>; sectors: Record<string, number> } {
   const regions: Record<string, number> = {};
   const sectors: Record<string, number> = {};
@@ -250,7 +265,7 @@ export function exposure(
     for (const [r, w] of Object.entries(regionSplit(a))) {
       regions[r] = (regions[r] ?? 0) + v * (w ?? 0);
     }
-    for (const [s, w] of Object.entries(sectorSplit(a))) {
+    for (const [s, w] of Object.entries(sectorSplit(a, real))) {
       sectors[s] = (sectors[s] ?? 0) + v * (w ?? 0);
     }
   }

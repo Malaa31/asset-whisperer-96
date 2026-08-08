@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PatrimoineRouteImport } from './routes/patrimoine'
 import { Route as ProfilRouteImport } from './routes/profil'
 import { Route as ApiPublicHistoryRouteImport } from './routes/api/public/history'
+import { Route as ApiPublicHoldingsRouteImport } from './routes/api/public/holdings'
 import { Route as ApiPublicQuoteRouteImport } from './routes/api/public/quote'
 import { Route as ApiPublicSearchSymbolsRouteImport } from './routes/api/public/search-symbols'
 
@@ -36,6 +37,11 @@ const ApiPublicHistoryRoute = ApiPublicHistoryRouteImport.update({
   path: '/api/public/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHoldingsRoute = ApiPublicHoldingsRouteImport.update({
+  id: '/api/public/holdings',
+  path: '/api/public/holdings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicQuoteRoute = ApiPublicQuoteRouteImport.update({
   id: '/api/public/quote',
   path: '/api/public/quote',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/patrimoine': typeof PatrimoineRoute
   '/profil': typeof ProfilRoute
   '/api/public/history': typeof ApiPublicHistoryRoute
+  '/api/public/holdings': typeof ApiPublicHoldingsRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/patrimoine': typeof PatrimoineRoute
   '/profil': typeof ProfilRoute
   '/api/public/history': typeof ApiPublicHistoryRoute
+  '/api/public/holdings': typeof ApiPublicHoldingsRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/patrimoine': typeof PatrimoineRoute
   '/profil': typeof ProfilRoute
   '/api/public/history': typeof ApiPublicHistoryRoute
+  '/api/public/holdings': typeof ApiPublicHoldingsRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
   '/api/public/search-symbols': typeof ApiPublicSearchSymbolsRoute
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/patrimoine'
     | '/profil'
     | '/api/public/history'
+    | '/api/public/holdings'
     | '/api/public/quote'
     | '/api/public/search-symbols'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/patrimoine'
     | '/profil'
     | '/api/public/history'
+    | '/api/public/holdings'
     | '/api/public/quote'
     | '/api/public/search-symbols'
   id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/patrimoine'
     | '/profil'
     | '/api/public/history'
+    | '/api/public/holdings'
     | '/api/public/quote'
     | '/api/public/search-symbols'
   fileRoutesById: FileRoutesById
@@ -104,6 +116,7 @@ export interface RootRouteChildren {
   PatrimoineRoute: typeof PatrimoineRoute
   ProfilRoute: typeof ProfilRoute
   ApiPublicHistoryRoute: typeof ApiPublicHistoryRoute
+  ApiPublicHoldingsRoute: typeof ApiPublicHoldingsRoute
   ApiPublicQuoteRoute: typeof ApiPublicQuoteRoute
   ApiPublicSearchSymbolsRoute: typeof ApiPublicSearchSymbolsRoute
 }
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/holdings': {
+      id: '/api/public/holdings'
+      path: '/api/public/holdings'
+      fullPath: '/api/public/holdings'
+      preLoaderRoute: typeof ApiPublicHoldingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/quote': {
       id: '/api/public/quote'
       path: '/api/public/quote'
@@ -160,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   PatrimoineRoute: PatrimoineRoute,
   ProfilRoute: ProfilRoute,
   ApiPublicHistoryRoute: ApiPublicHistoryRoute,
+  ApiPublicHoldingsRoute: ApiPublicHoldingsRoute,
   ApiPublicQuoteRoute: ApiPublicQuoteRoute,
   ApiPublicSearchSymbolsRoute: ApiPublicSearchSymbolsRoute,
 }
