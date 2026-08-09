@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
 import { Info } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
-import {
-  allocationByType,
-  diversificationScore,
-} from "@/lib/calc";
+import { allocationByType } from "@/lib/calc";
+import { diversificationReport } from "@/lib/score";
 import { eur, rawPct } from "@/lib/format";
 import { portfolioExposure } from "@/lib/diversification";
 
@@ -83,7 +81,10 @@ export function AllocationCard({
       .sort((a, b) => b.value - a.value);
   }, [assets, realSectors]);
 
-  const score = useMemo(() => diversificationScore(assets), [assets]);
+  const report = useMemo(
+    () => diversificationReport(assets, realSectors as never),
+    [assets, realSectors],
+  );
   const bySector = useMemo(() => {
     const { sectors } = portfolioExposure(assets, realSectors as never);
     return Object.entries(sectors)
@@ -99,7 +100,7 @@ export function AllocationCard({
       ? byType.map((x) => ({ key: TYPE_LABELS[x.type], value: x.value, color: TYPE_COLORS[x.type] }))
       : byRegion;
   const total = slices.reduce((s, x) => s + x.value, 0);
-  const value = view === "classes" ? score.classes : score.regions;
+  const value = report.global;
 
   if (!byType.length) return null;
 
@@ -196,13 +197,52 @@ export function AllocationCard({
               style={{ width: `${value}%` }}
             />
           </div>
+          <ul className="mt-3 grid grid-cols-5 gap-1.5">
+            {report.axes.map((a) => (
+              <li key={a.key} className="text-center">
+                <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
+                  <div
+                    className={`h-full rounded-full ${
+                      a.score >= 55 ? "bg-primary" : a.score >= 30 ? "bg-amber" : "bg-destructive"
+                    }`}
+                    style={{ width: `${a.score}%` }}
+                  />
+                </div>
+                <span className="mt-1 block truncate text-[9px] text-muted-foreground">
+                  {a.label}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {report.advice.length > 0 && (
+            <ul className="mt-3 space-y-1">
+              {report.advice.map((t) => (
+                <li key={t} className="text-[11px] leading-relaxed text-muted-foreground">
+                  · {t}
+                </li>
+              ))}
+            </ul>
+          )}
+
           {showInfo && (
-            <p className="mt-3 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
-              Indice de Herfindahl-Hirschman normalisé : 100 = réparti à parts
-              égales, 0 = tout concentré sur une seule case.
-              {view === "regions" &&
-                " Les ETF sont éclatés en transparence selon leur zone d'exposition réelle."}
-            </p>
+            <div className="mt-3 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
+              <p>
+                Cinq axes sont mesurés séparément puis pondérés : classes
+                d'actifs, régions et secteurs en transparence des ETF, nombre
+                effectif de lignes, dispersion des enveloppes. Le global ne peut
+                dépasser de plus de 25 points l'axe le plus faible : une seule
+                concentration suffit à fragiliser un portefeuille.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {report.axes.map((a) => (
+                  <li key={a.key} className="flex justify-between gap-2">
+                    <span className="truncate">{a.label}</span>
+                    <span className="num shrink-0">{a.score}/100</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

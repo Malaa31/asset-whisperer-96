@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useModalBack } from "@/hooks/useModalBack";
 import { X } from "lucide-react";
 import type { Asset } from "@/lib/types";
 import { TYPE_LABELS } from "@/lib/types";
@@ -38,6 +39,7 @@ export function QuickUpdate({
   onSave: (next: Asset[]) => void;
   onClose: () => void;
 }) {
+  useModalBack(onClose);
   const initialRows = useMemo<Row[]>(() => {
     const rows: Row[] = [];
     for (const a of assets) {

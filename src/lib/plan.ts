@@ -1,9 +1,10 @@
 import { assetValue } from "./calc";
+import { goalCurrent } from "./goals";
 import { diversificationFactor } from "./diversification";
 import { suitabilityFactor } from "./riskMatrix";
 import type { Analysis } from "./signals";
 import { regionSplit, type Sector } from "./classify";
-import type { Asset, Profile, RiskProfile } from "./types";
+import type { Asset, AssetType, Goal, Profile, RiskProfile } from "./types";
 
 /**
  * Moteur du plan de versement mensuel.
@@ -42,6 +43,35 @@ const CLASS_TARGETS: Record<RiskProfile, Record<InvestClass, number>> = {
   dynamique: { actions: 80, securise: 8, reels: 12 },
   offensif: { actions: 92, securise: 0, reels: 8 },
 };
+
+/**
+ * Hypothèses de rendement annuel long terme par classe, utilisées pour
+ * vérifier qu'un objectif est atteignable et, si besoin, incliner
+ * l'allocation. Volontairement prudentes.
+ */
+const EXPECTED_RETURN: Record<InvestClass, number> = {
+  actions: 0.075,
+  securise: 0.025,
+  reels: 0.045,
+};
+
+/**
+ * Part maximale d'actions tolérée selon l'horizon restant de l'objectif.
+ *
+ * Un capital nécessaire dans deux ans ne se joue pas en bourse : la
+ * probabilité de perte sur douze mois reste trop élevée pour une somme
+ * dont la date est fixée. La contrainte se relâche progressivement et
+ * disparaît au-delà de dix ans, où la dispersion des rendements actions
+ * redevient acceptable.
+ */
+function horizonEquityCap(horizon: number): number {
+  if (horizon <= 1) return 5;
+  if (horizon <= 3) return 30;
+  if (horizon <= 5) return 55;
+  if (horizon <= 8) return 80;
+  if (horizon <= 10) return 92;
+  return 100;
+}
 
 /** Un versement inférieur ne vaut pas les frais d'ordre. */
 const MIN_TICKET = 20;
@@ -143,6 +173,150 @@ export function bufferStatus(assets: Asset[], profile: Profile | null): BufferSt
   return { amount, months, threshold, sufficient: months >= threshold };
 }
 
+
+// ─────────────────────────────────────────────────────────────────────
+// Objectif : faisabilité et inclinaison de l'allocation
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Rendement annuel qu'il faudrait obtenir pour atteindre l'objectif à
+ * l'échéance, en versant `dca` chaque mois. Résolu par dichotomie : la
+ * valeur future est strictement croissante avec le taux, une recherche
+ * binaire converge donc sans risque d'osciller.
+ */
+export function requiredReturn(current: number, dca: number, goal: Goal): number | undefined {
+  const years = Math.max(0.5, goal.horizon);
+  const target = goal.amount;
+  if (target <= 0) return undefined;
+  const fv = (r: number): number => {
+    const m = r / 12;
+    const n = years * 12;
+    const growth = Math.pow(1 + m, n);
+    const annuity = Math.abs(m) < 1e-9 ? n : (growth - 1) / m;
+    return current * growth + dca * annuity;
+  };
+  if (fv(-0.05) >= target) return -0.05;
+  if (fv(0.5) < target) return undefined; // hors d'atteinte à ce versement
+  let lo = -0.05;
+  let hi = 0.5;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (fv(mid) < target) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/** Classe d'investissement visée par un objectif d'enveloppe. */
+function scopeClass(scope: AssetType | undefined): InvestClass | null {
+  switch (scope) {
+    case "pea":
+    case "crypto":
+      return "actions";
+    case "immo":
+      return "reels";
+    case "av":
+    case "livret":
+    case "cash":
+      return "securise";
+    default:
+      return null;
+  }
+}
+
+export interface TargetContext {
+  targets: Record<InvestClass, number>;
+  reasons: string[];
+  required?: number;
+  expected: number;
+}
+
+/**
+ * Allocation cible effective : celle du profil de risque, corrigée par
+ * l'horizon de l'objectif actif puis par sa faisabilité.
+ *
+ * C'est le point où le plan cesse d'être générique. Deux utilisateurs
+ * au même profil « dynamique » n'obtiennent pas la même répartition si
+ * l'un vise un apport dans trois ans et l'autre une retraite dans vingt.
+ */
+export function effectiveTargets(
+  risk: RiskProfile,
+  goal: Goal | null | undefined,
+  currentValue: number,
+  dca: number,
+): TargetContext {
+  const base = CLASS_TARGETS[risk] ?? CLASS_TARGETS.equilibre;
+  const t: Record<InvestClass, number> = { ...base };
+  const reasons: string[] = [];
+
+  if (goal) {
+    // 1. Contrainte d'horizon : on ne prend pas de risque pour une somme
+    //    dont la date est proche.
+    const cap = horizonEquityCap(goal.horizon);
+    if (t.actions > cap) {
+      const moved = t.actions - cap;
+      t.actions = cap;
+      t.securise += moved * 0.7;
+      t.reels += moved * 0.3;
+      reasons.push(
+        `Horizon de ${goal.horizon} an${goal.horizon > 1 ? "s" : ""} : part actions plafonnée à ${Math.round(cap)} %.`,
+      );
+    }
+
+    // 2. Objectif d'enveloppe : la poche correspondante est renforcée,
+    //    sans jamais dépasser le plafond d'horizon.
+    const sc = scopeClass(goal.scope);
+    if (goal.kind === "enveloppe" && sc) {
+      const boost = Math.min(12, 100 - t[sc]);
+      if (boost > 0 && !(sc === "actions" && t.actions >= cap)) {
+        t[sc] += boost;
+        const others = (Object.keys(t) as InvestClass[]).filter((c) => c !== sc);
+        const sum = others.reduce((s2, c) => s2 + t[c], 0);
+        for (const c of others) t[c] -= sum > 0 ? (boost * t[c]) / sum : 0;
+        reasons.push(`Objectif ciblé sur « ${goal.label} » : cette poche est renforcée.`);
+      }
+    }
+  }
+
+  const total = (Object.keys(t) as InvestClass[]).reduce((s2, c) => s2 + Math.max(0, t[c]), 0);
+  for (const c of Object.keys(t) as InvestClass[]) {
+    t[c] = total > 0 ? (Math.max(0, t[c]) / total) * 100 : 0;
+  }
+
+  const expected = (Object.keys(t) as InvestClass[]).reduce(
+    (s2, c) => s2 + (t[c] / 100) * EXPECTED_RETURN[c],
+    0,
+  );
+
+  // 3. Faisabilité : le rendement nécessaire se compare au rendement
+  //    espéré de la cible.
+  let required: number | undefined;
+  if (goal) {
+    required = requiredReturn(currentValue, dca, goal);
+    if (required === undefined) {
+      reasons.push(
+        "Objectif hors d'atteinte à ce versement : augmenter le montant mensuel ou allonger l'horizon.",
+      );
+    } else if (required > expected + 0.015 && horizonEquityCap(goal.horizon) > t.actions) {
+      const room = Math.min(10, horizonEquityCap(goal.horizon) - t.actions);
+      t.actions += room;
+      t.securise = Math.max(0, t.securise - room);
+      reasons.push(
+        `L'objectif demande ${(required * 100).toFixed(1)} % par an contre ${(expected * 100).toFixed(1)} % attendus : allocation légèrement plus offensive.`,
+      );
+    } else if (required < expected - 0.02) {
+      const room = Math.min(10, t.actions);
+      t.actions -= room;
+      t.securise += room;
+      reasons.push(
+        `${(required * 100).toFixed(1)} % par an suffisent : inutile de prendre plus de risque que nécessaire.`,
+      );
+    }
+  }
+
+  return { targets: t, reasons, ...(required !== undefined ? { required } : {}), expected };
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Résultat
 // ─────────────────────────────────────────────────────────────────────
@@ -154,6 +328,8 @@ export interface PlanLine {
   amount: number;
   weight: number;
   signal?: Analysis["signal"];
+  /** « matelas » pour la part dirigée vers la réserve de précaution. */
+  purpose?: "matelas";
 }
 
 export interface ClassView {
@@ -169,6 +345,12 @@ export interface PlanResult {
   buffer: BufferStatus;
   manual: boolean;
   note?: string;
+  /** Pourquoi cette répartition : horizon, objectif, faisabilité. */
+  rationale: string[];
+  /** Rendement annuel nécessaire pour tenir l'objectif, si calculable. */
+  required?: number;
+  /** Rendement annuel espéré de l'allocation cible. */
+  expected?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -184,10 +366,12 @@ export function buildPlan(
   manual?: Record<string, number>,
   /** Compositions sectorielles publiées, par ticker. */
   realSectors?: Map<string, Partial<Record<Sector, number>>>,
+  /** Objectif actif : horizon, montant, périmètre. */
+  goal?: Goal | null,
 ): PlanResult {
   const risk = profile?.riskProfile ?? "equilibre";
   const buffer = bufferStatus(assets, profile);
-  const empty = { lines: [], classes: [], buffer, manual: false };
+  const empty = { lines: [], classes: [], buffer, manual: false, rationale: [] as string[] };
 
   if (dca <= 0) return { ...empty, note: "Définissez un versement mensuel dans votre objectif." };
 
@@ -206,6 +390,7 @@ export function buildPlan(
         classes: [],
         buffer,
         manual: true,
+        rationale: ["Répartition saisie à la main : le modèle n'intervient pas."],
       };
     }
   }
@@ -244,7 +429,42 @@ export function buildPlan(
     destinations.some((a) => classOf(a) === c),
   );
 
-  const base = CLASS_TARGETS[risk] ?? CLASS_TARGETS.equilibre;
+  // Cible effective : profil de risque corrigé par l'horizon, le
+  // périmètre et la faisabilité de l'objectif actif.
+  const ctx = effectiveTargets(risk, goal, goal ? goalCurrent(assets, goal) : placed, dca);
+  const rationale = [...ctx.reasons];
+  const base = ctx.targets;
+
+  // ── Matelas d'abord ──
+  // Tant que la réserve n'atteint pas le nombre de mois attendus pour le
+  // profil, une part du versement y va. Investir avant d'avoir de quoi
+  // encaisser un imprévu revient à s'obliger à vendre au mauvais moment.
+  const bufferTarget = assets
+    .filter(isBuffer)
+    .sort((a, b) => assetValue(b) - assetValue(a))[0];
+  let bufferAmount = 0;
+  if (bufferTarget && !buffer.sufficient) {
+    const income = profile?.incomeMonthly ?? 0;
+    const missing =
+      income > 0
+        ? Math.max(0, buffer.threshold * income - buffer.amount)
+        : Math.max(0, 3000 - buffer.amount);
+    const deficit =
+      income > 0 && buffer.months !== undefined
+        ? Math.min(1, Math.max(0, (buffer.threshold - buffer.months) / buffer.threshold))
+        : 0.5;
+    const share = Math.min(0.6, 0.15 + 0.55 * deficit);
+    bufferAmount = Math.round(Math.min(dca * share, missing));
+    if (bufferAmount < MIN_TICKET) bufferAmount = 0;
+    if (bufferAmount > 0) {
+      rationale.push(
+        income > 0
+          ? `Matelas à ${(buffer.months ?? 0).toFixed(1)} mois pour ${buffer.threshold} attendus : une part du versement le complète d'abord.`
+          : "Matelas de précaution incomplet : une part du versement le complète d'abord.",
+      );
+    }
+  }
+  const investable = Math.max(0, dca - bufferAmount);
   // Les cibles se renormalisent sur les classes ouvertes : l'app ne
   // suggère jamais d'ouvrir un support absent du patrimoine.
   const openSum = open.reduce((s, c) => s + base[c], 0);
@@ -279,14 +499,16 @@ export function buildPlan(
   if (shares.size === 1 && open.length > 1) {
     const [only] = [...shares.keys()];
     if (only) {
-      shares.set(only, MAX_CLASS_SHARE);
+      // La part accordée dépend de l'ampleur de l'écart : un retard de
+      // deux points ne justifie pas de détourner les trois quarts du
+      // versement, un retard de trente points si.
+      const gap = pool[0]?.gap ?? 0;
+      const share = Math.min(MAX_CLASS_SHARE, 0.4 + gap / 60);
+      shares.set(only, share);
       const rest = open.filter((c) => c !== only);
       const restSum = rest.reduce((s2, c) => s2 + target(c), 0);
       for (const c of rest) {
-        shares.set(
-          c,
-          (1 - MAX_CLASS_SHARE) * (restSum > 0 ? target(c) / restSum : 1 / rest.length),
-        );
+        shares.set(c, (1 - share) * (restSum > 0 ? target(c) / restSum : 1 / rest.length));
       }
     }
   }
@@ -313,7 +535,7 @@ export function buildPlan(
   // ── Étape 4 : répartition dans chaque classe ──
   const lines: PlanLine[] = [];
   for (const [cls, share] of shares) {
-    const budget = dca * share;
+    const budget = investable * share;
     if (budget < MIN_TICKET) continue;
 
     const pool2 = destinations.filter((a) => {
@@ -335,9 +557,14 @@ export function buildPlan(
         // la logique d'un portefeuille cœur-satellite.
         const breadth = Object.values(regionSplit(a)).filter((x) => (x ?? 0) > 0.02).length;
         const core = breadth >= 4 ? 1.5 : breadth === 3 ? 1.25 : 1;
+        // Objectif d'enveloppe : à qualité comparable, le support qui
+        // porte l'objectif passe devant.
+        const onGoal =
+          goal?.kind === "enveloppe" && goal.scope && a.type === goal.scope ? 1.35 : 1;
         const w = clamp(
           quality *
             core *
+            onGoal *
             suitabilityFactor(a, risk) *
             diversificationFactor(a, assets, realSectors),
           10,
@@ -356,17 +583,31 @@ export function buildPlan(
     }
   }
 
-  if (!lines.length) {
+  if (!lines.length && bufferAmount <= 0) {
     return { ...empty, note: "Le versement est trop faible pour être réparti sur vos supports." };
   }
 
-  // Arrondis : le total doit retomber exactement sur le versement.
+  // Arrondis : le total placé doit retomber exactement sur la part
+  // investissable, matelas déduit.
   const total = lines.reduce((s, l) => s + l.amount, 0);
-  for (const l of lines) l.amount = Math.round((l.amount * dca) / total);
-  const rounded = lines.reduce((s, l) => s + l.amount, 0);
-  if (lines[0] && rounded !== dca) lines[0].amount += dca - rounded;
-  for (const l of lines) l.weight = Math.round((l.amount / dca) * 100);
+  if (total > 0) {
+    for (const l of lines) l.amount = Math.round((l.amount * investable) / total);
+    const rounded = lines.reduce((s, l) => s + l.amount, 0);
+    if (lines[0] && rounded !== investable) lines[0].amount += investable - rounded;
+  }
   lines.sort((a, b) => b.amount - a.amount);
+
+  if (bufferTarget && bufferAmount > 0) {
+    lines.unshift({
+      assetId: bufferTarget.id,
+      label: String(bufferTarget.data["name"] ?? "Réserve de précaution"),
+      cls: "securise",
+      amount: bufferAmount,
+      weight: 0,
+      purpose: "matelas",
+    });
+  }
+  for (const l of lines) l.weight = Math.round((l.amount / dca) * 100);
 
   const classes: ClassView[] = (["actions", "securise", "reels"] as InvestClass[])
     .filter((c) => netOf(c) > 0 || open.includes(c))
@@ -374,10 +615,23 @@ export function buildPlan(
       cls: c,
       current: current(c),
       target: target(c),
-      share: (lines.filter((l) => l.cls === c).reduce((s, l) => s + l.amount, 0) / dca) * 100,
+      share:
+        (lines
+          .filter((l) => l.cls === c && l.purpose !== "matelas")
+          .reduce((s, l) => s + l.amount, 0) /
+          Math.max(1, investable)) *
+        100,
     }));
 
-  return { lines, classes, buffer, manual: false };
+  return {
+    lines,
+    classes,
+    buffer,
+    manual: false,
+    rationale,
+    ...(ctx.required !== undefined ? { required: ctx.required } : {}),
+    expected: ctx.expected,
+  };
 }
 
 function toLine(a: Asset, amount: number, analyses: Map<string, Analysis>): PlanLine {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useModalBack } from "@/hooks/useModalBack";
 import { NaturalInput } from "./NaturalInput";
 import {
   AmountTriangle,
@@ -140,6 +141,7 @@ export function AssetModal({
   onSave: (a: Asset) => void;
   onDelete?: (id: string) => void;
 }) {
+  useModalBack(onClose);
   const [type, setType] = useState<AssetType | null>(asset?.type ?? null);
   const [mode, setMode] = useState<"search" | "manual">(asset ? "manual" : "search");
   const [data, setData] = useState<Record<string, string>>(() => {
