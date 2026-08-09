@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { Check, Info, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
@@ -36,6 +37,7 @@ export function PlanDetail({
   onWeights: (weights: Record<string, number> | null) => void;
   onClose: () => void;
 }) {
+  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const [showInfo, setShowInfo] = useState(false);

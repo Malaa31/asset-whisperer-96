@@ -5,4 +5,4 @@
  * la chaîne dépôt → déploiement → appareil fonctionne. À incrémenter
  * à chaque livraison.
  */
-export const BUILD_VERSION = "v26 · 09/08";
+export const BUILD_VERSION = "v27 · 09/08";

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -51,6 +52,7 @@ export function AssetAnalysis({
   onSell: () => void;
   onClose: () => void;
 }) {
+  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const [points, setPoints] = useState<HistoryPoint[] | null>(null);

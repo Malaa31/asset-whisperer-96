@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { X, Trash2 } from "lucide-react";
@@ -18,6 +19,7 @@ export function GoalEditor({
   onSave: (g: Goal) => void;
   onDelete?: (id: string) => void;
 }) {
+  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const [form, setForm] = useState<Goal>(goal ?? newGoal("patrimoine"));

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { X } from "lucide-react";
@@ -40,6 +41,7 @@ export function QuickUpdate({
   onSave: (next: Asset[]) => void;
   onClose: () => void;
 }) {
+  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const initialRows = useMemo<Row[]>(() => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { Plus, Trash2, X } from "lucide-react";
@@ -32,6 +33,7 @@ export function IncomeEditor({
   onClose: () => void;
   onSave: (next: Income[]) => void;
 }) {
+  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const [rows, setRows] = useState<Income[]>(() =>
