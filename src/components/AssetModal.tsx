@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { NaturalInput } from "./NaturalInput";
@@ -143,7 +142,6 @@ export function AssetModal({
   onSave: (a: Asset) => void;
   onDelete?: (id: string) => void;
 }) {
-  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const [type, setType] = useState<AssetType | null>(asset?.type ?? null);

@@ -27,11 +27,13 @@ export function useModalBack(onClose: () => void): void {
     window.history.pushState({ modal: token }, "");
 
     // Une feuille occupe tout l'écran : la barre d'onglets et le bouton
-    // d'ajout n'ont rien à faire par-dessus, et la page dessous ne doit
-    // pas défiler.
+    // d'ajout n'ont rien à faire par-dessus.
+    //
+    // Le défilement, lui, relève de `useLockScroll` seul. Deux modules
+    // agissant sur les mêmes propriétés du document les restauraient
+    // dans le désordre au démontage et laissaient la page bloquée.
     const depth = Number(document.body.dataset["sheet"] ?? 0) + 1;
     document.body.dataset["sheet"] = String(depth);
-    document.body.style.overflow = "hidden";
     let popped = false;
 
     const onPop = () => {
@@ -47,7 +49,6 @@ export function useModalBack(onClose: () => void): void {
         document.body.dataset["sheet"] = String(left);
       } else {
         delete document.body.dataset["sheet"];
-        document.body.style.overflow = "";
       }
       // Fermeture déclenchée par l'interface : on retire nous-mêmes
       // l'entrée ajoutée à l'ouverture.
