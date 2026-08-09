@@ -5,6 +5,7 @@ import { Check, Info, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { eur } from "@/lib/format";
 import { SIGNAL_LABELS, type Analysis } from "@/lib/signals";
 import { CLASS_LABELS, isDestination, type PlanResult } from "@/lib/plan";
+import type { PlanOutcome } from "@/lib/monthly-plan";
 import { RISK_LABELS, type Asset, type Profile } from "@/lib/types";
 
 /**
@@ -22,6 +23,7 @@ export function PlanDetail({
   dca,
   profile,
   analyses,
+  outcome,
   assets,
   onToggle,
   onWeights,
@@ -31,6 +33,8 @@ export function PlanDetail({
   dca: number;
   profile: Profile;
   analyses: Map<string, Analysis>;
+  /** Sortie du moteur d'allocation : contraintes, concentration, détail. */
+  outcome: PlanOutcome;
   assets: Asset[];
   onToggle: (assetId: string) => void;
   onWeights: (weights: Record<string, number> | null) => void;
@@ -40,6 +44,7 @@ export function PlanDetail({
   useModalBack(onClose);
   const [showInfo, setShowInfo] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [openLine, setOpenLine] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
 
   const excluded = profile.planExcluded ?? [];
@@ -116,6 +121,41 @@ export function PlanDetail({
         )}
 
         {plan.note && <p className="mt-4 text-sm text-muted-foreground">{plan.note}</p>}
+
+        {outcome.goal.message && (
+          <p
+            className={`mt-4 rounded-xl p-3 text-[11px] leading-relaxed ${
+              outcome.goal.kind === "unrealistic"
+                ? "border border-amber/40 bg-amber/10"
+                : "bg-elevated text-muted-foreground"
+            }`}
+          >
+            {outcome.goal.message}
+          </p>
+        )}
+
+        {outcome.violations.length > 0 && (
+          <ul className="mt-3 space-y-1.5">
+            {outcome.violations.map((v) => (
+              <li
+                key={v.code}
+                className="rounded-xl border border-amber/40 bg-amber/10 p-3 text-[11px] leading-relaxed"
+              >
+                {v.message}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {outcome.warnings.length > 0 && (
+          <ul className="mt-3 space-y-1.5">
+            {outcome.warnings.map((w) => (
+              <li key={w} className="rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
+                {w}
+              </li>
+            ))}
+          </ul>
+        )}
 
 
         <div className="mt-6 flex items-center justify-between gap-2">
@@ -197,6 +237,48 @@ export function PlanDetail({
                   style={{ width: `${l.weight}%` }}
                 />
               </div>
+              {!editing && (() => {
+                const detail = outcome.lines.find((o) => o.assetId === l.assetId);
+                if (!detail || openLine !== l.assetId) return null;
+                const rows: Array<[string, number]> = [
+                  ["Convergence vers la cible", detail.breakdown.convergence],
+                  ["Signal de marché", detail.breakdown.signal],
+                  ["Pénalité de risque", detail.breakdown.risk],
+                  ["Arrondi et frais", detail.breakdown.rounding],
+                ];
+                return (
+                  <ul className="mt-2 space-y-1 border-t border-border pt-2">
+                    {rows
+                      .filter(([, v]) => v !== 0)
+                      .map(([label, v]) => (
+                        <li key={label} className="flex justify-between text-[11px]">
+                          <span className="text-muted-foreground">{label}</span>
+                          <span className="num">
+                            {v > 0 ? "+" : ""}
+                            {v} €
+                          </span>
+                        </li>
+                      ))}
+                    <li className="flex justify-between border-t border-border pt-1 text-[11px] font-semibold">
+                      <span>Total</span>
+                      <span className="num">{detail.amount} €</span>
+                    </li>
+                  </ul>
+                );
+              })()}
+
+              {!editing && (
+                <div className="mt-2 flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setOpenLine((v) => (v === l.assetId ? null : l.assetId))}
+                    className="tap text-[11px] font-semibold text-muted-foreground"
+                  >
+                    {openLine === l.assetId ? "Masquer le détail" : "D'où vient ce montant ?"}
+                  </button>
+                </div>
+              )}
+
               {!editing && (
                 <button
                   type="button"

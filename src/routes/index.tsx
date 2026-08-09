@@ -12,6 +12,7 @@ import { AllocationCard } from "@/components/AllocationCard";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
 import { PlanDetail } from "@/components/PlanDetail";
 import { buildPlan } from "@/lib/plan";
+import { optimizePlan } from "@/lib/monthly-plan";
 import { useAnalyses } from "@/lib/useAnalyses";
 import { useSectors } from "@/lib/useSectors";
 import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
@@ -78,6 +79,19 @@ function Dashboard() {
 
   const { analyses } = useAnalyses(assets, profile?.riskProfile ?? "equilibre");
   const realSectors = useSectors(assets);
+  // Moteur d'allocation : budget de risque, cible, contraintes dures et
+  // traçabilité de chaque montant.
+  const outcome = useMemo(
+    () =>
+      optimizePlan(assets, analyses, profile, dca, {
+        excluded: profile?.planExcluded ?? [],
+        ...(profile?.planWeights ? { manual: profile.planWeights } : {}),
+        realSectors,
+        goal: activeGoal ?? null,
+      }),
+    [assets, analyses, profile, dca, realSectors, activeGoal],
+  );
+
   const plan = useMemo(
     () =>
       buildPlan(
@@ -206,6 +220,7 @@ function Dashboard() {
           dca={dca}
           profile={profile}
           analyses={analyses}
+          outcome={outcome}
           assets={assets}
           onToggle={(id) => {
             const cur = profile.planExcluded ?? [];
