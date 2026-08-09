@@ -50,6 +50,8 @@ export interface Profile {
   tiltGeographique?: "neutre" | "US" | "Europe" | "EM";
   /** Lignes que l'utilisateur a écartées du plan du mois. */
   planExcluded?: string[];
+  /** Lignes que l'utilisateur a explicitement ajoutées au plan. */
+  planIncluded?: string[];
   /** Répartition fixée à la main, en pourcentage par ligne. */
   planWeights?: Record<string, number>;
   /** Date ISO du dernier export de sauvegarde. */

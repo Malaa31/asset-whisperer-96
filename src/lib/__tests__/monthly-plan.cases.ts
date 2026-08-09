@@ -299,3 +299,27 @@ console.log("\nUN SEUL VÉHICULE PAR ZONE EN MODE NEUTRE");
     out.violations.some((v) => v.code === "single_vehicle"),
   );
 }
+
+console.log("\nAJOUT MANUEL D'UNE LIGNE");
+{
+  const portfolio = [
+    A("w", "ETF MSCI World", 10_000),
+    A("s", "ETF S&P 500", 5_000),
+    A("e", "ETF Stoxx Europe 600", 3_000),
+  ];
+  const analyses = new Map<string, Analysis>(portfolio.map((a) => [a.id, An({ volatility: 15 })]));
+  const profile = P({ riskProfile: "equilibre", age: 33 });
+
+  const sans = optimizePlan(portfolio, analyses, profile, 500);
+  const avec = optimizePlan(portfolio, analyses, profile, 500, { included: ["s"] });
+
+  check("sans ajout, le support redondant reste écarté", !sans.lines.some((l) => l.assetId === "s"));
+  check("ajouté à la main, il entre au plan", avec.lines.some((l) => l.assetId === "s"));
+  check(
+    "et la répartition est recalculée, pas complétée",
+    avec.lines.reduce((s, l) => s + l.amount, 0) === 500 &&
+      (avec.lines.find((l) => l.assetId === "w")?.amount ?? 0) <
+        (sans.lines.find((l) => l.assetId === "w")?.amount ?? 0),
+  );
+  check("chaque ligne reste au-dessus du minimum", avec.lines.every((l) => l.amount >= 25));
+}

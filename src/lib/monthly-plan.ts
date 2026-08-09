@@ -512,12 +512,14 @@ export function optimizePlan(
   dca: number,
   options: {
     excluded?: string[];
+    /** Lignes ajoutées à la main, exemptées du filtre de redondance. */
+    included?: string[];
     manual?: Record<string, number>;
     realSectors?: Map<string, Partial<Record<string, number>>>;
     goal?: Goal | null;
   } = {},
 ): PlanOutcome {
-  const { excluded = [], manual, realSectors, goal } = options;
+  const { excluded = [], included = [], manual, realSectors, goal } = options;
   const budget = riskBudgetFromProfile(profile);
   const target = targetAllocation(profile, portfolio, analyses);
   const totalValue = portfolio.reduce((s, a) => s + Math.max(0, assetValue(a)), 0);
@@ -542,6 +544,7 @@ export function optimizePlan(
   const eligible = portfolio.filter((a) => {
     if (excluded.includes(a.id)) return false;
     if (!Object.keys(regionSplit(a)).length) return false;
+    if (included.includes(a.id)) return true;
     if (classifyPocket(a, analyses) === "defensive" && defensive.covered) return false;
     return true;
   });
@@ -603,7 +606,7 @@ export function optimizePlan(
   // l'exclure viderait le plan d'un portefeuille pourtant investissable.
   const violationsPre: Violation[] = [];
   let candidates = scored.filter(
-    (c) => (c.an?.composite?.score ?? 0) >= -0.15 || c.gap > 0.05,
+    (c) => included.includes(c.asset.id) || (c.an?.composite?.score ?? 0) >= -0.15 || c.gap > 0.05,
   );
 
   // En l'absence d'inclinaison assumée, une seule ligne est financée par
@@ -618,7 +621,12 @@ export function optimizePlan(
     for (const c of [...candidates].sort(
       (a, b) => Object.keys(b.split).length - Object.keys(a.split).length,
     )) {
-      const twin = kept.find((k) => overlap(k.asset, c.asset) > 0.6);
+      // Une ligne ajoutée à la main est toujours conservée : le moteur
+      // recalcule alors la répartition autour d'elle plutôt que de la
+      // refuser. L'utilisateur assume l'inclinaison, le modèle en tire
+      // les conséquences sur les autres lignes.
+      const forced = included.includes(c.asset.id);
+      const twin = forced ? undefined : kept.find((k) => overlap(k.asset, c.asset) > 0.6);
       if (twin) {
         dropped.push(String(c.asset.data["name"] ?? ""));
         continue;

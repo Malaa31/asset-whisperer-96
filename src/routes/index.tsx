@@ -85,6 +85,7 @@ function Dashboard() {
     () =>
       optimizePlan(assets, analyses, profile, dca, {
         excluded: profile?.planExcluded ?? [],
+        included: profile?.planIncluded ?? [],
         ...(profile?.planWeights ? { manual: profile.planWeights } : {}),
         realSectors,
         goal: activeGoal ?? null,
@@ -246,9 +247,17 @@ function Dashboard() {
           outcome={outcome}
           assets={assets}
           onToggle={(id) => {
-            const cur = profile.planExcluded ?? [];
-            const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-            saveProfile({ ...profile, planExcluded: next });
+            // Une ligne du plan qu'on retire part dans les exclusions ;
+            // une ligne absente qu'on ajoute passe dans les inclusions,
+            // que le moteur exempte du filtre de redondance.
+            const excluded = profile.planExcluded ?? [];
+            const included = profile.planIncluded ?? [];
+            const inPlan = outcome.lines.some((l) => l.assetId === id);
+            saveProfile({
+              ...profile,
+              planExcluded: inPlan ? [...excluded, id] : excluded.filter((x) => x !== id),
+              planIncluded: inPlan ? included.filter((x) => x !== id) : [...included, id],
+            });
           }}
           onWeights={(w) => {
             const { planWeights: _drop, ...rest } = profile;
