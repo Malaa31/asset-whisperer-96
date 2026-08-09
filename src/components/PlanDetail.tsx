@@ -66,8 +66,6 @@ export function PlanDetail({
     return s + (Number.isFinite(n) ? n : 0);
   }, 0);
 
-  const b = plan.buffer;
-
   return (
     <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
       <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
@@ -101,45 +99,17 @@ export function PlanDetail({
 
         {showInfo && (
           <p className="mt-4 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
-            Le plan ne porte que sur des supports que vous détenez déjà. Il
-            dirige le versement vers les classes en retard sur votre allocation
-            cible, sans jamais vendre. À l'intérieur d'une classe, les lignes se
-            départagent sur leur qualité passée rapportée au risque, leur
-            tendance, leur adéquation à votre profil et leur effet sur la
-            répartition géographique en transparence — un ETF Monde contenant
-            déjà des actions américaines et européennes. L'épargne de précaution
-            n'entre pas dans le versement : c'est un préalable, pas un
-            placement. Ces indicateurs décrivent le passé et ne constituent pas
-            un conseil en investissement.
-          </p>
-        )}
-
-        {b.months !== undefined && !b.sufficient && (
-          <p className="mt-4 rounded-xl border border-amber/40 bg-amber/10 p-3 text-[11px] leading-relaxed">
-            Épargne de précaution : {b.months.toFixed(1)} mois de revenus sur{" "}
-            {b.threshold} attendus pour votre profil. Le plan y consacre une
-            part du versement tant qu'elle n'est pas complète.
+            Le plan répartit le versement sur vos placements financiers, hors
+            immobilier et livrets, vers les classes en retard sur votre cible.
+            Ce n'est pas un conseil en investissement.
           </p>
         )}
 
         {plan.rationale.length > 0 && !plan.manual && (
           <div className="mt-4 rounded-xl bg-elevated p-3">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Pourquoi cette répartition
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {plan.rationale[0]}
             </p>
-            <ul className="mt-2 space-y-1.5">
-              {plan.rationale.map((r) => (
-                <li key={r} className="text-[11px] leading-relaxed text-muted-foreground">
-                  {r}
-                </li>
-              ))}
-            </ul>
-            {plan.required !== undefined && plan.expected !== undefined && (
-              <p className="mt-2 num text-[11px] text-muted-foreground">
-                Rendement nécessaire {(plan.required * 100).toFixed(1)} % / an ·
-                espéré {(plan.expected * 100).toFixed(1)} % / an
-              </p>
-            )}
           </div>
         )}
 
@@ -170,9 +140,6 @@ export function PlanDetail({
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-              Le trait marque la cible de votre profil.
-            </p>
           </div>
         )}
 

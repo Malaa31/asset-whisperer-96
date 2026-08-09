@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Info } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import { allocationByType } from "@/lib/calc";
 import { diversificationReport } from "@/lib/score";
@@ -70,7 +69,6 @@ export function AllocationCard({
   realSectors?: Map<string, Partial<Record<string, number>>>;
 }) {
   const [view, setView] = useState<View>("classes");
-  const [showInfo, setShowInfo] = useState(false);
 
   const byType = useMemo(() => allocationByType(assets), [assets]);
   const byRegion = useMemo(() => {
@@ -106,7 +104,8 @@ export function AllocationCard({
 
   return (
     <section className="card-surface mt-4 overflow-hidden">
-      <div className="grid grid-cols-3 gap-1 border-b border-border bg-elevated p-1">
+      <h2 className="px-5 pt-4 text-sm font-semibold">Répartition</h2>
+      <div className="mt-3 grid grid-cols-3 gap-1 border-b border-border bg-elevated p-1">
         {(["classes", "regions", "sectors"] as const).map((v) => (
           <button
             key={v}
@@ -173,19 +172,7 @@ export function AllocationCard({
           </div>
 
           <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
-            <span className="flex items-center gap-1.5 text-sm font-semibold">
-              Diversification
-              <button
-                type="button"
-                aria-label="Comment ce score est calculé"
-                onClick={() => setShowInfo((s) => !s)}
-                className={`tap flex size-5 items-center justify-center rounded-full ${
-                  showInfo ? "bg-primary/12 text-primary" : "bg-elevated text-muted-foreground"
-                }`}
-              >
-                <Info className="size-3" />
-              </button>
-            </span>
+            <span className="text-sm font-semibold">Score de diversification</span>
             <span className="flex items-baseline gap-1.5">
               <span className={`font-display text-xl ${scoreTone(value)}`}>{value}</span>
               <span className="text-[11px] text-muted-foreground">/100 · {scoreText(value)}</span>
@@ -197,53 +184,6 @@ export function AllocationCard({
               style={{ width: `${value}%` }}
             />
           </div>
-          <ul className="mt-3 grid grid-cols-5 gap-1.5">
-            {report.axes.map((a) => (
-              <li key={a.key} className="text-center">
-                <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
-                  <div
-                    className={`h-full rounded-full ${
-                      a.score >= 55 ? "bg-primary" : a.score >= 30 ? "bg-amber" : "bg-destructive"
-                    }`}
-                    style={{ width: `${a.score}%` }}
-                  />
-                </div>
-                <span className="mt-1 block truncate text-[9px] text-muted-foreground">
-                  {a.label}
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          {report.advice.length > 0 && (
-            <ul className="mt-3 space-y-1">
-              {report.advice.map((t) => (
-                <li key={t} className="text-[11px] leading-relaxed text-muted-foreground">
-                  · {t}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {showInfo && (
-            <div className="mt-3 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
-              <p>
-                Cinq axes sont mesurés séparément puis pondérés : classes
-                d'actifs, régions et secteurs en transparence des ETF, nombre
-                effectif de lignes, dispersion des enveloppes. Le global ne peut
-                dépasser de plus de 25 points l'axe le plus faible : une seule
-                concentration suffit à fragiliser un portefeuille.
-              </p>
-              <ul className="mt-2 space-y-1">
-                {report.axes.map((a) => (
-                  <li key={a.key} className="flex justify-between gap-2">
-                    <span className="truncate">{a.label}</span>
-                    <span className="num shrink-0">{a.score}/100</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       )}
     </section>

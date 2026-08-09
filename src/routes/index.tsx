@@ -146,6 +146,13 @@ function Dashboard() {
 
       {assets.length > 0 && <AllocationCard assets={assets} realSectors={realSectors} />}
 
+      {plan.buffer.months !== undefined && !plan.buffer.sufficient && (
+        <p className="mt-4 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-muted-foreground">
+          Épargne de précaution : {plan.buffer.months.toFixed(1)} mois sur{" "}
+          {plan.buffer.threshold} recommandés.
+        </p>
+      )}
+
       <GoalPanel />
 
       {due && dca > 0 && (

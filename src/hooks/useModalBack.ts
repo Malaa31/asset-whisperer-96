@@ -25,6 +25,13 @@ export function useModalBack(onClose: () => void): void {
     // `pushState` n'entraîne aucune navigation : l'URL reste la même,
     // seule l'entrée d'historique est ajoutée.
     window.history.pushState({ modal: token }, "");
+
+    // Une feuille occupe tout l'écran : la barre d'onglets et le bouton
+    // d'ajout n'ont rien à faire par-dessus, et la page dessous ne doit
+    // pas défiler.
+    const depth = Number(document.body.dataset["sheet"] ?? 0) + 1;
+    document.body.dataset["sheet"] = String(depth);
+    document.body.style.overflow = "hidden";
     let popped = false;
 
     const onPop = () => {
@@ -35,6 +42,13 @@ export function useModalBack(onClose: () => void): void {
 
     return () => {
       window.removeEventListener("popstate", onPop);
+      const left = Number(document.body.dataset["sheet"] ?? 1) - 1;
+      if (left > 0) {
+        document.body.dataset["sheet"] = String(left);
+      } else {
+        delete document.body.dataset["sheet"];
+        document.body.style.overflow = "";
+      }
       // Fermeture déclenchée par l'interface : on retire nous-mêmes
       // l'entrée ajoutée à l'ouverture.
       if (!popped && (window.history.state as { modal?: string } | null)?.modal === token) {

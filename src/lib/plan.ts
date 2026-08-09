@@ -132,9 +132,15 @@ export function isDestination(a: Asset): boolean {
   if (!cls) return false;
   if (assetValue(a) < 0) return false;
   if (a.type === "immo") {
+    // Le plan du mois est un plan de placement financier : ni pierre
+    // (même papier), ni livret. Seuls les métaux logés là restent
+    // abondables, faute de meilleure enveloppe dans l'app.
     const label = `${a.data["name"] ?? ""} ${a.data["type"] ?? ""} ${a.data["sector"] ?? ""}`;
-    return PAPER_REALESTATE.test(label) || METALS.test(label);
+    return METALS.test(label) && !PAPER_REALESTATE.test(label);
   }
+  // Un livret ou un compte courant est une réserve, pas un placement :
+  // il relève du message d'épargne de précaution, pas du versement.
+  if (a.type === "livret" || a.type === "cash") return false;
   return true;
 }
 
@@ -432,39 +438,13 @@ export function buildPlan(
   // Cible effective : profil de risque corrigé par l'horizon, le
   // périmètre et la faisabilité de l'objectif actif.
   const ctx = effectiveTargets(risk, goal, goal ? goalCurrent(assets, goal) : placed, dca);
-  const rationale = [...ctx.reasons];
+  // Deux raisons suffisent : au-delà, la feuille devient un mur de texte.
+  const rationale = ctx.reasons.slice(0, 2);
   const base = ctx.targets;
 
-  // ── Matelas d'abord ──
-  // Tant que la réserve n'atteint pas le nombre de mois attendus pour le
-  // profil, une part du versement y va. Investir avant d'avoir de quoi
-  // encaisser un imprévu revient à s'obliger à vendre au mauvais moment.
-  const bufferTarget = assets
-    .filter(isBuffer)
-    .sort((a, b) => assetValue(b) - assetValue(a))[0];
-  let bufferAmount = 0;
-  if (bufferTarget && !buffer.sufficient) {
-    const income = profile?.incomeMonthly ?? 0;
-    const missing =
-      income > 0
-        ? Math.max(0, buffer.threshold * income - buffer.amount)
-        : Math.max(0, 3000 - buffer.amount);
-    const deficit =
-      income > 0 && buffer.months !== undefined
-        ? Math.min(1, Math.max(0, (buffer.threshold - buffer.months) / buffer.threshold))
-        : 0.5;
-    const share = Math.min(0.6, 0.15 + 0.55 * deficit);
-    bufferAmount = Math.round(Math.min(dca * share, missing));
-    if (bufferAmount < MIN_TICKET) bufferAmount = 0;
-    if (bufferAmount > 0) {
-      rationale.push(
-        income > 0
-          ? `Matelas à ${(buffer.months ?? 0).toFixed(1)} mois pour ${buffer.threshold} attendus : une part du versement le complète d'abord.`
-          : "Matelas de précaution incomplet : une part du versement le complète d'abord.",
-      );
-    }
-  }
-  const investable = Math.max(0, dca - bufferAmount);
+  // Le versement va intégralement au placement : la réserve de
+  // précaution est un message de suivi, pas une ligne du plan.
+  const investable = dca;
   // Les cibles se renormalisent sur les classes ouvertes : l'app ne
   // suggère jamais d'ouvrir un support absent du patrimoine.
   const openSum = open.reduce((s, c) => s + base[c], 0);
@@ -583,7 +563,7 @@ export function buildPlan(
     }
   }
 
-  if (!lines.length && bufferAmount <= 0) {
+  if (!lines.length) {
     return { ...empty, note: "Le versement est trop faible pour être réparti sur vos supports." };
   }
 
@@ -597,16 +577,6 @@ export function buildPlan(
   }
   lines.sort((a, b) => b.amount - a.amount);
 
-  if (bufferTarget && bufferAmount > 0) {
-    lines.unshift({
-      assetId: bufferTarget.id,
-      label: String(bufferTarget.data["name"] ?? "Réserve de précaution"),
-      cls: "securise",
-      amount: bufferAmount,
-      weight: 0,
-      purpose: "matelas",
-    });
-  }
   for (const l of lines) l.weight = Math.round((l.amount / dca) * 100);
 
   const classes: ClassView[] = (["actions", "securise", "reels"] as InvestClass[])
@@ -617,7 +587,7 @@ export function buildPlan(
       target: target(c),
       share:
         (lines
-          .filter((l) => l.cls === c && l.purpose !== "matelas")
+          .filter((l) => l.cls === c)
           .reduce((s, l) => s + l.amount, 0) /
           Math.max(1, investable)) *
         100,

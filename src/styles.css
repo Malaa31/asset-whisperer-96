@@ -154,3 +154,8 @@
     display: none;
   }
 }
+
+/* Une feuille plein écran masque la navigation de l'app. */
+body[data-sheet] .app-chrome {
+  display: none;
+}
