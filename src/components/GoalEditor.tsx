@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Sheet } from "./Sheet";
+import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { X, Trash2 } from "lucide-react";
@@ -18,6 +20,7 @@ export function GoalEditor({
   onSave: (g: Goal) => void;
   onDelete?: (id: string) => void;
 }) {
+  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const [form, setForm] = useState<Goal>(goal ?? newGoal("patrimoine"));
@@ -40,7 +43,7 @@ export function GoalEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
+    <Sheet onClose={onClose}>
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <button
           type="button"
@@ -140,7 +143,7 @@ export function GoalEditor({
           Enregistrer
         </button>
       </div>
-    </div>
+    </Sheet>
   );
 }
 

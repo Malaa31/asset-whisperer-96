@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Sheet } from "./Sheet";
+import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -51,6 +53,7 @@ export function AssetAnalysis({
   onSell: () => void;
   onClose: () => void;
 }) {
+  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const [points, setPoints] = useState<HistoryPoint[] | null>(null);
@@ -126,7 +129,7 @@ export function AssetAnalysis({
   const color = up ? "#1e5c48" : "#b3402e";
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
+    <Sheet onClose={onClose}>
       <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <button
           type="button"
@@ -383,7 +386,7 @@ export function AssetAnalysis({
           Vendre / retirer
         </button>
       </footer>
-    </div>
+    </Sheet>
   );
 }
 

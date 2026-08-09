@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { Sheet } from "./Sheet";
+import { useSheet } from "@/lib/useSheet";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { NaturalInput } from "./NaturalInput";
@@ -142,6 +144,7 @@ export function AssetModal({
   onSave: (a: Asset) => void;
   onDelete?: (id: string) => void;
 }) {
+  useSheet();
   useLockScroll(true);
   useModalBack(onClose);
   const [type, setType] = useState<AssetType | null>(asset?.type ?? null);
@@ -267,7 +270,7 @@ export function AssetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
+    <Sheet onClose={onClose}>
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <button
           type="button"
@@ -446,7 +449,7 @@ export function AssetModal({
           </button>
         </div>
       )}
-    </div>
+    </Sheet>
   );
 }
 
