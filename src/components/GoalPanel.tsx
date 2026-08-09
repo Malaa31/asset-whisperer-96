@@ -127,7 +127,7 @@ export function GoalPanel() {
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 pb-10">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-10">
             {goals.length > 1 && (
               <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4">
                 {goals.map((g) => (

@@ -283,7 +283,7 @@ export function AssetModal({
         <div className="size-9" />
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 pb-28">
         {!type && (
           <div className="mb-5">
             <NaturalInput

@@ -54,7 +54,7 @@ export function GoalEditor({
         <div className="size-9" />
       </header>
 
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 pb-28">
+      <div className="flex-1 min-h-0 space-y-4 overflow-y-auto px-4 py-4 pb-28">
         <div>
           <span className="mb-2 block text-xs text-muted-foreground">Type d'objectif</span>
           <div className="grid grid-cols-2 gap-2">
