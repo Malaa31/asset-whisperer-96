@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { Sheet } from "./Sheet";
 import { ChevronRight, Pencil, Plus, Target, X } from "lucide-react";
 import { useApp } from "@/lib/storage";
 import { eur, rawPct } from "@/lib/format";
@@ -107,7 +106,7 @@ export function GoalPanel() {
       )}
 
       {open && goal && (
-        <Sheet onClose={() => setOpen(false)}>
+        <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
           <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
             <button
               type="button"
@@ -187,7 +186,7 @@ export function GoalPanel() {
                     : `Projection ${eur(traj[traj.length - 1]?.projection ?? 0)} dans ${goal.horizon} ans — il manque ${eur(Math.max(0, goal.amount - (traj[traj.length - 1]?.projection ?? 0)))}.`}
             </p>
           </div>
-        </Sheet>
+        </div>
       )}
 
       {editing !== null && (
