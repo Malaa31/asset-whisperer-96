@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Info, TrendingDown, TrendingUp, Minus, X } from "lucide-react";
@@ -50,6 +51,7 @@ export function AssetAnalysis({
   onSell: () => void;
   onClose: () => void;
 }) {
+  useLockScroll(true);
   useModalBack(onClose);
   const [points, setPoints] = useState<HistoryPoint[] | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -124,7 +126,7 @@ export function AssetAnalysis({
   const color = up ? "#1e5c48" : "#b3402e";
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <button
           type="button"

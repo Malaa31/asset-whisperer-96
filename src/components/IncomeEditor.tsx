@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { Plus, Trash2, X } from "lucide-react";
 import {
@@ -31,6 +32,7 @@ export function IncomeEditor({
   onClose: () => void;
   onSave: (next: Income[]) => void;
 }) {
+  useLockScroll(true);
   useModalBack(onClose);
   const [rows, setRows] = useState<Income[]>(() =>
     (incomes ?? []).map((i) => ({ ...i })),
@@ -66,7 +68,7 @@ export function IncomeEditor({
     );
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <button
           type="button"

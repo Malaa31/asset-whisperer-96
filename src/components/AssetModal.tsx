@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { NaturalInput } from "./NaturalInput";
 import {
@@ -141,6 +142,7 @@ export function AssetModal({
   onSave: (a: Asset) => void;
   onDelete?: (id: string) => void;
 }) {
+  useLockScroll(true);
   useModalBack(onClose);
   const [type, setType] = useState<AssetType | null>(asset?.type ?? null);
   const [mode, setMode] = useState<"search" | "manual">(asset ? "manual" : "search");
@@ -265,7 +267,7 @@ export function AssetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <button
           type="button"

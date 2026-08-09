@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { X, Trash2 } from "lucide-react";
 import type { Goal, GoalKind, AssetType } from "@/lib/types";
@@ -17,6 +18,7 @@ export function GoalEditor({
   onSave: (g: Goal) => void;
   onDelete?: (id: string) => void;
 }) {
+  useLockScroll(true);
   useModalBack(onClose);
   const [form, setForm] = useState<Goal>(goal ?? newGoal("patrimoine"));
   const set = (patch: Partial<Goal>) => setForm((f) => ({ ...f, ...patch }));
@@ -38,7 +40,7 @@ export function GoalEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <button
           type="button"

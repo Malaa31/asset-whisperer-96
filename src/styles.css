@@ -82,6 +82,12 @@
     background-color: var(--color-background);
   }
 
+  html {
+    /* Sans cela, le rebond en fin de page fait apparaître et disparaître
+       les barres de Safari à chaque geste. */
+    overscroll-behavior-y: none;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);

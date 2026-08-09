@@ -106,7 +106,7 @@ export function GoalPanel() {
       )}
 
       {open && goal && (
-        <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+        <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
           <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
             <button
               type="button"

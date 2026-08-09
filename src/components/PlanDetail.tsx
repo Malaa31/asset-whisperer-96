@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { Check, Info, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { eur } from "@/lib/format";
@@ -35,6 +36,7 @@ export function PlanDetail({
   onWeights: (weights: Record<string, number> | null) => void;
   onClose: () => void;
 }) {
+  useLockScroll(true);
   useModalBack(onClose);
   const [showInfo, setShowInfo] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -67,7 +69,7 @@ export function PlanDetail({
   }, 0);
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex max-w-[480px] flex-col bg-background">
+    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <button
           type="button"
@@ -115,33 +117,6 @@ export function PlanDetail({
 
         {plan.note && <p className="mt-4 text-sm text-muted-foreground">{plan.note}</p>}
 
-        {plan.classes.length > 0 && !plan.manual && (
-          <div className="mt-6">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Vers votre allocation cible
-            </p>
-            <ul className="mt-2.5 space-y-2.5">
-              {plan.classes.map((c) => (
-                <li key={c.cls} className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 text-[12px]">{CLASS_LABELS[c.cls]}</span>
-                  <span className="relative h-2 flex-1 overflow-hidden rounded-full bg-elevated">
-                    <span
-                      className="absolute inset-y-0 left-0 rounded-full bg-primary/70"
-                      style={{ width: `${Math.min(100, c.current)}%` }}
-                    />
-                    <span
-                      className="absolute inset-y-0 w-0.5 bg-foreground"
-                      style={{ left: `${Math.min(100, c.target)}%` }}
-                    />
-                  </span>
-                  <span className="num w-20 shrink-0 text-right text-[11px] text-muted-foreground">
-                    {c.current.toFixed(0)} / {c.target.toFixed(0)} %
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
 
         <div className="mt-6 flex items-center justify-between gap-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
