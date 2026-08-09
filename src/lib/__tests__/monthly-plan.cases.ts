@@ -1,5 +1,12 @@
 import {
   aggregateExposures,
+  classifyPocket,
+  concentrationIndex,
+  defensiveGap,
+  isFinancial,
+  overlap,
+  planLabel,
+  realExposure,
   goalInsight,
   herfindahl,
   intentFromSignal,
@@ -180,5 +187,77 @@ console.log("\nALLOCATION CIBLE");
   );
 }
 
+void classifyPocket;
 console.log(failures ? `\n${failures} test(s) en échec` : "\nTous les tests passent");
 if (failures) process.exit(1);
+
+console.log("\nPOCHE DÉFENSIVE");
+{
+  const portfolio = [
+    A("w", "ETF MSCI World", 10_123),
+    A("s", "ETF S&P 500", 5_184),
+    A("e", "ETF Stoxx Europe 600", 3_653),
+    A("m", "ETF MSCI Émergent", 2_664),
+    { id: "l", type: "livret", data: { name: "Livret A", amount: 22_700, taux: 1.7 }, createdAt: "", updatedAt: "" } as unknown as Asset,
+    { id: "av", type: "av", data: { name: "Assurance vie", fondsEurosAmount: 176 }, createdAt: "", updatedAt: "" } as unknown as Asset,
+  ];
+  const analyses = new Map<string, Analysis>([
+    ["w", An({ volatility: 15, composite: { score: 0.2, kind: "conserver", parts: [] } as never })],
+    ["s", An({ volatility: 17, composite: { score: 0.2, kind: "conserver", parts: [] } as never })],
+    ["e", An({ volatility: 14, composite: { score: 0.2, kind: "conserver", parts: [] } as never })],
+    ["m", An({ volatility: 18, composite: { score: 0.43, kind: "conserver", parts: [] } as never })],
+    ["l", An({ volatility: 0.5 })],
+    ["av", An({ volatility: 1.5 })],
+  ]);
+  const profile = P({ riskProfile: "dynamique", age: 33 });
+
+  const status = defensiveGap(portfolio, profile, analyses);
+  check(
+    "poche défensive déjà couverte détectée",
+    status.covered,
+    `${Math.round(status.current)} € pour ${Math.round(status.target)} € visés`,
+  );
+
+  const out = optimizePlan(portfolio, analyses, profile, 500);
+  const avAmount = out.lines.find((l) => l.assetId === "av")?.amount ?? 0;
+  check("aucun versement sur le support sécurisé", avAmount === 0, `${avAmount} €`);
+  check("le message l'explique", (out.warnings[0] ?? "").includes("sécurisée"));
+
+  const em = out.lines.find((l) => l.assetId === "m");
+  check(
+    "signal 0,43 sans sous-pondération → maintenir",
+    !em || em.action === "maintenir",
+    em ? em.action : "absente",
+  );
+  const total = out.lines.reduce((s, l) => s + l.amount, 0);
+  check("somme exacte et lignes au-dessus du minimum", total === 500 && out.lines.every((l) => l.amount >= 25));
+  check("immobilier exclu des poches", isFinancial(A("i", "x", 1)) && !isFinancial({ id: "z", type: "immo", data: {}, createdAt: "", updatedAt: "" } as unknown as Asset));
+}
+
+console.log("\nCHEVAUCHEMENT");
+{
+  const world = A("w", "ETF MSCI World", 10_000);
+  const sp = A("s", "ETF S&P 500", 5_000);
+  const eu = A("e", "ETF Stoxx Europe 600", 3_000);
+  const rate = overlap(world, sp);
+  check("World et S&P 500 se recouvrent fortement", rate > 0.6, `${(rate * 100).toFixed(0)} %`);
+  check("World et Europe se recouvrent peu", overlap(world, eu) < 0.3, `${(overlap(world, eu) * 100).toFixed(0)} %`);
+
+  const exp = realExposure([world]);
+  check(
+    "un ETF monde seul expose bien aux États-Unis",
+    (exp.byZone["États-Unis"] ?? 0) > 0.6,
+    `${((exp.byZone["États-Unis"] ?? 0) * 100).toFixed(0)} %`,
+  );
+  check("concentration mesurée sur les expositions", concentrationIndex(exp.byZone) > 0.3);
+}
+
+console.log("\nTABLE DES LIBELLÉS");
+{
+  check("signal fort + sous-pondéré → renforcer", planLabel(0.5, 8) === "renforcer");
+  check("signal fort mais à la cible → maintenir", planLabel(0.5, 0) === "maintenir");
+  check("signal neutre + sous-pondéré → rattraper", planLabel(0.1, 8) === "rattraper");
+  check("signal neutre + surpondéré → réduire", planLabel(0.1, -8) === "reduire");
+  check("signal négatif + sous-pondéré → maintenir", planLabel(-0.4, 8) === "maintenir");
+  check("signal 0,43 avec écart −1 pt → maintenir", planLabel(0.43, -1) === "maintenir");
+}

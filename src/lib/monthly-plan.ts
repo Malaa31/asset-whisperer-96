@@ -221,7 +221,10 @@ export interface PlanBreakdown {
 
 export interface PlanLine {
   assetId: string;
+  /** Nom du support. */
   label: string;
+  /** Libellé d'action, croisant signal et écart à la cible. */
+  action: PlanLabel;
   amount: number;
   weight: number;
   intent: PlanIntent;
@@ -237,6 +240,12 @@ export interface Violation {
 
 export interface PlanOutcome {
   lines: PlanLine[];
+  /** État de la poche défensive. */
+  defensive?: DefensiveStatus;
+  /** Paires de supports se recouvrant nettement. */
+  overlaps?: Array<{ a: string; b: string; rate: number }>;
+  /** Concentration géographique des expositions. */
+  zoneConcentration?: number;
   violations: Violation[];
   budget: RiskBudget;
   target: TargetAllocation;
@@ -329,6 +338,172 @@ export function diversificationImpact(
  * exactement le montant affiché : convergence vers la cible, inclinaison
  * par le signal, pénalité de risque, ajustement d'arrondi.
  */
+// ─────────────────────────────────────────────────────────────────────
+// Poches de risque, chevauchement, libellés
+// ─────────────────────────────────────────────────────────────────────
+
+export type Pocket = "defensive" | "balanced" | "risky";
+
+/**
+ * Poche d'un actif, déduite de sa volatilité et non de son nom ni de son
+ * enveloppe. Un fonds euros et un livret réglementaire relèvent de la
+ * même poche, quelle que soit l'étiquette commerciale du support.
+ */
+export function classifyPocket(asset: Asset, analyses?: Map<string, Analysis>): Pocket {
+  const measured = analyses?.get(asset.id)?.volatility;
+  if (typeof measured === "number" && measured > 0) {
+    if (measured < 3) return "defensive";
+    return measured < 8 ? "balanced" : "risky";
+  }
+  // Sans mesure : les supports à capital garanti sont défensifs par
+  // construction, les lignes cotées sont risquées.
+  if (asset.type === "livret" || asset.type === "cash") return "defensive";
+  if (asset.type === "av") {
+    const uc = Number(asset.data["ucAmount"] ?? 0);
+    const fonds = Number(asset.data["fondsEurosAmount"] ?? 0);
+    return uc > fonds ? "risky" : "defensive";
+  }
+  if (asset.type === "pea" || asset.type === "crypto") return "risky";
+  return "balanced";
+}
+
+/** Un actif entre-t-il dans le patrimoine financier liquide ? */
+export function isFinancial(asset: Asset): boolean {
+  return asset.type !== "immo" && asset.type !== "credit" && asset.type !== "autre";
+}
+
+export interface DefensiveStatus {
+  current: number;
+  target: number;
+  /** Montant manquant, nul si la poche est déjà couverte. */
+  gap: number;
+  covered: boolean;
+  message?: string;
+}
+
+/**
+ * État de la poche défensive.
+ *
+ * Le patrimoine immobilier et les crédits en sont exclus : ils ne se
+ * réallouent pas d'un mois sur l'autre et fausseraient la cible.
+ */
+export function defensiveGap(
+  portfolio: Asset[],
+  profile: Profile | null,
+  analyses: Map<string, Analysis>,
+): DefensiveStatus {
+  const financial = portfolio.filter(isFinancial);
+  const total = financial.reduce((s, a) => s + Math.max(0, assetValue(a)), 0);
+  const current = financial
+    .filter((a) => classifyPocket(a, analyses) === "defensive")
+    .reduce((s, a) => s + Math.max(0, assetValue(a)), 0);
+
+  const target = targetAllocation(profile, portfolio, analyses);
+  const wanted = total * (1 - target.equityShare);
+  const gap = Math.max(0, wanted - current);
+  const covered = current >= wanted;
+
+  return {
+    current,
+    target: wanted,
+    gap,
+    covered,
+    ...(covered
+      ? {
+          message: `Votre poche sécurisée couvre déjà l'objectif (${Math.round(current).toLocaleString("fr-FR")} € pour ${Math.round(wanted).toLocaleString("fr-FR")} € visés). Le versement va intégralement sur la poche risquée.`,
+        }
+      : {}),
+  };
+}
+
+/** Prélèvements sociaux sur les produits de placement. */
+const SOCIAL_TAX = 0.172;
+
+/**
+ * Rendement net annuel d'un support défensif, en pourcentage.
+ * Le taux d'un livret réglementé est déjà net ; celui d'un fonds euros
+ * s'entend brut de frais et avant prélèvements sociaux.
+ */
+export function netYield(asset: Asset): number | undefined {
+  const rate = Number(asset.data["taux"] ?? 0);
+  if (asset.type === "livret") return rate > 0 ? rate : undefined;
+  if (asset.type === "av") {
+    const gross = Number(asset.data["fondsEurosRendement"] ?? 0);
+    if (gross <= 0) return undefined;
+    const fees = Number(asset.data["fraisGestion"] ?? 0.6);
+    return (gross - fees) * (1 - SOCIAL_TAX);
+  }
+  return undefined;
+}
+
+/** Exposition réelle, en parts, sur les seules lignes actions. */
+export function realExposure(
+  portfolio: Asset[],
+  realSectors?: Map<string, Partial<Record<string, number>>>,
+): Exposures {
+  return aggregateExposures(portfolio, realSectors);
+}
+
+/**
+ * Taux de recouvrement entre deux supports : somme des parts communes
+ * zone par zone. Un ETF monde et un ETF américain se recouvrent à
+ * hauteur de la part américaine du premier.
+ */
+export function overlap(a: Asset, b: Asset): number {
+  const sa = regionSplit(a);
+  const sb = regionSplit(b);
+  const zones = new Set([...Object.keys(sa), ...Object.keys(sb)]);
+  let common = 0;
+  for (const z of zones) {
+    const wa = (sa as Record<string, number | undefined>)[z] ?? 0;
+    const wb = (sb as Record<string, number | undefined>)[z] ?? 0;
+    common += Math.min(wa, wb);
+  }
+  return common;
+}
+
+export function overlapMatrix(assets: Asset[]): number[][] {
+  return assets.map((a) => assets.map((b) => (a.id === b.id ? 1 : overlap(a, b))));
+}
+
+/**
+ * Concentration d'une répartition, entre 0 et 1.
+ * Mesurée sur les expositions et non sur le nombre de lignes : quatre
+ * supports pointant vers les mêmes marchés ne diversifient rien.
+ */
+export function concentrationIndex(shares: Record<string, number>): number {
+  const total = Object.values(shares).reduce((s, v) => s + v, 0);
+  if (total <= 0) return 0;
+  return Object.values(shares).reduce((s, v) => s + (v / total) ** 2, 0);
+}
+
+export type PlanLabel = "renforcer" | "rattraper" | "maintenir" | "reduire";
+
+export const LABEL_TEXT: Record<PlanLabel, string> = {
+  renforcer: "Renforcer",
+  rattraper: "Rattraper",
+  maintenir: "Maintenir",
+  reduire: "Réduire",
+};
+
+/**
+ * Libellé d'une ligne du plan, croisant le signal de marché et l'écart
+ * à l'allocation cible.
+ *
+ * Un signal favorable ne suffit pas à justifier un renforcement : encore
+ * faut-il que la ligne soit réellement sous-pondérée. À l'inverse, un
+ * écart important se comble même sans signal, ce que dit « rattraper ».
+ * Le score employé est celui de la fiche, jamais recalculé.
+ */
+export function planLabel(signalScore: number | undefined, gapPoints: number): PlanLabel {
+  const s = signalScore ?? 0;
+  const under = gapPoints > 3;
+  const over = gapPoints < -3;
+  if (s > 0.35) return under ? "renforcer" : "maintenir";
+  if (s >= -0.15) return under ? "rattraper" : over ? "reduire" : "maintenir";
+  return under ? "maintenir" : "reduire";
+}
+
 export function optimizePlan(
   portfolio: Asset[],
   analyses: Map<string, Analysis>,
@@ -359,9 +534,16 @@ export function optimizePlan(
   };
   if (dca <= 0) return empty;
 
-  const eligible = portfolio.filter(
-    (a) => !excluded.includes(a.id) && Object.keys(regionSplit(a)).length > 0,
-  );
+  // Un support défensif n'est alimenté que si la poche l'est
+  // insuffisamment : verser sur un fonds euros quand les livrets
+  // débordent déjà revient à immobiliser sans raison.
+  const defensive = defensiveGap(portfolio, profile, analyses);
+  const eligible = portfolio.filter((a) => {
+    if (excluded.includes(a.id)) return false;
+    if (!Object.keys(regionSplit(a)).length) return false;
+    if (classifyPocket(a, analyses) === "defensive" && defensive.covered) return false;
+    return true;
+  });
   if (!eligible.length) return empty;
 
   // Répartition manuelle : elle prime, mais les contrôles s'appliquent.
@@ -377,6 +559,7 @@ export function optimizePlan(
           amount,
           weight: Math.round((amount / dca) * 100),
           intent: intentFromSignal(analyses.get(a.id)?.composite?.score),
+          action: "maintenir" as PlanLabel,
           gap: 0,
           breakdown: { convergence: amount, signal: 0, risk: 0, rounding: 0 },
         };
@@ -399,13 +582,21 @@ export function optimizePlan(
       const now = current.byZone[zone] ?? 0;
       gap += (w ?? 0) * (want - now);
     }
-    const intent = intentFromSignal(an?.composite?.score);
-    return { asset: a, an, gap, intent, split };
+    // L'écart est exprimé en points de pourcentage du portefeuille.
+    const label = planLabel(an?.composite?.score, gap * 100);
+    const intent: PlanIntent =
+      label === "renforcer" ? "renforcer" : label === "reduire" ? "alleger" : "maintenir";
+    return { asset: a, an, gap, intent, label, split };
   });
 
   // Une ligne en signal d'allègement ne reçoit rien, sauf si elle est
   // nettement sous-pondérée : on ne creuse pas un trou existant.
-  const candidates = scored.filter((c) => c.intent !== "alleger" || c.gap > 0.05);
+  // Seul un signal franchement négatif écarte une ligne. Un libellé
+  // « réduire » né d'un simple excès de pondération la déprioriser suffit :
+  // l'exclure viderait le plan d'un portefeuille pourtant investissable.
+  const candidates = scored.filter(
+    (c) => (c.an?.composite?.score ?? 0) >= -0.15 || c.gap > 0.05,
+  );
   if (!candidates.length) {
     return {
       ...empty,
@@ -519,6 +710,7 @@ export function optimizePlan(
       amount,
       weight: 0,
       intent: d.r.intent,
+      action: d.r.label,
       gap: d.r.gap * 100,
       breakdown: {
         convergence,
@@ -538,15 +730,52 @@ export function optimizePlan(
   }
   for (const l of lines) l.weight = Math.round((l.amount / dca) * 100);
 
+  // Chevauchements entre supports réellement alimentés : deux ETF qui se
+  // recouvrent largement ne diversifient pas, ils inclinent.
+  const funded = lines.map((l) => portfolio.find((a) => a.id === l.assetId)).filter(Boolean) as Asset[];
+  const overlaps: Array<{ a: string; b: string; rate: number }> = [];
+  for (let i = 0; i < funded.length; i++) {
+    for (let j = i + 1; j < funded.length; j++) {
+      const rate = overlap(funded[i]!, funded[j]!);
+      if (rate > 0.3) {
+        overlaps.push({
+          a: String(funded[i]!.data["name"] ?? ""),
+          b: String(funded[j]!.data["name"] ?? ""),
+          rate,
+        });
+      }
+    }
+  }
+
+  const exposure = realExposure(portfolio, realSectors);
+  const zoneConcentration = concentrationIndex(exposure.byZone);
+
   const impact = diversificationImpact(lines, portfolio, target, realSectors);
+  const extraWarnings = [...impact.warnings];
+  if (defensive.message) extraWarnings.unshift(defensive.message);
+  for (const o of overlaps) {
+    extraWarnings.push(
+      `${o.a} et ${o.b} se recouvrent à ${Math.round(o.rate * 100)} % : les alimenter tous deux surpondère une zone plutôt que de diversifier.`,
+    );
+  }
+  if (zoneConcentration > 0.35) {
+    const top = Object.entries(exposure.byZone).sort((a, b) => b[1] - a[1])[0];
+    extraWarnings.push(
+      `Concentration géographique élevée (${zoneConcentration.toFixed(2)})${top ? `, portée par ${top[0]}` : ""}.`,
+    );
+  }
+
   return {
     lines,
+    defensive,
+    overlaps,
+    zoneConcentration,
     violations,
     budget,
     target,
     goal: insight,
     hhi: impact.hhi,
-    warnings: impact.warnings,
+    warnings: extraWarnings,
   };
 }
 

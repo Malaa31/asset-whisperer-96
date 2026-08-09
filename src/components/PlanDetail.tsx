@@ -5,7 +5,7 @@ import { Check, Info, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { eur } from "@/lib/format";
 import { SIGNAL_LABELS, type Analysis } from "@/lib/signals";
 import { CLASS_LABELS, isDestination, type PlanResult } from "@/lib/plan";
-import type { PlanOutcome } from "@/lib/monthly-plan";
+import { LABEL_TEXT, type PlanOutcome } from "@/lib/monthly-plan";
 import { RISK_LABELS, type Asset, type Profile } from "@/lib/types";
 
 /**
