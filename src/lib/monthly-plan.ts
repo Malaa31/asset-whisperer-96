@@ -570,6 +570,7 @@ export function optimizePlan(
   }
 
   // ── Écart à la cible, zone par zone, ramené à chaque ligne ──
+  const tiltPref = profile?.tiltGeographique ?? "neutre";
   const current = aggregateExposures(portfolio, realSectors);
   const scored = eligible.map((a) => {
     const split = regionSplit(a);
@@ -578,7 +579,12 @@ export function optimizePlan(
     // exposée aux zones en retard.
     let gap = 0;
     for (const [zone, w] of Object.entries(split)) {
-      const want = (target.byZone[zone] ?? 0) * target.equityShare;
+      // Une inclinaison assumée relève la cible de la zone choisie d'un
+      // quart, le reste étant renormalisé.
+      const tiltZone =
+        tiltPref === "US" ? "États-Unis" : tiltPref === "Europe" ? "Europe" : tiltPref === "EM" ? "Émergents" : null;
+      const boost = tiltZone && zone === tiltZone ? 1.25 : 1;
+      const want = (target.byZone[zone] ?? 0) * boost * target.equityShare;
       const now = current.byZone[zone] ?? 0;
       gap += (w ?? 0) * (want - now);
     }
@@ -594,9 +600,38 @@ export function optimizePlan(
   // Seul un signal franchement négatif écarte une ligne. Un libellé
   // « réduire » né d'un simple excès de pondération la déprioriser suffit :
   // l'exclure viderait le plan d'un portefeuille pourtant investissable.
-  const candidates = scored.filter(
+  const violationsPre: Violation[] = [];
+  let candidates = scored.filter(
     (c) => (c.an?.composite?.score ?? 0) >= -0.15 || c.gap > 0.05,
   );
+
+  // En l'absence d'inclinaison assumée, une seule ligne est financée par
+  // zone : alimenter un fonds monde et un fonds américain revient à
+  // surpondérer les États-Unis sans le décider. Entre deux supports qui
+  // se recouvrent largement, on garde le plus large — celui qui couvre
+  // le plus de zones —, et à couverture égale le moins chargé en frais.
+  const tilt = profile?.tiltGeographique ?? "neutre";
+  if (tilt === "neutre" && candidates.length > 1) {
+    const dropped: string[] = [];
+    const kept: typeof candidates = [];
+    for (const c of [...candidates].sort(
+      (a, b) => Object.keys(b.split).length - Object.keys(a.split).length,
+    )) {
+      const twin = kept.find((k) => overlap(k.asset, c.asset) > 0.6);
+      if (twin) {
+        dropped.push(String(c.asset.data["name"] ?? ""));
+        continue;
+      }
+      kept.push(c);
+    }
+    if (dropped.length) {
+      candidates = kept;
+      violationsPre.push({
+        code: "single_vehicle",
+        message: `${dropped.join(", ")} : déjà couvert par un support plus large. Sans inclinaison assumée, une seule ligne est financée par zone.`,
+      });
+    }
+  }
   if (!candidates.length) {
     return {
       ...empty,
@@ -606,11 +641,47 @@ export function optimizePlan(
     };
   }
 
-  const violations: Violation[] = [];
+  const violations: Violation[] = [...violationsPre];
+
+  // Quand aucune zone n'est en retard — un portefeuille déjà conforme à
+  // sa cible —, le versement suit simplement l'allocation visée plutôt
+  // que de se répartir à parts égales, ce qui diluerait le cœur du
+  // portefeuille au profit des satellites.
+  const anyGap = candidates.some((c) => c.gap > 0.005);
+  const tiltZone =
+    tiltPref === "US"
+      ? "États-Unis"
+      : tiltPref === "Europe"
+        ? "Europe"
+        : tiltPref === "EM"
+          ? "Émergents"
+          : null;
+
+  const targetWeightOf = (
+    split: Record<string, number | undefined>,
+    isSatellite: boolean,
+  ): number => {
+    // Un satellite mono-zone d'une zone déjà couverte par un support
+    // large ne reçoit que le supplément voulu par l'inclinaison, jamais
+    // la cible entière : sinon il prendrait la place du cœur.
+    if (isSatellite && tiltZone) return (target.byZone[tiltZone] ?? 0) * 0.25;
+    let w = 0;
+    for (const [zone, part] of Object.entries(split)) {
+      w += (part ?? 0) * (target.byZone[zone] ?? 0);
+    }
+    return w;
+  };
 
   // ── Poids bruts : convergence, signal, pénalité de risque ──
   const raw = candidates.map((c) => {
-    const convergence = Math.max(0, c.gap);
+    const split = c.split as Record<string, number | undefined>;
+    // Satellite : concentré sur la zone inclinée, alors qu'un support
+    // plus large la couvre déjà.
+    const isSatellite =
+      tiltZone !== null &&
+      (split[tiltZone] ?? 0) > 0.8 &&
+      candidates.some((o) => o !== c && Object.keys(o.split).length >= 3);
+    const convergence = anyGap ? Math.max(0, c.gap) : targetWeightOf(split, isSatellite);
     const signalScore = c.an?.composite?.score ?? 0;
     // Une intention de maintien n'autorise pas de surpondération : le
     // signal ne peut alors que réduire, jamais augmenter.
@@ -696,6 +767,9 @@ export function optimizePlan(
   }
 
   const lines: PlanLine[] = draft.map((d) => {
+    // Sans écart à combler, le versement entretient la cible : parler de
+    // réduction serait trompeur puisqu'on continue d'acheter.
+    const action: PlanLabel = anyGap ? d.r.label : d.r.label === "reduire" ? "maintenir" : d.r.label;
     const exact = d.amount;
     const amount = Math.round(exact);
     const scale = totalWeight > 0 ? dca / totalWeight : 0;
@@ -710,7 +784,7 @@ export function optimizePlan(
       amount,
       weight: 0,
       intent: d.r.intent,
-      action: d.r.label,
+      action,
       gap: d.r.gap * 100,
       breakdown: {
         convergence,

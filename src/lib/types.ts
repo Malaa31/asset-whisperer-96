@@ -46,6 +46,8 @@ export interface Profile {
   goals?: Goal[];
   activeGoalId?: string;
   hideAmounts?: boolean;
+  /** Inclinaison géographique assumée du portefeuille. */
+  tiltGeographique?: "neutre" | "US" | "Europe" | "EM";
   /** Lignes que l'utilisateur a écartées du plan du mois. */
   planExcluded?: string[];
   /** Répartition fixée à la main, en pourcentage par ligne. */
