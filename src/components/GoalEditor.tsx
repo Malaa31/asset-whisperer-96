@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useModalBack } from "@/hooks/useModalBack";
 import { X, Trash2 } from "lucide-react";
 import type { Goal, GoalKind, AssetType } from "@/lib/types";
 import { GOAL_KIND_LABELS, GOAL_KIND_HINTS, ENVELOPE_OPTIONS, newGoal } from "@/lib/goals";
@@ -16,6 +17,7 @@ export function GoalEditor({
   onSave: (g: Goal) => void;
   onDelete?: (id: string) => void;
 }) {
+  useModalBack(onClose);
   const [form, setForm] = useState<Goal>(goal ?? newGoal("patrimoine"));
   const set = (patch: Partial<Goal>) => setForm((f) => ({ ...f, ...patch }));
 

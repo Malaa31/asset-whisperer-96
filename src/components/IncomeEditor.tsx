@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useModalBack } from "@/hooks/useModalBack";
 import { Plus, Trash2, X } from "lucide-react";
 import {
   INCOME_KIND_EMOJI,
@@ -30,6 +31,7 @@ export function IncomeEditor({
   onClose: () => void;
   onSave: (next: Income[]) => void;
 }) {
+  useModalBack(onClose);
   const [rows, setRows] = useState<Income[]>(() =>
     (incomes ?? []).map((i) => ({ ...i })),
   );

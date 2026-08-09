@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useModalBack } from "@/hooks/useModalBack";
 import { Check, Info, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { eur } from "@/lib/format";
 import { SIGNAL_LABELS, type Analysis } from "@/lib/signals";
@@ -34,6 +35,7 @@ export function PlanDetail({
   onWeights: (weights: Record<string, number> | null) => void;
   onClose: () => void;
 }) {
+  useModalBack(onClose);
   const [showInfo, setShowInfo] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -115,9 +117,30 @@ export function PlanDetail({
         {b.months !== undefined && !b.sufficient && (
           <p className="mt-4 rounded-xl border border-amber/40 bg-amber/10 p-3 text-[11px] leading-relaxed">
             Épargne de précaution : {b.months.toFixed(1)} mois de revenus sur{" "}
-            {b.threshold} attendus pour votre profil. Complétez-la avant
-            d'augmenter vos versements — elle n'entre pas dans ce plan.
+            {b.threshold} attendus pour votre profil. Le plan y consacre une
+            part du versement tant qu'elle n'est pas complète.
           </p>
+        )}
+
+        {plan.rationale.length > 0 && !plan.manual && (
+          <div className="mt-4 rounded-xl bg-elevated p-3">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Pourquoi cette répartition
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {plan.rationale.map((r) => (
+                <li key={r} className="text-[11px] leading-relaxed text-muted-foreground">
+                  {r}
+                </li>
+              ))}
+            </ul>
+            {plan.required !== undefined && plan.expected !== undefined && (
+              <p className="mt-2 num text-[11px] text-muted-foreground">
+                Rendement nécessaire {(plan.required * 100).toFixed(1)} % / an ·
+                espéré {(plan.expected * 100).toFixed(1)} % / an
+              </p>
+            )}
+          </div>
         )}
 
         {plan.note && <p className="mt-4 text-sm text-muted-foreground">{plan.note}</p>}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useModalBack } from "@/hooks/useModalBack";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Info, TrendingDown, TrendingUp, Minus, X } from "lucide-react";
 import { analyze, SIGNAL_LABELS, VERDICT_LABELS, type Analysis, type SignalKind } from "@/lib/signals";
@@ -49,6 +50,7 @@ export function AssetAnalysis({
   onSell: () => void;
   onClose: () => void;
 }) {
+  useModalBack(onClose);
   const [points, setPoints] = useState<HistoryPoint[] | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("5a");

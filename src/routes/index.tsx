@@ -88,8 +88,9 @@ function Dashboard() {
         profile?.planExcluded ?? [],
         profile?.planWeights,
         realSectors,
+        activeGoal ?? null,
       ),
-    [assets, analyses, profile, dca, realSectors],
+    [assets, analyses, profile, dca, realSectors, activeGoal],
   );
 
   return (
