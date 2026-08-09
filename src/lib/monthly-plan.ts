@@ -402,6 +402,7 @@ export function defensiveGap(
   const wanted = total * (1 - target.equityShare);
   const gap = Math.max(0, wanted - current);
   const covered = current >= wanted;
+  const share = total > 0 ? current / total : 0;
 
   return {
     current,
@@ -410,7 +411,7 @@ export function defensiveGap(
     covered,
     ...(covered
       ? {
-          message: `Votre poche sécurisée couvre déjà l'objectif (${Math.round(current).toLocaleString("fr-FR")} € pour ${Math.round(wanted).toLocaleString("fr-FR")} € visés). Le versement va intégralement sur la poche risquée.`,
+          message: `Votre poche sécurisée représente ${Math.round(share * 100)} % de votre patrimoine financier, au-dessus des ${Math.round((1 - target.equityShare) * 100)} % visés pour ce profil (${Math.round(current).toLocaleString("fr-FR")} € pour ${Math.round(wanted).toLocaleString("fr-FR")} € attendus). Ce versement va donc intégralement en actions.`,
         }
       : {}),
   };

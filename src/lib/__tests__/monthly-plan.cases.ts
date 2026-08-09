@@ -261,3 +261,41 @@ console.log("\nTABLE DES LIBELLÉS");
   check("signal négatif + sous-pondéré → maintenir", planLabel(-0.4, 8) === "maintenir");
   check("signal 0,43 avec écart −1 pt → maintenir", planLabel(0.43, -1) === "maintenir");
 }
+
+console.log("\nLE SOLVEUR RÉSOUT VRAIMENT");
+{
+  // Deux supports aux écarts très différents ne peuvent pas recevoir le
+  // même montant : des montants identiques trahiraient un repli uniforme.
+  const portfolio = [
+    A("us", "ETF S&P 500", 20_000),
+    A("eu", "ETF Stoxx Europe 600", 1_000),
+    A("em", "ETF MSCI Émergent", 1_000),
+  ];
+  const analyses = new Map<string, Analysis>(
+    portfolio.map((a) => [a.id, An({ volatility: 15 })]),
+  );
+  const out = optimizePlan(portfolio, analyses, P({ riskProfile: "equilibre", age: 33 }), 500);
+  const amounts = out.lines.map((l) => l.amount);
+  const uniform = amounts.length > 1 && new Set(amounts).size === 1;
+  check("montants différenciés selon l'écart", !uniform, amounts.join(" / ") + " €");
+  check("total exact", amounts.reduce((s, v) => s + v, 0) === 500);
+}
+
+console.log("\nUN SEUL VÉHICULE PAR ZONE EN MODE NEUTRE");
+{
+  const portfolio = [
+    A("w", "ETF MSCI World", 10_000),
+    A("s", "ETF S&P 500", 5_000),
+    A("e", "ETF Stoxx Europe 600", 3_000),
+  ];
+  const analyses = new Map<string, Analysis>(
+    portfolio.map((a) => [a.id, An({ volatility: 15 })]),
+  );
+  const out = optimizePlan(portfolio, analyses, P({ riskProfile: "equilibre", age: 33 }), 500);
+  const sp = out.lines.find((l) => l.assetId === "s");
+  check("le support redondant n'est pas financé", !sp, sp ? `${sp.amount} €` : "0 €");
+  check(
+    "et la raison est donnée",
+    out.violations.some((v) => v.code === "single_vehicle"),
+  );
+}
