@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useLockScroll } from "@/lib/useLockScroll";
 import { useModalBack } from "@/hooks/useModalBack";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Info, TrendingDown, TrendingUp, Minus, X } from "lucide-react";
+import { Info, MoreHorizontal, TrendingDown, TrendingUp, Minus, X } from "lucide-react";
 import { analyze, SIGNAL_LABELS, VERDICT_LABELS, type Analysis, type SignalKind } from "@/lib/signals";
 import type { HistoryPoint, HistoryResult } from "@/routes/api/public/history";
 import { eur } from "@/lib/format";
 import { assetValue } from "@/lib/calc";
-import { regionSplit, sectorSplit } from "@/lib/classify";
+import { benchmarkFor, regionSplit, sectorSplit } from "@/lib/classify";
+import { SRRI_LABELS } from "@/lib/metrics";
 import { useSectors } from "@/lib/useSectors";
 import type { Asset, RiskProfile } from "@/lib/types";
 
@@ -24,14 +25,6 @@ const SIGNAL_STYLE: Record<SignalKind, { cls: string; Icon: typeof TrendingUp }>
   alleger: { cls: "text-destructive bg-destructive/10", Icon: TrendingDown },
 };
 
-/** Niveau de risque déduit de la volatilité annualisée. */
-function riskLevel(vol: number): { level: number; label: string; cls: string } {
-  if (vol < 5) return { level: 1, label: "Très faible", cls: "bg-primary" };
-  if (vol < 10) return { level: 2, label: "Faible", cls: "bg-primary" };
-  if (vol < 15) return { level: 3, label: "Modéré", cls: "bg-amber" };
-  if (vol < 22) return { level: 4, label: "Élevé", cls: "bg-amber" };
-  return { level: 5, label: "Très élevé", cls: "bg-destructive" };
-}
 
 /**
  * Fiche d'une ligne cotée : courbe de performance, niveau de risque,
@@ -57,6 +50,7 @@ export function AssetAnalysis({
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("5a");
   const [showInfo, setShowInfo] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [resolved, setResolved] = useState<string | undefined>(undefined);
 
@@ -298,29 +292,98 @@ export function AssetAnalysis({
               <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                 {analysis.reason}
               </p>
+              {analysis.composite && (
+                <ul className="mt-3 space-y-2 border-t border-border pt-3">
+                  {analysis.composite.parts.map((part) => (
+                    <li key={part.key} className="flex items-center gap-2.5">
+                      <span className="w-28 shrink-0 text-[11px] text-muted-foreground">
+                        {part.label}
+                      </span>
+                      {/* Barre centrée : la moitié gauche marque un facteur
+                          défavorable, la droite un facteur favorable. */}
+                      <span className="relative h-1.5 flex-1 rounded-full bg-elevated">
+                        <span className="absolute inset-y-0 left-1/2 w-px bg-border" />
+                        <span
+                          className={`absolute inset-y-0 rounded-full ${
+                            part.value >= 0 ? "bg-primary" : "bg-destructive"
+                          }`}
+                          style={
+                            part.value >= 0
+                              ? { left: "50%", width: `${Math.min(50, part.value * 50)}%` }
+                              : {
+                                  right: "50%",
+                                  width: `${Math.min(50, Math.abs(part.value) * 50)}%`,
+                                }
+                          }
+                        />
+                      </span>
+                      <span className="num w-9 shrink-0 text-right text-[10px] text-muted-foreground">
+                        {part.value > 0 ? "+" : ""}
+                        {part.value.toFixed(2)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+
+            {analysis.regression && (
+              <div className="card-surface mt-3 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Face à son indice</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {benchmarkFor(`${asset.data["name"] ?? ""} ${ticker}`).label}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
+                  <Row
+                    label="Surperformance"
+                    value={`${analysis.regression.alpha > 0 ? "+" : ""}${analysis.regression.alpha.toFixed(1)} %/an`}
+                  />
+                  <Row label="Sensibilité" value={analysis.regression.beta.toFixed(2)} />
+                  <Row
+                    label="Écart de suivi"
+                    value={`${analysis.regression.trackingError.toFixed(1)} %`}
+                  />
+                  <Row
+                    label="Variance expliquée"
+                    value={`${(analysis.regression.r2 * 100).toFixed(0)} %`}
+                  />
+                </div>
+                <p className="mt-2.5 text-[10px] leading-relaxed text-muted-foreground">
+                  Une sensibilité de 1 signifie suivre l'indice. La surperformance
+                  isole ce que la ligne a rapporté au-delà de cette exposition.
+                </p>
+              </div>
+            )}
 
             <div className="card-surface mt-3 p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold">Niveau de risque</span>
                 <span className="text-[11px] text-muted-foreground">
-                  {riskLevel(analysis.volatility).label} · {analysis.volatility.toFixed(0)} % de
-                  volatilité
+                  {SRRI_LABELS[analysis.srri]} · {analysis.srri}/7
                 </span>
               </div>
               <div className="mt-2.5 flex gap-1">
-                {[1, 2, 3, 4, 5].map((i) => {
-                  const r = riskLevel(analysis.volatility);
-                  return (
-                    <span
-                      key={i}
-                      className={`h-1.5 flex-1 rounded-full ${i <= r.level ? r.cls : "bg-elevated"}`}
-                    />
-                  );
-                })}
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 flex-1 rounded-full ${
+                      i <= analysis.srri
+                        ? analysis.srri >= 6
+                          ? "bg-destructive"
+                          : analysis.srri >= 4
+                            ? "bg-amber"
+                            : "bg-primary"
+                        : "bg-elevated"
+                    }`}
+                  />
+                ))}
               </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Pire baisse subie : {analysis.maxDrawdown.toFixed(0)} %
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                Volatilité {analysis.volatility.toFixed(1)} % par an (3 ans, annualisée) ·
+                pire baisse {analysis.maxDrawdown.toFixed(0)} % sur {analysis.years.toFixed(0)} ans.
+                Échelle européenne de 1 à 7.
               </p>
             </div>
 
@@ -346,12 +409,20 @@ export function AssetAnalysis({
               <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
                 {analysis.verdictReason}
               </p>
+              {!analysis.consistent && (
+                <p className="mt-3 rounded-xl border border-amber/40 bg-amber/10 p-3 text-[11px] leading-relaxed">
+                  Ces indicateurs ne passent pas les contrôles de cohérence
+                  internes et ne sont pas affichés : {analysis.warnings[0]}.
+                </p>
+              )}
+              {analysis.consistent && (
               <div className="mt-3 grid grid-cols-4 gap-2 border-t border-border pt-3 text-center">
-                <Metric label="Perf/an" value={`${analysis.cagr.toFixed(1)} %`} />
-                <Metric label="Sharpe" value={analysis.sharpe.toFixed(2)} />
-                <Metric label="Sortino" value={analysis.sortino.toFixed(2)} />
-                <Metric label="Calmar" value={analysis.calmar.toFixed(2)} />
+                <Metric label={`Perf/an (${analysis.years.toFixed(0)} ans)`} value={`${analysis.cagr.toFixed(1)} %`} />
+                <Metric label="Sharpe (3 ans)" value={analysis.sharpe.toFixed(2)} />
+                <Metric label="Sortino (3 ans)" value={analysis.sortino.toFixed(2)} />
+                <Metric label="Calmar (max)" value={analysis.calmar.toFixed(2)} />
               </div>
+              )}
               {showInfo && (
                 <p className="mt-3 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
                   Sharpe : rendement au-delà d'un placement sans risque, rapporté
@@ -367,21 +438,41 @@ export function AssetAnalysis({
         )}
       </div>
 
-      <footer className="sticky bottom-0 flex gap-2 border-t border-border bg-card px-5 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+      <footer className="sticky bottom-0 flex items-center gap-2 border-t border-border bg-card px-5 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
         <button
           type="button"
           onClick={onEdit}
-          className="tap h-12 flex-1 rounded-xl border border-border text-sm font-semibold"
+          className="tap h-12 flex-1 rounded-xl bg-primary text-sm font-bold text-primary-foreground"
         >
-          Modifier
+          Modifier ma position
         </button>
-        <button
-          type="button"
-          onClick={onSell}
-          className="tap h-12 flex-1 rounded-xl border border-destructive/40 text-sm font-semibold text-destructive"
-        >
-          Vendre / retirer
-        </button>
+        {/* La cession reste accessible sans être mise en avant : sur un
+            plan d'investissement de long terme, un bouton rouge pleine
+            largeur encourage exactement le réflexe qu'il faut éviter. */}
+        <div className="relative">
+          <button
+            type="button"
+            aria-label="Autres actions"
+            onClick={() => setMoreOpen((v) => !v)}
+            className="tap flex size-12 items-center justify-center rounded-xl border border-border"
+          >
+            <MoreHorizontal className="size-5" />
+          </button>
+          {moreOpen && (
+            <div className="absolute bottom-14 right-0 w-52 overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setMoreOpen(false);
+                  onSell();
+                }}
+                className="tap w-full px-4 py-3 text-left text-sm text-destructive"
+              >
+                Vendre / retirer la ligne
+              </button>
+            </div>
+          )}
+        </div>
       </footer>
     </div>
   );
@@ -406,6 +497,16 @@ function Bars({ rows }: { rows: Array<{ key: string; value: number }> }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Ligne libellé / valeur d'un tableau compact. */
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className="num text-[12px] font-semibold">{value}</span>
+    </div>
   );
 }
 

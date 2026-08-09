@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { analyze, type Analysis } from "./signals";
 import type { HistoryResult } from "@/routes/api/public/history";
+import { benchmarkFor } from "./classify";
 import type { Asset, RiskProfile } from "./types";
 
 /** Marché de référence pour le calcul de l'alpha : actions monde. */
-const BENCHMARK = "IWDA.AS";
+/** Indice par défaut ; chaque ligne peut en réclamer un plus adapté. */
+const BENCHMARK = "URTH";
 
 /**
  * Analyse les lignes cotées du portefeuille. Un seul chargement par
@@ -52,8 +54,13 @@ export function useAnalyses(assets: Asset[], risk: RiskProfile) {
             String(asset.data["ticker"]),
             String(asset.data["name"] ?? ""),
           );
+          // Un fonds émergent se juge face aux émergents : le comparer à
+          // un indice mondial mesurerait l'écart entre deux marchés
+          // plutôt que la qualité du fonds.
+          const own = benchmarkFor(`${asset.data["name"] ?? ""} ${asset.data["ticker"] ?? ""}`);
+          const ownBench = own.symbol === BENCHMARK ? bench : await load(own.symbol);
           if (!data?.points?.length) return null;
-          const a = analyze(String(asset.data["ticker"]), data.points, risk, bench?.points);
+          const a = analyze(String(asset.data["ticker"]), data.points, risk, (ownBench ?? bench)?.points);
           return a ? ([asset.id, a] as const) : null;
         }),
       );

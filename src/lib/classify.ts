@@ -274,3 +274,26 @@ export function exposure(
   }
   return { regions, sectors };
 }
+
+/**
+ * Indice de référence d'une ligne, pour la mesure de surperformance.
+ *
+ * Comparer un fonds émergent à un indice mondial fausse l'alpha : la
+ * différence mesurée reflète alors l'écart entre deux marchés, pas la
+ * qualité du fonds.
+ */
+const BENCHMARKS: Array<{ re: RegExp; symbol: string; label: string }> = [
+  { re: /\b(s&?p\s*500|sp500|nasdaq)\b/i, symbol: "^GSPC", label: "S&P 500" },
+  { re: /\b(stoxx|euro\s*stoxx|msci\s*europe|cac|dax)\b/i, symbol: "^STOXX", label: "Stoxx Europe 600" },
+  { re: /\b([ée]mergent|emerging|\bem\b)\b/i, symbol: "EEM", label: "MSCI Émergents" },
+  { re: /\b(japon|japan|topix|nikkei)\b/i, symbol: "^N225", label: "Nikkei 225" },
+  { re: /\b(msci\s*world|world|monde|acwi)\b/i, symbol: "URTH", label: "MSCI World" },
+];
+
+/** Indice par défaut : actions monde. */
+export const DEFAULT_BENCHMARK = { symbol: "URTH", label: "MSCI World" };
+
+export function benchmarkFor(text: string): { symbol: string; label: string } {
+  const hit = BENCHMARKS.find((b) => b.re.test(text));
+  return hit ? { symbol: hit.symbol, label: hit.label } : DEFAULT_BENCHMARK;
+}

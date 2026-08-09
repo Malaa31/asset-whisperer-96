@@ -1,4 +1,22 @@
 import type { HistoryPoint } from "@/routes/api/public/history";
+import {
+  annualizedReturn,
+  annualizedVolatility,
+  calmarRatio,
+  detectFrequency,
+  downsideDeviation,
+  logReturns,
+  jensenAlpha,
+  maxDrawdown,
+  sharpeRatio,
+  sortinoRatio,
+  srriBucket,
+  validateMetrics,
+  windowOf,
+  compositeSignal,
+  type CompositeSignal,
+  type Regression,
+} from "./metrics";
 import type { RiskProfile } from "./types";
 
 /**
@@ -57,6 +75,13 @@ export interface Metrics {
   beta?: number;
   /** Surperformance annualisée à risque de marché égal (%). */
   alpha?: number;
+  /** Échelle de risque réglementaire, de 1 à 7. */
+  srri: number;
+  /** Fréquence détectée des données, en périodes par an. */
+  periods: number;
+  /** Les métriques passent-elles les contrôles de cohérence ? */
+  consistent: boolean;
+  warnings: string[];
 }
 
 export interface Analysis extends Metrics {
@@ -67,6 +92,10 @@ export interface Analysis extends Metrics {
   verdictReason: string;
   /** Score de classement 0-100, pondéré par le profil. */
   score: number;
+  /** Détail du signal composite, pour l'affichage des sous-scores. */
+  composite?: CompositeSignal;
+  /** Comparaison à l'indice de référence. */
+  regression?: Regression;
 }
 
 const mean = (xs: number[]): number =>
@@ -83,50 +112,9 @@ function monthlyReturns(points: HistoryPoint[]): number[] {
 }
 
 export function computeMetrics(points: HistoryPoint[]): Metrics | null {
-  const pts = points.filter((p) => p.c > 0).sort((a, b) => a.t - b.t);
-  if (pts.length < MIN_YEARS * 12) return null;
-
-  const first = pts[0]!;
-  const last = pts[pts.length - 1]!;
-  const years = (last.t - first.t) / (365.25 * 24 * 3600 * 1000);
-  if (years < MIN_YEARS) return null;
-
-  const cagr = (Math.pow(last.c / first.c, 1 / years) - 1) * 100;
-
-  const rets = monthlyReturns(pts);
-  const m = mean(rets);
-  const variance = mean(rets.map((r) => (r - m) ** 2));
-  const volatility = Math.sqrt(variance) * Math.sqrt(12) * 100;
-
-  // Pire baisse : plus grand recul entre un sommet et le creux suivant.
-  let peak = pts[0]!.c;
-  let maxDrawdown = 0;
-  for (const p of pts) {
-    if (p.c > peak) peak = p.c;
-    const dd = (p.c / peak - 1) * 100;
-    if (dd < maxDrawdown) maxDrawdown = dd;
-  }
-
-  const window = pts.slice(-12);
-  const ma = mean(window.map((p) => p.c));
-  const vsLongMa = ma > 0 ? (last.c / ma - 1) * 100 : 0;
-
-  const ref12 = pts[Math.max(0, pts.length - 13)]!;
-  const last12m = ref12.c > 0 ? (last.c / ref12.c - 1) * 100 : 0;
-
-  const excess = cagr - RISK_FREE;
-  const sharpe = volatility > 0 ? excess / volatility : 0;
-
-  // Volatilité baissière seule : un actif qui ne bouge qu'à la hausse
-  // n'est pas risqué, l'écart-type classique le pénalise à tort.
-  const down = rets.filter((r) => r < 0);
-  const downDev = down.length ? Math.sqrt(mean(down.map((r) => r ** 2))) * Math.sqrt(12) * 100 : 0;
-  const sortino = downDev > 0 ? excess / downDev : sharpe;
-
-  const calmar = maxDrawdown < 0 ? cagr / Math.abs(maxDrawdown) : 0;
-
-  return { years, cagr, volatility, maxDrawdown, vsLongMa, last12m, sharpe, sortino, calmar };
+  return computeMetricsV2(points);
 }
+
 
 /**
  * Régression des rendements de la ligne sur ceux du marché de référence.
@@ -163,6 +151,16 @@ export function regress(
 
   const beta = cov / varx;
   return { beta, alpha: (my - beta * mx) * 12 * 100 };
+}
+
+/** Phrase résumant ce qui pousse le signal, à partir du sous-score dominant. */
+function reasonOf(c: CompositeSignal): string {
+  const top = [...c.parts].sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0];
+  if (!top || Math.abs(top.value) < 0.1) {
+    return "Aucun facteur ne ressort nettement : la ligne se tient dans sa moyenne.";
+  }
+  const sens = top.value > 0 ? "favorable" : "défavorable";
+  return `${top.label} ${sens} : c'est ce qui pèse le plus dans le signal.`;
 }
 
 function signalOf(m: Metrics): { signal: SignalKind; reason: string } {
@@ -241,6 +239,61 @@ function scoreOf(m: Metrics, profile: RiskProfile): number {
   return Math.round(perf * w.perf + risk * w.risk + trend * w.trend);
 }
 
+/**
+ * Métriques calculées par le module dédié, avec contrôle de cohérence.
+ * Les fenêtres retenues suivent l'usage : trois ans pour la volatilité
+ * et les ratios, la totalité de l'historique pour la pire baisse.
+ */
+function computeMetricsV2(points: HistoryPoint[]): Metrics | null {
+  const pts = points.filter((p) => p.c > 0).sort((a, b) => a.t - b.t);
+  if (pts.length < 12) return null;
+
+  const years = (pts[pts.length - 1]!.t - pts[0]!.t) / (365.25 * 24 * 3600 * 1000);
+  if (years < MIN_YEARS) return null;
+
+  const volatility = annualizedVolatility(pts, 3);
+  if (volatility === null) return null;
+
+  const win = windowOf(pts, 3);
+  const freq = detectFrequency(win.map((p) => p.t));
+  const periods = freq?.periods ?? 12;
+  const rets = logReturns(win.map((p) => p.c));
+
+  const cagr = annualizedReturn(pts) ?? 0;
+  const maxDD = maxDrawdown(pts);
+  const sharpe = sharpeRatio(cagr, volatility) ?? 0;
+  const sortino = sortinoRatio(cagr, downsideDeviation(rets, 0, periods)) ?? sharpe;
+  const calmar = calmarRatio(cagr, maxDD) ?? 0;
+
+  // Moyenne longue et dynamique récente, exprimées sur la fréquence réelle.
+  const longWindow = Math.max(6, Math.round(periods));
+  const tail = pts.slice(-longWindow);
+  const ma = tail.reduce((s, p) => s + p.c, 0) / tail.length;
+  const last = pts[pts.length - 1]!.c;
+  const vsLongMa = ma > 0 ? (last / ma - 1) * 100 : 0;
+  const ref = pts[Math.max(0, pts.length - longWindow - 1)]!;
+  const last12m = ref.c > 0 ? (last / ref.c - 1) * 100 : 0;
+
+  const bundle = { volatility, maxDD, annualReturn: cagr, sharpe, sortino, calmar, srri: null };
+  const { valid, warnings } = validateMetrics(bundle);
+
+  return {
+    years,
+    cagr,
+    volatility,
+    maxDrawdown: maxDD,
+    vsLongMa,
+    last12m,
+    sharpe,
+    sortino,
+    calmar,
+    srri: srriBucket(volatility),
+    periods,
+    consistent: valid,
+    warnings,
+  };
+}
+
 export function analyze(
   symbol: string,
   points: HistoryPoint[],
@@ -250,10 +303,33 @@ export function analyze(
   const base = computeMetrics(points);
   if (!base) return null;
 
-  const reg = benchmark?.length ? regress(points, benchmark) : null;
+  const freq = detectFrequency(points.map((p) => p.t));
+  const reg = benchmark?.length
+    ? jensenAlpha(monthlyReturns(points), monthlyReturns(benchmark), freq?.periods ?? 12)
+    : null;
   const m: Metrics = reg ? { ...base, beta: reg.beta, alpha: reg.alpha } : base;
 
-  const { signal, reason } = signalOf(m);
+  // Le signal composite croise tendance de fond, surperformance et excès
+  // de court terme. La seule moyenne 12 mois, trop fruste, ne sert plus
+  // que de repli quand l'historique est trop court.
+  const composite = compositeSignal(points, benchmark ? monthlyReturns(benchmark) : undefined);
+  const fallback = signalOf(m);
+  const signal: SignalKind = composite
+    ? composite.kind === "achat"
+      ? "renforcer"
+      : composite.kind
+    : fallback.signal;
+  const reason = composite ? reasonOf(composite) : fallback.reason;
   const { verdict, reason: verdictReason } = verdictOf(m);
-  return { ...m, symbol, signal, reason, verdict, verdictReason, score: scoreOf(m, profile) };
+  return {
+    ...m,
+    symbol,
+    signal,
+    reason,
+    verdict,
+    verdictReason,
+    score: scoreOf(m, profile),
+    ...(composite ? { composite } : {}),
+    ...(reg ? { regression: reg } : {}),
+  };
 }
