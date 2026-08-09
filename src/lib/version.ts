@@ -1,7 +1,5 @@
 /**
  * Marqueur de version, affiché dans Profil → Vos données.
- *
- * Sert de témoin : si le numéro affiché correspond au dernier livré, la
- * chaîne dépôt → déploiement → appareil fonctionne.
+ * Témoin de la chaîne dépôt → déploiement → appareil.
  */
-export const BUILD_VERSION = "v33 · 09/08";
+export const BUILD_VERSION = "v34 · 09/08";

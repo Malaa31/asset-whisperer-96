@@ -11,7 +11,7 @@ import { GoalPanel } from "@/components/GoalPanel";
 import { AllocationCard } from "@/components/AllocationCard";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
 import { PlanDetail } from "@/components/PlanDetail";
-import { buildPlan } from "@/lib/plan";
+import { buildPlan, classOf } from "@/lib/plan";
 import { optimizePlan } from "@/lib/monthly-plan";
 import { useAnalyses } from "@/lib/useAnalyses";
 import { useSectors } from "@/lib/useSectors";
@@ -106,6 +106,29 @@ function Dashboard() {
       ),
     [assets, analyses, profile, dca, realSectors, activeGoal],
   );
+
+  // Les montants viennent du moteur d'allocation ; l'ancien résultat ne
+  // fournit plus que l'état du matelas et le classement par poche.
+  const mergedPlan = useMemo(
+    () => ({
+      ...plan,
+      lines: outcome.lines.map((l) => {
+        const asset = assets.find((a) => a.id === l.assetId);
+        return {
+          assetId: l.assetId,
+          label: l.label,
+          cls: (asset ? classOf(asset) : null) ?? "actions",
+          amount: l.amount,
+          weight: l.weight,
+          ...(asset && analyses.get(asset.id)
+            ? { signal: analyses.get(asset.id)!.signal }
+            : {}),
+        };
+      }),
+    }),
+    [plan, outcome, assets, analyses],
+  );
+
 
   return (
     <div className="fade-up px-5 pt-8">
@@ -216,7 +239,7 @@ function Dashboard() {
 
       {planOpen && profile && (
         <PlanDetail
-          plan={plan}
+          plan={mergedPlan}
           dca={dca}
           profile={profile}
           analyses={analyses}
