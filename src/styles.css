@@ -139,8 +139,18 @@
   }
 }
 
+/**
+ * Animation d'entrée des pages.
+ *
+ * Le mode de remplissage est volontairement limité à l'amont. Avec
+ * « both », l'animation reste appliquée après sa fin : la propriété de
+ * transformation demeure animée, ce qui fait de l'élément un bloc
+ * conteneur pour ses descendants en positionnement fixe. Les feuilles
+ * plein écran se plaçaient alors par rapport à la page et non à
+ * l'écran, s'insérant dans le flux au lieu de le recouvrir.
+ */
 @utility fade-up {
-  animation: fadeUp 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fadeUp 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 @keyframes fadeUp {
