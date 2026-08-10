@@ -1,4 +1,6 @@
 import { assetValue } from "./calc";
+import { diversificationFactor } from "./diversification";
+import { suitabilityFactor } from "./riskMatrix";
 import { regionSplit, sectorSplit } from "./classify";
 import type { Analysis } from "./signals";
 import type { Asset, Goal, Profile, RiskProfile } from "./types";
@@ -136,7 +138,21 @@ export function targetAllocation(
     .map((a) => analyses.get(a.id)?.volatility)
     .filter((v): v is number => typeof v === "number" && v > 0);
   // Sans mesure disponible, une volatilité d'actions de référence.
-  const equitySigma = sigmas.length ? sigmas.reduce((s, v) => s + v, 0) / sigmas.length : 15;
+  // Volatilité de la poche, non moyenne des volatilités : les lignes ne
+  // varient pas ensemble, et la moyenne simple surestime le risque, ce
+  // qui conduisait à un sous-investissement systématique en actions.
+  const weighted = equities
+    .map((a) => ({
+      weight: Math.max(0, assetValue(a)),
+      risk: analyses.get(a.id)?.volatility ?? 15,
+      cls: corrClassOf(a, analyses),
+    }))
+    .filter((x) => x.weight > 0);
+  const equitySigma = weighted.length
+    ? portfolioRisk(weighted).value
+    : sigmas.length
+      ? sigmas.reduce((s, v) => s + v, 0) / sigmas.length
+      : 15;
 
   const equityShare = Math.max(0, Math.min(1, budget.sigmaTarget / equitySigma));
   const sum = Object.values(ZONE_BASE).reduce((s, v) => s + v, 0);
@@ -208,6 +224,37 @@ export function goalInsight(
 
 export type PlanIntent = "renforcer" | "maintenir" | "alleger";
 
+/**
+ * Décomposition d'un montant.
+ *
+ * Deux blocs, parce que le calcul lui-même en comporte deux : un poids
+ * de base additif, puis des coefficients multiplicatifs. Prétendre que
+ * quatre termes additifs restituent le montant reviendrait à cacher les
+ * coefficients dans la ligne d'arrondi, qui deviendrait illisible.
+ */
+export interface WeightBreakdown {
+  /** Bloc additif. */
+  convergence: number;
+  signal: number;
+  risk: number;
+  /** Plancher appliqué quand la somme des trois termes est trop faible. */
+  floor: number;
+  /** Somme des trois termes, plancher compris. */
+  base: number;
+  /** Coefficients appliqués ensuite, chacun autour de 1. */
+  suitability: number;
+  diversification: number;
+  core: number;
+  /** Poids après coefficients et bornage. */
+  final: number;
+  /** Part du versement, en pourcentage. */
+  share: number;
+  /** Montant avant arrondi. */
+  gross: number;
+  /** Écart d'arrondi, en euros. */
+  rounding: number;
+}
+
 export interface PlanBreakdown {
   /** Rapprochement de la cible, en euros. */
   convergence: number;
@@ -231,6 +278,8 @@ export interface PlanLine {
   /** Écart à la cible, en points de pourcentage. */
   gap: number;
   breakdown: PlanBreakdown;
+  /** Décomposition en deux blocs : poids additif puis coefficients. */
+  weights?: WeightBreakdown;
 }
 
 export interface Violation {
@@ -240,6 +289,8 @@ export interface Violation {
 
 export interface PlanOutcome {
   lines: PlanLine[];
+  /** Baisse projetée du portefeuille après versement. */
+  projectedDrawdown?: RiskEstimate;
   /** État de la poche défensive. */
   defensive?: DefensiveStatus;
   /** Paires de supports se recouvrant nettement. */
@@ -343,6 +394,71 @@ export function diversificationImpact(
 // ─────────────────────────────────────────────────────────────────────
 
 export type Pocket = "defensive" | "balanced" | "risky";
+
+// ─────────────────────────────────────────────────────────────────────
+// Corrélations et risque de portefeuille
+// ─────────────────────────────────────────────────────────────────────
+
+/** Grandes familles servant à la table de corrélations. */
+export type CorrClass = "actions-dev" | "actions-em" | "obligataire" | "monetaire";
+
+/**
+ * Corrélations forfaitaires entre familles.
+ *
+ * Valeurs d'ordre de grandeur, tirées du comportement observé des
+ * grandes classes. Elles tiennent lieu de mesure tant que les
+ * corrélations réelles ne sont pas calculées : mieux vaut une hypothèse
+ * explicite qu'une addition naïve des risques, qui les surestime.
+ */
+const CORRELATION: Record<CorrClass, Partial<Record<CorrClass, number>>> = {
+  "actions-dev": { "actions-dev": 0.85, "actions-em": 0.7, obligataire: 0.2, monetaire: 0 },
+  "actions-em": { "actions-em": 0.85, "actions-dev": 0.7, obligataire: 0.2, monetaire: 0 },
+  obligataire: { obligataire: 0.6, "actions-dev": 0.2, "actions-em": 0.2, monetaire: 0 },
+  monetaire: { monetaire: 1, "actions-dev": 0, "actions-em": 0, obligataire: 0 },
+};
+
+export function correlationOf(a: CorrClass, b: CorrClass): number {
+  if (a === b) return 1;
+  return CORRELATION[a]?.[b] ?? 0.5;
+}
+
+/** Famille de corrélation d'un actif, déduite de son exposition. */
+export function corrClassOf(asset: Asset, analyses?: Map<string, Analysis>): CorrClass {
+  const sigma = analyses?.get(asset.id)?.volatility;
+  if (typeof sigma === "number" && sigma > 0 && sigma < 3) return "monetaire";
+  const split = regionSplit(asset);
+  if (!Object.keys(split).length) return "obligataire";
+  return (split["Émergents"] ?? 0) > 0.5 ? "actions-em" : "actions-dev";
+}
+
+export interface RiskEstimate {
+  value: number;
+  /** Origine des corrélations employées. */
+  method: "forfaitaire" | "mesurée";
+}
+
+/**
+ * Agrégation d'un risque par la formule de portefeuille.
+ *
+ * Sert autant à la volatilité qu'à la pire baisse : additionner
+ * naïvement les risques de plusieurs lignes surestime le risque total,
+ * puisqu'elles ne baissent pas toutes en même temps.
+ */
+export function portfolioRisk(
+  items: Array<{ weight: number; risk: number; cls: CorrClass }>,
+): RiskEstimate {
+  const total = items.reduce((s, i) => s + i.weight, 0);
+  if (total <= 0) return { value: 0, method: "forfaitaire" };
+  let sum = 0;
+  for (const i of items) {
+    for (const j of items) {
+      const wi = i.weight / total;
+      const wj = j.weight / total;
+      sum += wi * wj * correlationOf(i.cls, j.cls) * Math.abs(i.risk) * Math.abs(j.risk);
+    }
+  }
+  return { value: Math.sqrt(Math.max(0, sum)), method: "forfaitaire" };
+}
 
 /**
  * Poche d'un actif, déduite de sa volatilité et non de son nom ni de son
@@ -568,7 +684,28 @@ export function optimizePlan(
           breakdown: { convergence: amount, signal: 0, risk: 0, rounding: 0 },
         };
       });
-      const impact = diversificationImpact(lines, portfolio, target, realSectors);
+      // C6 — baisse projetée du portefeuille après versement, comparée à la
+  // tolérance du profil. On n'empêche jamais le versement : un
+  // dépassement provient le plus souvent du portefeuille existant, que
+  // le plan ne peut pas corriger à lui seul.
+  const afterItems = portfolio
+    .map((a) => {
+      const add = lines.find((l) => l.assetId === a.id)?.amount ?? 0;
+      const weight = Math.max(0, assetValue(a)) + add;
+      const dd = analyses.get(a.id)?.maxDrawdown ?? 0;
+      return { weight, risk: dd, cls: corrClassOf(a, analyses) };
+    })
+    .filter((x) => x.weight > 0 && x.risk !== 0);
+  const projectedDrawdown = afterItems.length ? portfolioRisk(afterItems) : undefined;
+  const ddViolations: Violation[] = [];
+  if (projectedDrawdown && projectedDrawdown.value > budget.ddTolerance) {
+    ddViolations.push({
+      code: "drawdown_over",
+      message: `Baisse projetée de ${projectedDrawdown.value.toFixed(0)} % contre ${budget.ddTolerance} % visés pour ce profil (estimation à corrélations forfaitaires). L'écart vient du portefeuille existant, que ce versement seul ne corrige pas.`,
+    });
+  }
+
+  const impact = diversificationImpact(lines, portfolio, target, realSectors);
       return { ...empty, lines, hhi: impact.hhi, warnings: impact.warnings };
     }
   }
@@ -700,8 +837,26 @@ export function optimizePlan(
     // Au-delà du budget de risque, la ligne est pénalisée
     // proportionnellement à son excès de volatilité.
     const penalty = sigma > budget.sigmaTarget ? -((sigma - budget.sigmaTarget) / 100) * 0.5 : 0;
-    const weight = Math.max(0.01, convergence + signalBoost + penalty);
-    return { ...c, convergence, signalBoost, penalty, weight };
+    // Bloc additif : le poids de base.
+    const base = Math.max(0.01, convergence + signalBoost + penalty);
+    // Bloc multiplicatif : adéquation au profil, effet sur la
+    // diversification, ancrage du cœur de portefeuille.
+    const suitability = suitabilityFactor(c.asset, risk);
+    const diversification = diversificationFactor(c.asset, portfolio, realSectors);
+    const zones = Object.values(c.split).filter((w) => (w ?? 0) > 0.02).length;
+    const core = zones >= 4 ? 1.5 : zones === 3 ? 1.25 : 1;
+    const weight = Math.min(2, Math.max(0.01, base * suitability * diversification * core));
+    return {
+      ...c,
+      convergence,
+      signalBoost,
+      penalty,
+      base,
+      suitability,
+      diversification,
+      core,
+      weight,
+    };
   });
 
   let weights = new Map(raw.map((r) => [r.asset.id, r.weight]));
@@ -795,6 +950,22 @@ export function optimizePlan(
       intent: d.r.intent,
       action,
       gap: d.r.gap * 100,
+      weights: {
+        convergence: d.r.convergence,
+        signal: d.r.signalBoost,
+        risk: d.r.penalty,
+        // Rendu explicite : sans lui, le bloc additif ne restituerait pas
+        // le poids de base dès que la somme tombe sous le plancher.
+        floor: d.r.base - (d.r.convergence + d.r.signalBoost + d.r.penalty),
+        base: d.r.base,
+        suitability: d.r.suitability,
+        diversification: d.r.diversification,
+        core: d.r.core,
+        final: d.r.weight,
+        share: totalWeight > 0 ? (d.r.weight / totalWeight) * 100 : 0,
+        gross: exact,
+        rounding: amount - exact,
+      },
       breakdown: {
         convergence,
         signal,
@@ -833,6 +1004,26 @@ export function optimizePlan(
   const exposure = realExposure(portfolio, realSectors);
   const zoneConcentration = concentrationIndex(exposure.byZone);
 
+  // C6 — baisse projetée du portefeuille après versement, comparée à la
+  // tolérance du profil. On n'empêche jamais le versement : un
+  // dépassement provient le plus souvent du portefeuille existant, que
+  // le plan ne peut pas corriger à lui seul.
+  const afterItems = portfolio
+    .map((a) => {
+      const add = lines.find((l) => l.assetId === a.id)?.amount ?? 0;
+      const weight = Math.max(0, assetValue(a)) + add;
+      const dd = analyses.get(a.id)?.maxDrawdown ?? 0;
+      return { weight, risk: dd, cls: corrClassOf(a, analyses) };
+    })
+    .filter((x) => x.weight > 0 && x.risk !== 0);
+  const projectedDrawdown = afterItems.length ? portfolioRisk(afterItems) : undefined;
+  if (projectedDrawdown && projectedDrawdown.value > budget.ddTolerance) {
+    violations.push({
+      code: "drawdown_over",
+      message: `Baisse projetée de ${projectedDrawdown.value.toFixed(0)} % contre ${budget.ddTolerance} % visés pour ce profil (estimation à corrélations forfaitaires). L'écart vient du portefeuille existant, que ce versement seul ne corrige pas.`,
+    });
+  }
+
   const impact = diversificationImpact(lines, portfolio, target, realSectors);
   const extraWarnings = [...impact.warnings];
   if (defensive.message) extraWarnings.unshift(defensive.message);
@@ -850,6 +1041,7 @@ export function optimizePlan(
 
   return {
     lines,
+    ...(projectedDrawdown ? { projectedDrawdown } : {}),
     defensive,
     overlaps,
     zoneConcentration,

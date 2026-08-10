@@ -13,7 +13,10 @@ import {
   optimizePlan,
   riskBudgetFromProfile,
   targetAllocation,
+  portfolioRisk,
+  correlationOf,
 } from "../monthly-plan";
+import { regionSplit } from "../classify";
 import type { Analysis } from "../signals";
 import type { Asset, Goal, Profile } from "../types";
 
@@ -322,4 +325,78 @@ console.log("\nAJOUT MANUEL D'UNE LIGNE");
         (sans.lines.find((l) => l.assetId === "w")?.amount ?? 0),
   );
   check("chaque ligne reste au-dessus du minimum", avec.lines.every((l) => l.amount >= 25));
+}
+
+console.log("\nRISQUE DE PORTEFEUILLE ET BAISSE PROJETÉE");
+{
+  // La formule de portefeuille doit donner moins que la moyenne simple :
+  // les lignes ne baissent pas toutes en même temps.
+  const items = [
+    { weight: 1, risk: 20, cls: "actions-dev" as const },
+    { weight: 1, risk: 20, cls: "actions-em" as const },
+  ];
+  const agg = portfolioRisk(items);
+  check("agrégation inférieure à la moyenne simple", agg.value < 20, `${agg.value.toFixed(1)} % contre 20 %`);
+  check("origine des corrélations annoncée", agg.method === "forfaitaire");
+  check("corrélation actions / monétaire nulle", correlationOf("actions-dev", "monetaire") === 0);
+  check("corrélation d'une classe avec elle-même", correlationOf("actions-em", "actions-em") === 1);
+
+  const portfolio = [A("a", "ETF MSCI Émergent", 10_000), A("b", "ETF Nasdaq", 10_000)];
+  const analyses = new Map<string, Analysis>([
+    ["a", An({ volatility: 22, maxDrawdown: -45, srri: 6 })],
+    ["b", An({ volatility: 24, maxDrawdown: -50, srri: 6 })],
+  ]);
+  const out = optimizePlan(portfolio, analyses, P({ riskProfile: "equilibre", age: 33 }), 500);
+  check(
+    "dépassement de la baisse tolérée signalé",
+    out.violations.some((v) => v.code === "drawdown_over"),
+  );
+  check("le versement n'est pas bloqué", out.lines.reduce((s, l) => s + l.amount, 0) === 500);
+}
+
+console.log("\nDÉCOMPOSITION EN DEUX BLOCS");
+{
+  let bad = 0;
+  for (let i = 0; i < 20; i++) {
+    const n = 2 + (i % 3);
+    const portfolio = Array.from({ length: n }, (_, k) =>
+      A(`x${k}`, ["ETF MSCI World", "ETF Stoxx Europe 600", "ETF MSCI Émergent"][k]!, 1_000 * (k + 2)),
+    );
+    const analyses = new Map<string, Analysis>(
+      portfolio.map((a, k) => [a.id, An({ volatility: 12 + k * 3, srri: 5 })]),
+    );
+    const out = optimizePlan(portfolio, analyses, P({ riskProfile: "dynamique", age: 40 }), 400 + i * 13);
+    for (const l of out.lines) {
+      const w = l.weights;
+      if (!w) continue;
+      // Bloc additif exact.
+      if (Math.abs(w.convergence + w.signal + w.risk + w.floor - w.base) > 1e-9) bad++;
+      // Bloc multiplicatif exact, bornage compris.
+      const expected = Math.min(2, Math.max(0.01, w.base * w.suitability * w.diversification * w.core));
+      if (Math.abs(expected - w.final) > 1e-9) bad++;
+    }
+    const total = out.lines.reduce((s, l) => s + l.amount, 0);
+    if (out.lines.length && total !== 400 + i * 13) bad++;
+  }
+  check("poids additif et multiplicatif vérifiés séparément, 20 cas", bad === 0, `${bad} écart(s)`);
+}
+
+console.log("\nRÉFÉRENTIEL GÉOGRAPHIQUE UNIQUE");
+{
+  const world = A("w", "ETF MSCI World", 10_000);
+  const split = regionSplit(world);
+  check("le monde n'expose à aucun émergent", (split["Émergents"] ?? -1) === 0);
+  const somme = Object.values(split).reduce((s, v) => s + (v ?? 0), 0);
+  check("les parts somment à 100 %", Math.abs(somme - 1) < 0.01, `${(somme * 100).toFixed(1)} %`);
+
+  const cible = targetAllocation(P({ riskProfile: "equilibre" }), [world], new Map());
+  const zonesCible = new Set(Object.keys(cible.byZone));
+  const zonesReelles = new Set(Object.keys(split));
+  const manquantes = [...zonesReelles].filter((z) => !zonesCible.has(z));
+  const surnumeraires = [...zonesCible].filter((z) => !zonesReelles.has(z));
+  check(
+    "mêmes zones des deux côtés",
+    manquantes.length === 0 && surnumeraires.length === 0,
+    [...manquantes, ...surnumeraires].join(", ") || "identiques",
+  );
 }

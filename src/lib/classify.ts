@@ -93,11 +93,21 @@ const SECTOR_EMERGING: Split<Sector> = {
   Diversifié: 0.07,
 };
 
+/**
+ * Décomposition du MSCI World, exprimée dans le référentiel de la
+ * capitalisation mondiale.
+ *
+ * La part émergente y figure explicitement à zéro : cet indice n'en
+ * contient aucun. L'omettre créait un écart structurel permanent, la
+ * zone émergente paraissant éternellement sous-pondérée face à une
+ * cible qui, elle, en prévoit onze pour cent.
+ */
 const REGION_WORLD: Split<Region> = {
-  "États-Unis": 0.71,
-  Europe: 0.185,
-  Japon: 0.06,
-  "Autres dév.": 0.045,
+  "États-Unis": 0.697,
+  Europe: 0.169,
+  Japon: 0.067,
+  "Autres dév.": 0.067,
+  Émergents: 0,
 };
 
 /** Motifs reconnus dans un libellé ou un ticker. */
