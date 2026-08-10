@@ -87,6 +87,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      // Icône du raccourci sur l'écran d'accueil iOS. C'est un simple
+      // fichier image : elle n'installe aucun service worker et ne
+      // touche donc pas au cycle de mise à jour de l'application.
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
     ],
   }),
   shellComponent: RootShell,
