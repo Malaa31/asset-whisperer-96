@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, RefreshCw, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
@@ -10,8 +10,6 @@ import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
 import { AllocationCard } from "@/components/AllocationCard";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
-import { PlanDetail } from "@/components/PlanDetail";
-import { buildPlan, classOf } from "@/lib/plan";
 import { optimizePlan } from "@/lib/monthly-plan";
 import { useAnalyses } from "@/lib/useAnalyses";
 import { useSectors } from "@/lib/useSectors";
@@ -40,7 +38,6 @@ function Dashboard() {
   const { profile, assets, setAssets, saveProfile } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | undefined>(undefined);
-  const [planOpen, setPlanOpen] = useState(false);
 
   const t = useMemo(() => totals(assets), [assets]);
   const goals = useMemo(() => profileGoals(profile), [profile]);
@@ -92,44 +89,6 @@ function Dashboard() {
       }),
     [assets, analyses, profile, dca, realSectors, activeGoal],
   );
-
-  const plan = useMemo(
-    () =>
-      buildPlan(
-        assets,
-        analyses,
-        profile,
-        dca,
-        profile?.planExcluded ?? [],
-        profile?.planWeights,
-        realSectors,
-        activeGoal ?? null,
-      ),
-    [assets, analyses, profile, dca, realSectors, activeGoal],
-  );
-
-  // Les montants viennent du moteur d'allocation ; l'ancien résultat ne
-  // fournit plus que l'état du matelas et le classement par poche.
-  const mergedPlan = useMemo(
-    () => ({
-      ...plan,
-      lines: outcome.lines.map((l) => {
-        const asset = assets.find((a) => a.id === l.assetId);
-        return {
-          assetId: l.assetId,
-          label: l.label,
-          cls: (asset ? classOf(asset) : null) ?? "actions",
-          amount: l.amount,
-          weight: l.weight,
-          ...(asset && analyses.get(asset.id)
-            ? { signal: analyses.get(asset.id)!.signal }
-            : {}),
-        };
-      }),
-    }),
-    [plan, outcome, assets, analyses],
-  );
-
 
   return (
     <div className="fade-up px-5 pt-8">
@@ -184,10 +143,10 @@ function Dashboard() {
 
       {assets.length > 0 && <AllocationCard assets={assets} realSectors={realSectors} />}
 
-      {plan.buffer.months !== undefined && !plan.buffer.sufficient && (
+      {outcome.buffer.months !== undefined && !outcome.buffer.sufficient && (
         <p className="mt-4 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-muted-foreground">
-          Épargne de précaution : {plan.buffer.months.toFixed(1)} mois sur{" "}
-          {plan.buffer.threshold} recommandés.
+          Épargne de précaution : {outcome.buffer.months.toFixed(1)} mois sur{" "}
+          {outcome.buffer.threshold} recommandés.
         </p>
       )}
 
@@ -214,9 +173,8 @@ function Dashboard() {
       )}
 
       {dca > 0 && (
-        <button
-          type="button"
-          onClick={() => setPlanOpen(true)}
+        <Link
+          to="/plan"
           className="tap card-surface mt-4 flex w-full items-center justify-between p-4 text-left"
         >
           <span className="flex items-center gap-2 text-sm font-semibold">
@@ -227,7 +185,7 @@ function Dashboard() {
             {eur(dca)}
             <ChevronRight className="size-4" />
           </span>
-        </button>
+        </Link>
       )}
 
       {needsBackup && (
@@ -238,35 +196,7 @@ function Dashboard() {
         </p>
       )}
 
-      {planOpen && profile && (
-        <PlanDetail
-          plan={mergedPlan}
-          dca={dca}
-          profile={profile}
-          analyses={analyses}
-          outcome={outcome}
-          assets={assets}
-          onToggle={(id) => {
-            // Une ligne du plan qu'on retire part dans les exclusions ;
-            // une ligne absente qu'on ajoute passe dans les inclusions,
-            // que le moteur exempte du filtre de redondance.
-            const excluded = profile.planExcluded ?? [];
-            const included = profile.planIncluded ?? [];
-            const inPlan = outcome.lines.some((l) => l.assetId === id);
-            saveProfile({
-              ...profile,
-              planExcluded: inPlan ? [...excluded, id] : excluded.filter((x) => x !== id),
-              planIncluded: inPlan ? included.filter((x) => x !== id) : [...included, id],
-            });
-          }}
-          onWeights={(w) => {
-            const { planWeights: _drop, ...rest } = profile;
-            saveProfile(w ? { ...rest, planWeights: w } : rest);
-          }}
-          onClose={() => setPlanOpen(false)}
-        />
-      )}
-    </div>
+</div>
   );
 }
 

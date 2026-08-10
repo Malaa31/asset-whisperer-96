@@ -1,11 +1,9 @@
-import { useState } from "react";
-import { useLockScroll } from "@/lib/useLockScroll";
-import { useModalBack } from "@/hooks/useModalBack";
+import { useMemo, useState } from "react";
 import { Check, Info, Minus, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { eur } from "@/lib/format";
 import { SIGNAL_LABELS, type Analysis } from "@/lib/signals";
-import { CLASS_LABELS, isDestination, type PlanResult } from "@/lib/plan";
-import { LABEL_TEXT, type PlanOutcome } from "@/lib/monthly-plan";
+import { CLASS_LABELS, classOf, isDestination } from "@/lib/plan";
+import { type PlanOutcome } from "@/lib/monthly-plan";
 import { RISK_LABELS, type Asset, type Profile } from "@/lib/types";
 
 /**
@@ -19,7 +17,6 @@ import { RISK_LABELS, type Asset, type Profile } from "@/lib/types";
  * celles qu'il détient, ou fixer lui-même les pourcentages.
  */
 export function PlanDetail({
-  plan,
   dca,
   profile,
   analyses,
@@ -29,7 +26,6 @@ export function PlanDetail({
   onWeights,
   onClose,
 }: {
-  plan: PlanResult;
   dca: number;
   profile: Profile;
   analyses: Map<string, Analysis>;
@@ -40,14 +36,33 @@ export function PlanDetail({
   onWeights: (weights: Record<string, number> | null) => void;
   onClose: () => void;
 }) {
-  useLockScroll(true);
-  useModalBack(onClose);
   const [showInfo, setShowInfo] = useState(false);
   const [editing, setEditing] = useState(false);
   const [openLine, setOpenLine] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
 
   const excluded = profile.planExcluded ?? [];
+  const manual = Boolean(profile.planWeights && Object.keys(profile.planWeights).length);
+
+  // Une seule source pour les lignes affichées : la sortie du moteur.
+  // L'ancien double calcul produisait des montants et des libellés qui
+  // ne se recoupaient pas.
+  const plan = useMemo(() => {
+    const lines = outcome.lines.map((l) => {
+      const asset = assets.find((a) => a.id === l.assetId);
+      const an = asset ? analyses.get(asset.id) : undefined;
+      return {
+        assetId: l.assetId,
+        label: l.label,
+        cls: (asset ? classOf(asset) : null) ?? ("actions" as const),
+        amount: l.amount,
+        weight: l.weight,
+        signal: an?.signal,
+      };
+    });
+    return { lines, manual };
+  }, [outcome, assets, analyses, manual]);
+
   const inPlan = new Set(plan.lines.map((l) => l.assetId));
   // Supports détenus, abondables, mais absents du plan : retirés à la
   // main, ou écartés par le modèle.
@@ -112,51 +127,24 @@ export function PlanDetail({
           </p>
         )}
 
-        {plan.rationale.length > 0 && !plan.manual && (
-          <div className="mt-4 rounded-xl bg-elevated p-3">
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {plan.rationale[0]}
-            </p>
-          </div>
-        )}
-
-        {plan.note && <p className="mt-4 text-sm text-muted-foreground">{plan.note}</p>}
-
-        {outcome.goal.message && (
-          <p
-            className={`mt-4 rounded-xl p-3 text-[11px] leading-relaxed ${
-              outcome.goal.kind === "unrealistic"
-                ? "border border-amber/40 bg-amber/10"
-                : "bg-elevated text-muted-foreground"
-            }`}
-          >
-            {outcome.goal.message}
+        {outcome.rationale && !plan.manual && (
+          <p className="mt-4 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
+            {outcome.rationale}
           </p>
         )}
 
-        {outcome.violations.length > 0 && (
-          <ul className="mt-3 space-y-1.5">
-            {outcome.violations.map((v) => (
-              <li
-                key={v.code}
-                className="rounded-xl border border-amber/40 bg-amber/10 p-3 text-[11px] leading-relaxed"
-              >
-                {v.message}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {outcome.warnings.length > 0 && (
-          <ul className="mt-3 space-y-1.5">
-            {outcome.warnings.map((w) => (
-              <li key={w} className="rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">
-                {w}
-              </li>
-            ))}
-          </ul>
-        )}
-
+        {/* Au plus deux messages : le moteur les a déjà classés par
+            importance, les contraintes avant les avertissements. */}
+        {[...outcome.violations.map((v) => v.message), ...outcome.warnings]
+          .slice(0, 2)
+          .map((m) => (
+            <p
+              key={m}
+              className="mt-3 rounded-xl border border-amber/40 bg-amber/10 p-3 text-[11px] leading-relaxed"
+            >
+              {m}
+            </p>
+          ))}
 
         <div className="mt-6 flex items-center justify-between gap-2">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">

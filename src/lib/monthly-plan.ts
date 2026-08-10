@@ -2,6 +2,19 @@ import { assetValue } from "./calc";
 import { diversificationFactor } from "./diversification";
 import { suitabilityFactor } from "./riskMatrix";
 import { regionSplit, sectorSplit } from "./classify";
+import { bufferStatus, horizonEquityCap, isDestination, type BufferStatus } from "./plan";
+import { requiredReturn } from "./plan";
+import {
+  BASE_BUDGET,
+  MAX_EM,
+  MAX_ZONE,
+  MAX_PLAN_MESSAGES,
+  MIN_TICKET,
+  SIGNAL_REDUCE,
+  SIGNAL_REINFORCE,
+  SRRI_CAP,
+  ZONE_BASE,
+} from "./policy";
 import type { Analysis } from "./signals";
 import type { Asset, Goal, Profile, RiskProfile } from "./types";
 
@@ -32,13 +45,6 @@ export interface RiskBudget {
   /** Horizon retenu, en années, si l'âge est connu. */
   horizon?: number;
 }
-
-const BASE_BUDGET: Record<RiskProfile, { sigma: number; dd: number }> = {
-  prudent: { sigma: 5, dd: 10 },
-  equilibre: { sigma: 9, dd: 15 },
-  dynamique: { sigma: 13, dd: 22 },
-  offensif: { sigma: 18, dd: 35 },
-};
 
 /**
  * Budget de risque déduit du profil, modulé par l'horizon quand l'âge
@@ -100,15 +106,6 @@ export function aggregateExposures(
 // 3. Allocation cible
 // ─────────────────────────────────────────────────────────────────────
 
-/** Répartition géographique de référence, à la capitalisation mondiale. */
-const ZONE_BASE: Record<string, number> = {
-  "États-Unis": 0.62,
-  Europe: 0.15,
-  Japon: 0.06,
-  Émergents: 0.11,
-  "Autres dév.": 0.06,
-};
-
 export interface TargetAllocation {
   /** Part visée en actions, entre 0 et 1. */
   equityShare: number;
@@ -130,6 +127,8 @@ export function targetAllocation(
   profile: Profile | null,
   portfolio: Asset[],
   analyses: Map<string, Analysis>,
+  /** Horizon de l'objectif actif, en années, quand il est plus court. */
+  horizon?: number,
 ): TargetAllocation {
   const budget = riskBudgetFromProfile(profile);
 
@@ -154,7 +153,10 @@ export function targetAllocation(
       ? sigmas.reduce((s, v) => s + v, 0) / sigmas.length
       : 15;
 
-  const equityShare = Math.max(0, Math.min(1, budget.sigmaTarget / equitySigma));
+  // Glidepath : une somme attendue à date rapprochée ne se joue pas en
+  // bourse. Le plafond d'horizon prime toujours sur le budget de risque.
+  const cap = horizon && horizon > 0 ? horizonEquityCap(horizon) / 100 : 1;
+  const equityShare = Math.max(0, Math.min(cap, budget.sigmaTarget / equitySigma));
   const sum = Object.values(ZONE_BASE).reduce((s, v) => s + v, 0);
   const byZone = Object.fromEntries(
     Object.entries(ZONE_BASE).map(([z, w]) => [z, w / sum]),
@@ -185,6 +187,8 @@ export function goalInsight(
   currentCapital: number,
   goal: Goal | null | undefined,
   budget: RiskBudget,
+  /** Versement mensuel : sans lui, le rendement requis est surestimé. */
+  dca = 0,
 ): GoalInsight {
   if (!goal?.amount || goal.amount <= 0) return { kind: "none" };
   const horizon = goal.horizon ?? budget.horizon;
@@ -196,7 +200,18 @@ export function goalInsight(
   }
   if (currentCapital <= 0) return { kind: "ok" };
 
-  const required = (Math.pow(goal.amount / currentCapital, 1 / horizon) - 1) * 100;
+  // Le rendement requis tient compte des versements à venir : les
+  // ignorer conduisait à exiger du portefeuille ce que l'épargne
+  // apporte déjà.
+  const solved = requiredReturn(currentCapital, dca, { ...goal, horizon });
+  if (solved === undefined) {
+    return {
+      kind: "unrealistic",
+      message:
+        "L'objectif reste hors d'atteinte à ce niveau de versement. Allongez l'horizon, relevez le versement ou baissez la cible.",
+    };
+  }
+  const required = solved * 100;
   if (required <= 0) {
     return {
       kind: "reached",
@@ -204,7 +219,7 @@ export function goalInsight(
         "Votre capital actuel couvre déjà l'objectif sur l'horizon défini. Vous pouvez réduire le risque ou relever l'objectif.",
     };
   }
-  if (required > 12) {
+  if (required > 10) {
     return {
       kind: "unrealistic",
       requiredReturn: required,
@@ -298,6 +313,10 @@ export interface PlanOutcome {
   /** Concentration géographique des expositions. */
   zoneConcentration?: number;
   violations: Violation[];
+  /** État de la réserve de précaution : message clé, jamais une destination. */
+  buffer: BufferStatus;
+  /** Une phrase disant pourquoi cette répartition. */
+  rationale?: string;
   budget: RiskBudget;
   target: TargetAllocation;
   goal: GoalInsight;
@@ -305,27 +324,11 @@ export interface PlanOutcome {
   warnings: string[];
 }
 
-/** Versement minimal : en deçà, les frais d'ordre dépassent un pour cent. */
-const MIN_TICKET = 25;
-
-/** Plafond d'exposition sur une seule zone, part du portefeuille. */
-const MAX_ZONE = 0.45;
-
-/** Plafond spécifique aux émergents, à une fois et demie leur poids. */
-const MAX_EM = 0.165;
-
-const SRRI_CAP: Record<RiskProfile, number> = {
-  prudent: 0,
-  equilibre: 0.15,
-  dynamique: 0.25,
-  offensif: 0.45,
-};
-
 /** Intention autorisée par le signal composite de l'actif. */
 export function intentFromSignal(score: number | undefined): PlanIntent {
   if (score === undefined) return "maintenir";
-  if (score > 0.35) return "renforcer";
-  if (score < -0.15) return "alleger";
+  if (score > SIGNAL_REINFORCE) return "renforcer";
+  if (score < SIGNAL_REDUCE) return "alleger";
   return "maintenir";
 }
 
@@ -637,14 +640,17 @@ export function optimizePlan(
 ): PlanOutcome {
   const { excluded = [], included = [], manual, realSectors, goal } = options;
   const budget = riskBudgetFromProfile(profile);
-  const target = targetAllocation(profile, portfolio, analyses);
+  const horizon = goal?.horizon ?? budget.horizon;
+  const target = targetAllocation(profile, portfolio, analyses, horizon);
   const totalValue = portfolio.reduce((s, a) => s + Math.max(0, assetValue(a)), 0);
-  const insight = goalInsight(totalValue, goal, budget);
+  const insight = goalInsight(totalValue, goal, budget, dca);
   const risk = profile?.riskProfile ?? "equilibre";
 
+  const buffer = bufferStatus(portfolio, profile);
   const empty: PlanOutcome = {
     lines: [],
     violations: [],
+    buffer,
     budget,
     target,
     goal: insight,
@@ -659,6 +665,9 @@ export function optimizePlan(
   const defensive = defensiveGap(portfolio, profile, analyses);
   const eligible = portfolio.filter((a) => {
     if (excluded.includes(a.id)) return false;
+    // Le plan est un plan de placement : immobilier, livrets et comptes
+    // courants ne sont pas des destinations de versement.
+    if (!isDestination(a)) return false;
     if (!Object.keys(regionSplit(a)).length) return false;
     if (included.includes(a.id)) return true;
     if (classifyPocket(a, analyses) === "defensive" && defensive.covered) return false;
@@ -706,7 +715,13 @@ export function optimizePlan(
   }
 
   const impact = diversificationImpact(lines, portfolio, target, realSectors);
-      return { ...empty, lines, hhi: impact.hhi, warnings: impact.warnings };
+      return {
+        ...empty,
+        lines,
+        hhi: impact.hhi,
+        warnings: impact.warnings.slice(0, MAX_PLAN_MESSAGES),
+        rationale: "Répartition personnalisée : les montants suivent vos pourcentages.",
+      };
     }
   }
 
@@ -1039,18 +1054,34 @@ export function optimizePlan(
     );
   }
 
+  // Une seule phrase de justification : horizon, cible, et ce que le
+  // versement corrige en priorité.
+  const behind = Object.entries(target.byZone)
+    .map(([z, w]) => ({ z, gap: w * target.equityShare - (exposure.byZone[z] ?? 0) }))
+    .sort((a, b) => b.gap - a.gap)[0];
+  const rationale = [
+    `Cible ${Math.round(target.equityShare * 100)} % d'actions${
+      horizon ? ` sur un horizon de ${Math.round(horizon)} an${horizon >= 2 ? "s" : ""}` : ""
+    }`,
+    behind && behind.gap > 0.02 ? `versement dirigé vers ${behind.z}, en retard` : "versement réparti à la cible",
+  ].join(", ") + ".";
+
   return {
     lines,
+    rationale,
+    buffer,
     ...(projectedDrawdown ? { projectedDrawdown } : {}),
     defensive,
     overlaps,
     zoneConcentration,
-    violations,
+    violations: violations.slice(0, MAX_PLAN_MESSAGES),
     budget,
     target,
     goal: insight,
     hhi: impact.hhi,
-    warnings: extraWarnings,
+    // Trop de messages tue le message : seuls les plus importants
+    // restent, les contraintes passant avant les avertissements.
+    warnings: extraWarnings.slice(0, Math.max(0, MAX_PLAN_MESSAGES - violations.length)),
   };
 }
 

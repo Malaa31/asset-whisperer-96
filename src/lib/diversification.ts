@@ -1,5 +1,6 @@
 import { assetValue } from "./calc";
-import { exposure, regionSplit, sectorSplit, type Region, type Sector } from "./classify";
+import { exposure, regionSplit, sectorSplit, type Sector } from "./classify";
+import { REGION_TARGET, SECTOR_TARGET } from "./policy";
 import type { Asset } from "./types";
 
 /**
@@ -14,36 +15,6 @@ import type { Asset } from "./types";
  * On mesure donc l'effet marginal de chaque euro versé : rapproche-t-il
  * la répartition des cibles, ou l'en éloigne-t-il ?
  */
-
-/**
- * Cible géographique, à la pondération des marchés mondiaux, avec une
- * part émergente relevée : leur poids boursier sous-estime leur poids
- * économique et leur valorisation les rend moins corrélés.
- */
-const REGION_TARGET: Partial<Record<Region, number>> = {
-  "États-Unis": 0.6,
-  Europe: 0.18,
-  Émergents: 0.14,
-  Japon: 0.05,
-  "Autres dév.": 0.03,
-};
-
-/**
- * Cible sectorielle, proche de la répartition mondiale mais avec la
- * technologie ramenée sous son poids de marché : elle y dépasse le quart
- * de l'indice, ce qui constitue une concentration en soi.
- */
-const SECTOR_TARGET: Partial<Record<Sector, number>> = {
-  Technologie: 0.22,
-  Finance: 0.17,
-  Santé: 0.13,
-  Consommation: 0.18,
-  Industrie: 0.12,
-  Énergie: 0.05,
-  Matériaux: 0.05,
-  "Services publics": 0.04,
-  Immobilier: 0.04,
-};
 
 /** Poids de l'axe géographique face à l'axe sectoriel. */
 const REGION_WEIGHT = 0.6;

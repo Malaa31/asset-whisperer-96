@@ -1,6 +1,7 @@
 import { assetValue } from "./calc";
 import { classOf, isBuffer } from "./plan";
-import { exposure, type Region, type Sector } from "./classify";
+import { exposure, type Sector } from "./classify";
+import { REGION_TARGET, SECTOR_TARGET } from "./policy";
 import { TYPE_LABELS, type Asset } from "./types";
 
 /**
@@ -22,26 +23,6 @@ import { TYPE_LABELS, type Asset } from "./types";
  * corrigée par le maillon faible : un axe très bas plafonne le global,
  * parce qu'une seule concentration suffit à faire mal.
  */
-
-export const REGION_TARGET: Partial<Record<Region, number>> = {
-  "États-Unis": 0.6,
-  Europe: 0.18,
-  Émergents: 0.14,
-  Japon: 0.05,
-  "Autres dév.": 0.03,
-};
-
-export const SECTOR_TARGET: Partial<Record<Sector, number>> = {
-  Technologie: 0.22,
-  Finance: 0.17,
-  Santé: 0.13,
-  Consommation: 0.18,
-  Industrie: 0.12,
-  Énergie: 0.05,
-  Matériaux: 0.05,
-  "Services publics": 0.04,
-  Immobilier: 0.04,
-};
 
 /** Nombre de lignes au-delà duquel l'ajout d'une position n'apporte plus grand-chose. */
 const TARGET_POSITIONS = 12;

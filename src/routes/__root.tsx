@@ -91,6 +91,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // fichier image : elle n'installe aucun service worker et ne
       // touche donc pas au cycle de mise à jour de l'application.
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      // Le manifeste rend l'application installable : lancée depuis
+      // l'écran d'accueil, elle s'affiche sans les barres du navigateur.
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,
