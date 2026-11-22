@@ -74,7 +74,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
       },
-      { name: "theme-color", content: "#eef4ef" },
+      { name: "theme-color", content: "#f4f7f5" },
       { title: "Patrimoine — Pilotage de patrimoine personnel" },
       {
         name: "description",
@@ -104,7 +104,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="fr" className="bg-background">
       <head>
         <HeadContent />
       </head>

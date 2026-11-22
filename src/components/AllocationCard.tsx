@@ -22,14 +22,14 @@ import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 
 /** Palette système (type iOS). */
 const TYPE_COLORS: Record<AssetType, string> = {
-  pea: "#007AFF",
-  av: "#AF52DE",
-  livret: "#FFCC00",
-  immo: "#FF9500",
-  crypto: "#5856D6",
-  cash: "#5AC8FA",
-  autre: "#8E8E93",
-  credit: "#FF3B30",
+  pea: "#16795b",
+  av: "#589b83",
+  livret: "#91b6a5",
+  immo: "#49687b",
+  crypto: "#7892a2",
+  cash: "#b1c5bb",
+  autre: "#a1a9a5",
+  credit: "#b85b5b",
 };
 
 const REGION_COLORS: Record<string, string> = {
@@ -155,17 +155,12 @@ export function AllocationCard({
 
             <ul className="min-w-0 flex-1 space-y-2">
               {slices.slice(0, 6).map((x) => (
-                <li key={x.key} className="flex items-center justify-between gap-2 text-xs">
+                <li key={x.key} className="flex min-w-0 items-center justify-between gap-2 text-xs">
                   <span className="flex min-w-0 items-center gap-2">
-                    <span
-                      className="size-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: x.color }}
-                    />
+                    <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: x.color }} />
                     <span className="truncate">{x.key}</span>
                   </span>
-                  <span className="shrink-0 num text-muted-foreground">
-                    {rawPct((x.value / total) * 100, 0)}
-                  </span>
+                  <span className="shrink-0 text-right"><span className="block num font-medium">{eur(x.value)}</span><span className="num text-[10px] text-muted-foreground">{rawPct((x.value / total) * 100, 0)}</span></span>
                 </li>
               ))}
             </ul>

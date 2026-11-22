@@ -91,57 +91,58 @@ function Dashboard() {
   );
 
   return (
-    <div className="fade-up px-5 pt-8">
-      <header className="flex items-center justify-between">
+    <main className="fade-up flex flex-col gap-5 px-5 pb-6 pt-7">
+      <header className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Bonjour
-          </p>
-          <h1 className="font-display text-[1.75rem] leading-tight tracking-tight">
-            {profile?.name}
-          </h1>
+          <p className="text-xs font-medium text-muted-foreground">Bonjour,</p>
+          <h1 className="font-display text-2xl leading-tight tracking-tight">{profile?.name}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             aria-label="Mode discret"
             onClick={() => profile && saveProfile({ ...profile, hideAmounts: !profile.hideAmounts })}
-            className="tap flex size-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground"
+            className="tap flex size-11 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground"
           >
             {profile?.hideAmounts ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
           <button
             type="button"
+            aria-label={`Actualiser les cours — ${sinceLabel(lastUpdate)}`}
             onClick={() => void refresh()}
-            className="tap flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-[11px] text-muted-foreground"
+            className="tap flex size-11 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground"
           >
-            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
-            {sinceLabel(lastUpdate)}
+            <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
         </div>
       </header>
 
-      <section className="card-surface mt-6 p-6">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Patrimoine net
-        </p>
-        <div className="mt-2 font-display text-[2.75rem] leading-none tracking-tight">
-          {eur(t.net)}
-        </div>
-        {t.gain !== 0 && (
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary">
-            <TrendingUp className="size-3.5" />
-            {eur(t.gain)} ({pct((t.gain / Math.max(1, t.actifs - t.gain)) * 100)})
+      <section className="relative overflow-hidden rounded-[1.75rem] bg-primary p-6 text-primary-foreground shadow-lg shadow-primary/10" aria-labelledby="net-worth-title">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p id="net-worth-title" className="text-xs font-semibold uppercase tracking-[0.14em] opacity-75">Patrimoine net</p>
+            <p className="mt-3 font-display text-[2.65rem] leading-none tracking-tight sm:text-5xl">{eur(t.net)}</p>
           </div>
-        )}
-        <p className="mt-5 border-t border-border pt-4 text-[11px] text-muted-foreground">
-          Actifs <span className="num text-foreground">{eur(t.actifs)}</span>
-          {"  ·  "}
-          Dettes <span className="num text-destructive">{eur(t.dettes)}</span>
-        </p>
+          {t.gain !== 0 && (
+            <span className={`mt-1 inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold ${t.gain >= 0 ? "bg-success/20 text-primary-foreground" : "bg-destructive/20 text-primary-foreground"}`}>
+              <TrendingUp className="size-3.5" />
+              {pct((t.gain / Math.max(1, t.actifs - t.gain)) * 100)}
+            </span>
+          )}
+        </div>
+        <p className="mt-3 text-xs opacity-75">{sinceLabel(lastUpdate)}</p>
+        <div className="mt-6 grid grid-cols-2 gap-3 border-t border-primary-foreground/20 pt-4">
+          <div><p className="text-[11px] opacity-70">Actifs</p><p className="mt-1 num text-sm font-semibold">{eur(t.actifs)}</p></div>
+          <div><p className="text-[11px] opacity-70">Dettes</p><p className="mt-1 num text-sm font-semibold">{eur(t.dettes)}</p></div>
+        </div>
       </section>
 
-      {assets.length > 0 && <AllocationCard assets={assets} realSectors={realSectors} />}
+      <section aria-label="Indicateurs clés" className="grid grid-cols-2 gap-3">
+        <div className="card-surface p-4"><p className="text-xs text-muted-foreground">Lignes suivies</p><p className="mt-2 font-display text-2xl">{assets.length}</p><p className="mt-1 text-[11px] text-muted-foreground">dans votre patrimoine</p></div>
+        <div className="card-surface p-4"><p className="text-xs text-muted-foreground">Versement mensuel</p><p className="mt-2 font-display text-2xl">{eur(dca)}</p><p className="mt-1 text-[11px] text-muted-foreground">objectif en cours</p></div>
+      </section>
+
+      {assets.length > 0 && <AllocationCard assets={assets} realSectors={realSectors} />} 
 
       {outcome.buffer.months !== undefined && !outcome.buffer.sufficient && (
         <p className="mt-4 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-muted-foreground">
@@ -196,7 +197,7 @@ function Dashboard() {
         </p>
       )}
 
-</div>
+</main>
   );
 }
 

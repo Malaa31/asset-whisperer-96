@@ -19,7 +19,7 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
         type="button"
         onClick={onAdd}
         aria-label="Ajouter une ligne"
-        className="app-chrome tap fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-[max(1rem,calc(50vw-224px))] z-40 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-primary/10"
+        className="app-chrome tap fixed bottom-[calc(88px+env(safe-area-inset-bottom))] right-[max(1.25rem,calc(50vw-216px))] z-40 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-primary/10 transition-transform active:scale-95"
       >
         <Plus className="size-6" strokeWidth={2.5} />
       </button>
@@ -31,7 +31,7 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
               key={to}
               to={to}
               activeOptions={{ exact: to === "/" }}
-              className="flex flex-col items-center gap-1 py-1 text-[11px] font-medium text-muted-foreground transition-colors data-[status=active]:text-primary"
+              className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors data-[status=active]:bg-primary/10 data-[status=active]:text-primary"
             >
               <Icon className="size-[22px]" strokeWidth={1.9} />
               {label}

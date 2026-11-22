@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, ChevronRight, ClipboardCheck } from "lucide-react";
+import { Plus, ChevronRight, ClipboardCheck, Landmark, ShieldCheck, PiggyBank, Home, Bitcoin, Banknote, Package, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { QuickUpdate } from "@/components/QuickUpdate";
 import { useApp } from "@/lib/storage";
@@ -53,9 +53,12 @@ function Patrimoine() {
     .filter((g) => g.items.length);
 
   return (
-    <div className="fade-up px-5 pt-8">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-[1.75rem] leading-tight tracking-tight">Patrimoine</h1>
+    <main className="fade-up flex flex-col gap-5 px-5 pb-6 pt-7">
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">Vue d'ensemble</p>
+          <h1 className="font-display text-2xl leading-tight tracking-tight">Patrimoine</h1>
+        </div>
         <button
           type="button"
           onClick={() => setPointing(true)}
@@ -63,9 +66,14 @@ function Patrimoine() {
         >
           <ClipboardCheck className="size-3.5" /> Pointage
         </button>
-      </div>
+      </header>
 
-      <div className="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-elevated p-1">
+      <section className="card-surface flex items-end justify-between gap-4 p-5">
+        <div><p className="text-xs text-muted-foreground">Patrimoine net</p><p className="mt-2 font-display text-3xl tracking-tight">{eur(t.net)}</p></div>
+        <div className="text-right"><p className="text-xs text-muted-foreground">{side === "actifs" ? "Actifs" : "Passifs"}</p><p className="mt-2 num text-sm font-semibold">{eur(side === "actifs" ? t.actifs : t.dettes)}</p></div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-1 rounded-2xl bg-elevated p-1">
         {(["actifs", "passifs"] as const).map((s) => (
           <button
             key={s}
@@ -107,20 +115,23 @@ function Patrimoine() {
       <div className="mt-5 space-y-6">
         {groups.map((g) => {
           const sub = g.items.reduce((s, a) => s + Math.abs(assetValue(a)), 0);
+          const share = (sub / Math.max(1, side === "actifs" ? t.actifs : t.dettes)) * 100;
           return (
-            <section key={g.type}>
-              <div className="mb-2 flex items-baseline justify-between">
-                <h2 className="text-sm font-semibold">{TYPE_LABELS[g.type]}</h2>
-                <span className="num text-xs text-muted-foreground">{eur(sub)}</span>
+            <section key={g.type} aria-labelledby={`group-${g.type}`}>
+              <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><CategoryIcon type={g.type} /></span>
+                  <div><h2 id={`group-${g.type}`} className="text-sm font-semibold">{TYPE_LABELS[g.type]}</h2><p className="text-[11px] text-muted-foreground">{g.items.length} ligne{g.items.length > 1 ? "s" : ""} · {rawPct(share, 0)}</p></div>
+                </div>
+                <span className="num text-sm font-semibold">{eur(sub)}</span>
               </div>
-              <div className="space-y-2">
+              <div className="flex flex-col gap-2">
                 {g.items.map((a) => (
                   <AssetRow
                     key={a.id}
                     asset={a}
-                    onOpen={() =>
-                      a.data["ticker"] ? setAnalyzing(a) : setEditing(a)
-                    }
+                    share={Math.abs(assetValue(a)) / Math.max(1, side === "actifs" ? t.actifs : t.dettes) * 100}
+                    onOpen={() => a.data["ticker"] ? setAnalyzing(a) : setEditing(a)}
                   />
                 ))}
               </div>
@@ -128,9 +139,7 @@ function Patrimoine() {
           );
         })}
         {!groups.length && (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            Aucune ligne pour l'instant.
-          </p>
+          <div className="card-surface flex flex-col items-center gap-2 px-5 py-10 text-center"><span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Landmark className="size-5" /></span><p className="text-sm font-semibold">Aucune ligne pour l&apos;instant</p><p className="text-xs text-muted-foreground">Ajoutez un actif ou un passif pour commencer votre suivi.</p></div>
         )}
       </div>
 
@@ -194,11 +203,16 @@ function Patrimoine() {
           onClose={() => setAnalyzing(null)}
         />
       )}
-    </div>
+    </main>
   );
 }
 
-function AssetRow({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
+function CategoryIcon({ type }: { type: AssetType }) {
+  const Icon = { pea: Landmark, av: ShieldCheck, livret: PiggyBank, immo: Home, crypto: Bitcoin, cash: Banknote, autre: Package, credit: CreditCard }[type];
+  return <Icon aria-hidden="true" className="size-4" />;
+}
+
+function AssetRow({ asset, share, onOpen }: { asset: Asset; share: number; onOpen: () => void }) {
   const value = assetValue(asset);
   const gain = assetGain(asset);
   const d = asset.data;
@@ -232,30 +246,18 @@ function AssetRow({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="tap card-surface flex w-full flex-col gap-2 px-4 py-3 text-left"
+      className="tap card-surface flex w-full flex-col gap-3 p-4 text-left transition-transform active:scale-[0.99]"
     >
       <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-elevated text-muted-foreground"><CategoryIcon type={asset.type} /></span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">
-            {String(d["name"] ?? d["type"] ?? d["ticker"] ?? "Ligne")}
-          </div>
-          <div className="mt-0.5 truncate num text-[11px] text-muted-foreground">
-            {tags.join(" · ")}
-          </div>
+          <div className="truncate text-sm font-semibold">{String(d["name"] ?? d["type"] ?? d["ticker"] ?? "Ligne")}</div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">{tags.join(" · ") || TYPE_LABELS[asset.type]}</div>
         </div>
         <div className="shrink-0 text-right">
-          <div
-            className={`num text-sm ${asset.type === "credit" ? "text-destructive" : ""}`}
-          >
-            {eur(Math.abs(value))}
-          </div>
-          {gain !== 0 && (
-            <div
-              className={`num text-[11px] ${gain >= 0 ? "text-primary" : "text-destructive"}`}
-            >
-              {signedEur(gain)}
-            </div>
-          )}
+          <div className={`num text-sm font-semibold ${asset.type === "credit" ? "text-destructive" : ""}`}>{eur(Math.abs(value))}</div>
+          <div className="num text-[11px] text-muted-foreground">{rawPct(share, 1)}</div>
+          {gain !== 0 && <div className={`num text-[11px] ${gain >= 0 ? "text-primary" : "text-destructive"}`}>{signedEur(gain)}</div>}
         </div>
         <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
       </div>

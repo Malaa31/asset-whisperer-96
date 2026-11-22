@@ -82,10 +82,14 @@ function ProfilPage() {
   const backupAge = daysSinceBackup(profile);
 
   return (
-    <div className="fade-up px-5 pt-8">
-      <h1 className="font-display text-[1.75rem] leading-tight tracking-tight">Profil</h1>
+    <main className="fade-up flex flex-col gap-4 px-5 pb-8 pt-7">
+      <header className="mb-1">
+        <p className="text-xs font-medium text-muted-foreground">Votre espace</p>
+        <h1 className="font-display text-2xl leading-tight tracking-tight">Profil</h1>
+      </header>
 
-      <section className="card-surface mt-5 space-y-3 p-5">
+      <section className="card-surface space-y-4 p-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Informations personnelles</h2>
         <Row label="Prénom" value={profile.name} onChange={(v) => update({ name: v })} />
         <Row
           label="Âge"
@@ -119,7 +123,7 @@ function ProfilPage() {
         </span>
       </button>
 
-      <section className="card-surface mt-4 p-5">
+      <section className="card-surface p-5">
         <h2 className="text-sm font-semibold">Profil de risque</h2>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {(Object.keys(TARGET_ALLOCATIONS) as RiskProfile[]).map((r) => (
@@ -139,7 +143,7 @@ function ProfilPage() {
         </div>
       </section>
 
-      <section className="card-surface mt-4 p-5">
+      <section className="card-surface p-5">
         <div className="flex items-center justify-between gap-3">
           <span>
             <span className="block text-sm font-semibold">Rappel de versement</span>
@@ -172,7 +176,7 @@ function ProfilPage() {
         )}
       </section>
 
-      <section className="card-surface mt-4 p-5">
+      <section className="card-surface p-5">
         <div className="flex items-baseline justify-between">
           <h2 className="text-sm font-semibold">Vos données</h2>
           <span className="text-[10px] text-muted-foreground">{BUILD_VERSION}</span>
@@ -234,7 +238,7 @@ function ProfilPage() {
           }}
         />
       )}
-    </div>
+    </main>
   );
 }
 
