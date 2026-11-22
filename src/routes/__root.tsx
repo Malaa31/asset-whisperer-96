@@ -74,7 +74,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
       },
-      { name: "theme-color", content: "#f4f7f5" },
+      { name: "theme-color", content: "#F2F2F7" },
       { title: "Patrimoine — Pilotage de patrimoine personnel" },
       {
         name: "description",

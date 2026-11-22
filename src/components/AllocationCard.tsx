@@ -22,14 +22,14 @@ import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 
 /** Palette système (type iOS). */
 const TYPE_COLORS: Record<AssetType, string> = {
-  pea: "#16795b",
-  av: "#589b83",
-  livret: "#91b6a5",
-  immo: "#49687b",
-  crypto: "#7892a2",
-  cash: "#b1c5bb",
-  autre: "#a1a9a5",
-  credit: "#b85b5b",
+  pea: "#007AFF",
+  av: "#AF52DE",
+  livret: "#FFCC00",
+  immo: "#FF9500",
+  crypto: "#5856D6",
+  cash: "#5AC8FA",
+  autre: "#8E8E93",
+  credit: "#FF3B30",
 };
 
 const REGION_COLORS: Record<string, string> = {
