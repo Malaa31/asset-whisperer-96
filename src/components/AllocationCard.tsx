@@ -110,7 +110,7 @@ export function AllocationCard({
             type="button"
             onClick={() => setView(v)}
             className={`rounded-lg py-2 text-xs font-semibold transition-colors ${
-              view === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              view === v ? "bg-card text-primary" : "text-muted-foreground"
             }`}
           >
             {v === "classes" ? "Par classe" : v === "regions" ? "Par région" : "Par secteur"}

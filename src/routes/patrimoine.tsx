@@ -69,7 +69,7 @@ function Patrimoine() {
       </header>
 
       <section className="card-surface flex items-end justify-between gap-4 p-5">
-        <div><p className="text-xs text-muted-foreground">Patrimoine net</p><p className="mt-2 font-display text-3xl tracking-tight">{eur(t.net)}</p></div>
+        <div><p className="text-xs text-muted-foreground">Patrimoine net</p><p className="mt-2 font-display text-3xl tracking-tight text-primary">{eur(t.net)}</p></div>
         <div className="text-right"><p className="text-xs text-muted-foreground">{side === "actifs" ? "Actifs" : "Passifs"}</p><p className="mt-2 num text-sm font-semibold">{eur(side === "actifs" ? t.actifs : t.dettes)}</p></div>
       </section>
 
@@ -82,8 +82,9 @@ function Patrimoine() {
               setSide(s);
               setFilter("all");
             }}
+            aria-pressed={side === s}
             className={`rounded-xl py-2.5 text-xs font-semibold transition-colors ${
-              side === s ? "bg-card text-foreground" : "text-muted-foreground"
+              side === s ? "bg-card text-primary" : "text-muted-foreground"
             }`}
           >
             <div className="capitalize">{s}</div>

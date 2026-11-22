@@ -113,12 +113,12 @@ export function PlanDetail({
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5 pb-[calc(4rem+env(safe-area-inset-bottom))]">
-        <section className="rounded-3xl bg-primary p-5 text-primary-foreground shadow-lg shadow-primary/10">
-          <p className="text-xs font-semibold uppercase tracking-wider opacity-75">À investir ce mois</p>
-          <p className="mt-3 font-display text-4xl leading-none tracking-tight">{eur(dca)}</p>
-          <p className="mt-2 text-xs opacity-75">Profil {RISK_LABELS[profile.riskProfile].toLowerCase()}{plan.manual ? " · répartition personnalisée" : ""}</p>
-          {plan.lines.length > 0 && <div className="mt-5 flex h-2 overflow-hidden rounded-full bg-primary-foreground/20" aria-label="Répartition du versement">{plan.lines.map((line, index) => <span key={line.assetId} className={index % 2 === 0 ? "bg-primary-foreground" : "bg-primary-foreground/50"} style={{ width: `${line.weight}%` }} />)}</div>}
-          <div className="mt-3 flex items-center justify-between text-[11px] opacity-80"><span>{plan.lines.length} placement{plan.lines.length > 1 ? "s" : ""}</span><span>{plan.manual ? "Personnalisé" : "Équilibré selon votre profil"}</span></div>
+        <section className="card-surface rounded-3xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">À investir ce mois</p>
+          <p className="mt-3 font-display text-4xl leading-none tracking-tight text-primary">{eur(dca)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Profil {RISK_LABELS[profile.riskProfile].toLowerCase()}{plan.manual ? " · répartition personnalisée" : ""}</p>
+          {plan.lines.length > 0 && <div className="mt-5 flex h-2 overflow-hidden rounded-full bg-elevated" aria-label="Répartition du versement">{plan.lines.map((line, index) => <span key={line.assetId} className={index % 2 === 0 ? "bg-primary" : "bg-primary/50"} style={{ width: `${line.weight}%` }} />)}</div>}
+          <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground"><span>{plan.lines.length} placement{plan.lines.length > 1 ? "s" : ""}</span><span>{plan.manual ? "Personnalisé" : "Équilibré selon votre profil"}</span></div>
         </section>
 
         {showInfo && (

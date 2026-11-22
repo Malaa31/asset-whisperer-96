@@ -117,7 +117,7 @@ export function AssetAnalysis({
         ? `${months} mois`
         : "la période";
   const up = periodPerf >= 0;
-  const color = up ? "#1e5c48" : "#b3402e";
+  const color = up ? "#34D399" : "#F87171";
 
   return (
     <div className="mobile-sheet fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
@@ -189,23 +189,24 @@ export function AssetAnalysis({
                   </defs>
                   <XAxis
                     dataKey="t"
-                    tick={{ fill: "#6c7076", fontSize: 10 }}
+                    tick={{ fill: "#8E8E93", fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
                     minTickGap={40}
                   />
                   <YAxis
                     width={44}
-                    tick={{ fill: "#6c7076", fontSize: 10 }}
+                    tick={{ fill: "#8E8E93", fontSize: 10 }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v: number) => `${v.toFixed(0)} %`}
                   />
                   <Tooltip
                     contentStyle={{
-                      background: "#fff",
-                      border: "1px solid #e5e5df",
+                      background: "#141416",
+                      border: "1px solid #26262A",
                       borderRadius: 12,
+                      color: "#F5F5F7",
                       fontSize: 12,
                     }}
                     formatter={(v: number) => [`${v.toFixed(1)} %`, "Performance"]}

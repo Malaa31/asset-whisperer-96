@@ -19,12 +19,12 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
         type="button"
         onClick={onAdd}
         aria-label="Ajouter une ligne"
-        className="app-chrome tap fixed bottom-[calc(88px+env(safe-area-inset-bottom))] right-[max(1.25rem,calc(50vw-216px))] z-40 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-primary/10 transition-transform active:scale-95"
+        className="app-chrome tap fixed bottom-[calc(88px+env(safe-area-inset-bottom))] right-[max(1.25rem,calc(50vw-216px))] z-40 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-transform active:scale-95"
       >
         <Plus className="size-6" strokeWidth={2.5} />
       </button>
 
-      <nav className="app-chrome fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[480px] border-t border-border bg-background/90 backdrop-blur-xl">
+      <nav className="app-chrome fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[480px] border-t border-border bg-background/75 backdrop-blur-xl">
         <div className="grid grid-cols-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2">
           {items.map(({ to, label, Icon }) => (
             <Link
