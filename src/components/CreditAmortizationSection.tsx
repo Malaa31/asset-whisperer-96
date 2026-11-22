@@ -96,7 +96,8 @@ export function CreditAmortizationSection({
           <NumberField label="Taux annuel (%)" value={data["taux"]} onChange={(value) => update("taux", value)} />
           <div className="col-span-2">
             <NumberField
-              label="Mensualité (€) · laisser vide pour une annuité standard"
+              label="Mensualité hors assurance (€)"
+              helper="Montant qui rembourse capital + intérêts, sans l'assurance emprunteur. Sinon le capital restant serait sous-estimé. Laisser vide pour une annuité standard."
               value={data["mensualite"]}
               onChange={(value) => update("mensualite", value)}
             />
@@ -145,7 +146,8 @@ export function CreditAmortizationSection({
                     onChange={(value) => updateTiers(tiers.map((item, i) => i === index ? { ...item, debutMois: value } : item))}
                   />
                   <NumberField
-                    label="Mensualité (€)"
+                    label="Mensualité hors assurance (€)"
+                    helper="Montant qui rembourse capital + intérêts, sans l'assurance emprunteur. Sinon le capital restant serait sous-estimé."
                     value={tier.mensualite}
                     onChange={(value) => updateTiers(tiers.map((item, i) => i === index ? { ...item, mensualite: value } : item))}
                   />
@@ -203,7 +205,7 @@ export function CreditAmortizationSection({
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: string | undefined; onChange: (value: string) => void }) {
+function NumberField({ label, helper, value, onChange }: { label: string; helper?: string; value: string | undefined; onChange: (value: string) => void }) {
   return (
     <label className="block min-w-0">
       <span className="mb-1 block text-xs leading-snug text-muted-foreground">{label}</span>
@@ -213,6 +215,7 @@ function NumberField({ label, value, onChange }: { label: string; value: string 
         onChange={(event) => onChange(event.target.value)}
         className="h-11 w-full rounded-xl border border-border bg-elevated px-3 num text-sm outline-none focus:border-primary"
       />
+      {helper && <span className="mt-1 block text-[10px] leading-relaxed text-muted-foreground">{helper}</span>}
     </label>
   );
 }
