@@ -42,36 +42,94 @@
 }
 
 :root {
-  --radius: 0.875rem;
-  /* Thème clair type iOS : fond gris système, cartes blanches, bleu Apple. */
-  --background: oklch(0.965 0.003 260);          /* ~#F2F2F7 systemGroupedBackground */
-  --foreground: oklch(0.23 0.006 270);           /* ~#1C1C1E label */
-  --card: oklch(1 0 0);                          /* blanc */
-  --card-foreground: oklch(0.23 0.006 270);
-  --elevated: oklch(0.945 0.004 260);            /* ~#E9E9EE fill secondaire */
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.23 0.006 270);
-  --primary: oklch(0.58 0.19 255);               /* bleu Apple #007AFF */
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.945 0.004 260);
-  --secondary-foreground: oklch(0.23 0.006 270);
-  --muted: oklch(0.945 0.004 260);
-  --muted-foreground: oklch(0.55 0.01 270);      /* ~#6D6D72 secondaryLabel */
-  --accent: oklch(0.945 0.004 260);
-  --accent-foreground: oklch(0.23 0.006 270);
-  --destructive: oklch(0.62 0.21 27);            /* rouge Apple #FF3B30 */
+  --radius: 1rem;
+  color-scheme: light;
+  --background: oklch(0.975 0.008 155);
+  --foreground: oklch(0.22 0.025 165);
+  --card: oklch(0.995 0.003 155);
+  --card-foreground: oklch(0.22 0.025 165);
+  --elevated: oklch(0.95 0.012 155);
+  --popover: oklch(0.995 0.003 155);
+  --popover-foreground: oklch(0.22 0.025 165);
+  --primary: oklch(0.42 0.09 165);
+  --primary-foreground: oklch(0.99 0.005 155);
+  --secondary: oklch(0.95 0.012 155);
+  --secondary-foreground: oklch(0.25 0.025 165);
+  --muted: oklch(0.95 0.012 155);
+  --muted-foreground: oklch(0.48 0.025 165);
+  --accent: oklch(0.93 0.025 155);
+  --accent-foreground: oklch(0.28 0.05 165);
+  --destructive: oklch(0.52 0.18 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --amber: oklch(0.72 0.15 75);                  /* ambre lisible sur clair */
-  --info: oklch(0.58 0.19 255);
-  --violet: oklch(0.58 0.19 305);
-  --orange: oklch(0.7 0.17 55);
-  --border: oklch(0.915 0.004 260);              /* ~#E5E5EA separator */
-  --input: oklch(0.915 0.004 260);
-  --ring: oklch(0.58 0.19 255);
-  --success: oklch(0.65 0.17 152);               /* vert Apple */
+  --amber: oklch(0.58 0.12 75);
+  --info: oklch(0.42 0.09 165);
+  --violet: oklch(0.48 0.08 305);
+  --orange: oklch(0.58 0.14 55);
+  --border: oklch(0.89 0.015 155);
+  --input: oklch(0.89 0.015 155);
+  --ring: oklch(0.48 0.09 165);
+  --success: oklch(0.47 0.12 150);
 }
 
+.dark {
+  color-scheme: dark;
+  --background: oklch(0.17 0.018 165);
+  --foreground: oklch(0.94 0.012 155);
+  --card: oklch(0.21 0.02 165);
+  --card-foreground: oklch(0.94 0.012 155);
+  --elevated: oklch(0.25 0.022 165);
+  --popover: oklch(0.22 0.02 165);
+  --popover-foreground: oklch(0.94 0.012 155);
+  --primary: oklch(0.72 0.1 158);
+  --primary-foreground: oklch(0.17 0.025 165);
+  --secondary: oklch(0.26 0.022 165);
+  --secondary-foreground: oklch(0.92 0.012 155);
+  --muted: oklch(0.26 0.022 165);
+  --muted-foreground: oklch(0.71 0.02 160);
+  --accent: oklch(0.29 0.035 160);
+  --accent-foreground: oklch(0.92 0.012 155);
+  --destructive: oklch(0.72 0.16 25);
+  --destructive-foreground: oklch(0.17 0.02 165);
+  --amber: oklch(0.78 0.13 80);
+  --info: oklch(0.72 0.1 158);
+  --violet: oklch(0.74 0.1 305);
+  --orange: oklch(0.76 0.14 55);
+  --border: oklch(0.32 0.02 165);
+  --input: oklch(0.32 0.02 165);
+  --ring: oklch(0.72 0.1 158);
+  --success: oklch(0.72 0.12 150);
+}
 
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+    --background: oklch(0.17 0.018 165);
+    --foreground: oklch(0.94 0.012 155);
+    --card: oklch(0.21 0.02 165);
+    --card-foreground: oklch(0.94 0.012 155);
+    --elevated: oklch(0.25 0.022 165);
+    --popover: oklch(0.22 0.02 165);
+    --popover-foreground: oklch(0.94 0.012 155);
+    --primary: oklch(0.72 0.1 158);
+    --primary-foreground: oklch(0.17 0.025 165);
+    --secondary: oklch(0.26 0.022 165);
+    --secondary-foreground: oklch(0.92 0.012 155);
+    --muted: oklch(0.26 0.022 165);
+    --muted-foreground: oklch(0.71 0.02 160);
+    --accent: oklch(0.29 0.035 160);
+    --accent-foreground: oklch(0.92 0.012 155);
+    --destructive: oklch(0.72 0.16 25);
+    --destructive-foreground: oklch(0.17 0.02 165);
+    --amber: oklch(0.78 0.13 80);
+    --info: oklch(0.72 0.1 158);
+    --violet: oklch(0.74 0.1 305);
+    --orange: oklch(0.76 0.14 55);
+    --border: oklch(0.32 0.02 165);
+    --input: oklch(0.32 0.02 165);
+    --ring: oklch(0.72 0.1 158);
+    --success: oklch(0.72 0.12 150);
+  }
+}
 
 @layer base {
   * {
@@ -93,6 +151,25 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  button,
+  a {
+    transition-duration: 180ms;
   }
 
   h1,
@@ -130,6 +207,17 @@
   background-color: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
+  box-shadow: 0 2px 10px oklch(0.2 0.03 165 / 0.035);
+}
+
+.dark .card-surface {
+  box-shadow: 0 4px 16px oklch(0 0 0 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) .card-surface {
+    box-shadow: 0 4px 16px oklch(0 0 0 / 0.12);
+  }
 }
 
 @utility tap {

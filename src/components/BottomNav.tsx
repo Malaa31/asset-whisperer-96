@@ -19,7 +19,7 @@ export function BottomNav({ onAdd }: { onAdd: () => void }) {
         type="button"
         onClick={onAdd}
         aria-label="Ajouter une ligne"
-        className="app-chrome tap fixed bottom-[calc(72px+env(safe-area-inset-bottom))] right-[max(1rem,calc(50vw-224px))] z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+        className="app-chrome tap fixed bottom-[calc(76px+env(safe-area-inset-bottom))] right-[max(1rem,calc(50vw-224px))] z-40 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-primary/10"
       >
         <Plus className="size-6" strokeWidth={2.5} />
       </button>
