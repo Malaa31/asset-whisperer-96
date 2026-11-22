@@ -6,7 +6,7 @@ import { useApp } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
-import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
+import { eur, pct, rawPct, signedEur, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
 import { AllocationCard } from "@/components/AllocationCard";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
@@ -125,8 +125,8 @@ function Dashboard() {
           </div>
           {t.gain !== 0 && (
             <span className={`mt-1 inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1.5 text-xs font-semibold ${t.gain >= 0 ? "bg-success/20 text-primary-foreground" : "bg-destructive/20 text-primary-foreground"}`}>
-              <TrendingUp className="size-3.5" />
-              {pct((t.gain / Math.max(1, t.actifs - t.gain)) * 100)}
+              {t.gain < 0 ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+              {signedEur(t.gain)} ({pct((t.gain / Math.max(1, t.actifs - t.gain)) * 100)})
             </span>
           )}
         </div>
