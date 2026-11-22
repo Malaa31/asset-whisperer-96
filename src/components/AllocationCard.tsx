@@ -7,39 +7,37 @@ import { portfolioExposure } from "@/lib/diversification";
 
 /** Palette des secteurs, dans l'ordre d'affichage. */
 const SECTOR_COLORS = [
-  "#007AFF",
-  "#34C759",
-  "#AF52DE",
-  "#FF9500",
-  "#5AC8FA",
-  "#FFCC00",
-  "#FF3B30",
-  "#5856D6",
+  "#C9A45C",
+  "#D8C3A0",
+  "#7C93B8",
+  "#5FA8A0",
+  "#A98BB5",
+  "#C07A52",
   "#8E8E93",
-  "#00C7BE",
+  "#E07A7A",
 ];
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 
 /** Palette système (type iOS). */
 const TYPE_COLORS: Record<AssetType, string> = {
-  pea: "#007AFF",
-  av: "#AF52DE",
-  livret: "#FFCC00",
-  immo: "#FF9500",
-  crypto: "#5856D6",
-  cash: "#5AC8FA",
+  pea: "#C9A45C",
+  av: "#D8C3A0",
+  livret: "#5FA8A0",
+  immo: "#C07A52",
+  crypto: "#A98BB5",
+  cash: "#7C93B8",
   autre: "#8E8E93",
-  credit: "#FF3B30",
+  credit: "#E07A7A",
 };
 
 const REGION_COLORS: Record<string, string> = {
-  "États-Unis": "#007AFF",
-  Europe: "#5AC8FA",
-  Émergents: "#AF52DE",
-  Japon: "#FF9500",
+  "États-Unis": "#7C93B8",
+  Europe: "#C9A45C",
+  Émergents: "#A98BB5",
+  Japon: "#C07A52",
   "Autres dév.": "#8E8E93",
-  Commodities: "#FFCC00",
-  "Fonds €": "#34C759",
+  Commodities: "#D8C3A0",
+  "Fonds €": "#5FA8A0",
 };
 
 function scoreTone(v: number): string {

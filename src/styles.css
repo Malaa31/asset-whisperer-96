@@ -26,6 +26,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -43,94 +44,35 @@
 
 :root {
   --radius: 0.875rem;
-  color-scheme: light;
-  /* Thème clair type iOS : fond gris système, cartes blanches, bleu Apple. */
-  --background: oklch(0.965 0.003 260);          /* ~#F2F2F7 systemGroupedBackground */
-  --foreground: oklch(0.23 0.006 270);           /* ~#1C1C1E label */
-  --card: oklch(1 0 0);                          /* blanc */
-  --card-foreground: oklch(0.23 0.006 270);
-  --elevated: oklch(0.945 0.004 260);            /* ~#E9E9EE fill secondaire */
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.23 0.006 270);
-  --primary: oklch(0.58 0.19 255);               /* bleu Apple #007AFF */
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.945 0.004 260);
-  --secondary-foreground: oklch(0.23 0.006 270);
-  --muted: oklch(0.945 0.004 260);
-  --muted-foreground: oklch(0.55 0.01 270);      /* ~#6D6D72 secondaryLabel */
-  --accent: oklch(0.945 0.004 260);
-  --accent-foreground: oklch(0.23 0.006 270);
-  --destructive: oklch(0.62 0.21 27);            /* rouge Apple #FF3B30 */
-  --destructive-foreground: oklch(0.99 0 0);
-  --amber: oklch(0.72 0.15 75);                  /* ambre lisible sur clair */
-  --info: oklch(0.58 0.19 255);
-  --violet: oklch(0.58 0.19 305);
-  --orange: oklch(0.7 0.17 55);
-  --border: oklch(0.915 0.004 260);              /* ~#E5E5EA separator */
-  --input: oklch(0.915 0.004 260);
-  --ring: oklch(0.58 0.19 255);
-  --success: oklch(0.65 0.17 152);               /* vert Apple */
-}
-
-.dark {
   color-scheme: dark;
-  --background: #000000;
-  --foreground: #FFFFFF;
-  --card: #1C1C1E;
-  --card-foreground: #FFFFFF;
-  --elevated: #2C2C2E;
-  --popover: #1C1C1E;
-  --popover-foreground: #FFFFFF;
-  --primary: #0A84FF;
-  --primary-foreground: #FFFFFF;
-  --secondary: #2C2C2E;
-  --secondary-foreground: #FFFFFF;
-  --muted: #2C2C2E;
-  --muted-foreground: #98989F;
-  --accent: #2C2C2E;
-  --accent-foreground: #FFFFFF;
-  --destructive: #FF453A;
-  --destructive-foreground: #FFFFFF;
-  --amber: #FFD60A;
-  --info: #0A84FF;
-  --violet: #BF5AF2;
-  --orange: #FF9F0A;
-  --border: #38383A;
-  --input: #38383A;
-  --ring: #0A84FF;
-  --success: #30D158;
+  --background: #0A0A0B;
+  --foreground: #F5F5F7;
+  --card: #141416;
+  --card-foreground: #F5F5F7;
+  --elevated: #1C1C1F;
+  --popover: #141416;
+  --popover-foreground: #F5F5F7;
+  --primary: #C9A45C;
+  --primary-foreground: #0A0A0B;
+  --secondary: #1C1C1F;
+  --secondary-foreground: #F5F5F7;
+  --muted: #1C1C1F;
+  --muted-foreground: #8E8E93;
+  --accent: #1C1C1F;
+  --accent-foreground: #F5F5F7;
+  --destructive: #F87171;
+  --destructive-foreground: #0A0A0B;
+  --amber: #D8C3A0;
+  --info: #7C93B8;
+  --violet: #A98BB5;
+  --orange: #C07A52;
+  --border: #26262A;
+  --input: #26262A;
+  --ring: #C9A45C;
+  --success: #34D399;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    color-scheme: dark;
-    --background: #000000;
-    --foreground: #FFFFFF;
-    --card: #1C1C1E;
-    --card-foreground: #FFFFFF;
-    --elevated: #2C2C2E;
-    --popover: #1C1C1E;
-    --popover-foreground: #FFFFFF;
-    --primary: #0A84FF;
-    --primary-foreground: #FFFFFF;
-    --secondary: #2C2C2E;
-    --secondary-foreground: #FFFFFF;
-    --muted: #2C2C2E;
-    --muted-foreground: #98989F;
-    --accent: #2C2C2E;
-    --accent-foreground: #FFFFFF;
-    --destructive: #FF453A;
-    --destructive-foreground: #FFFFFF;
-    --amber: #FFD60A;
-    --info: #0A84FF;
-    --violet: #BF5AF2;
-    --orange: #FF9F0A;
-    --border: #38383A;
-    --input: #38383A;
-    --ring: #0A84FF;
-    --success: #30D158;
-  }
-}
+
 
 @layer base {
   * {
@@ -208,17 +150,6 @@
   background-color: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-2xl);
-  box-shadow: 0 4px 18px rgb(0 0 0 / 0.045);
-}
-
-.dark .card-surface {
-  box-shadow: 0 4px 16px oklch(0 0 0 / 0.12);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) .card-surface {
-    box-shadow: 0 4px 16px oklch(0 0 0 / 0.12);
-  }
 }
 
 @utility tap {
