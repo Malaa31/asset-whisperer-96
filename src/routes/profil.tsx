@@ -3,6 +3,8 @@ import { useRef, useState } from "react";
 import { ChevronRight, Download, RotateCcw, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { eur } from "@/lib/format";
+import { effectiveIncomeMonthly, rentAfterVacancy } from "@/lib/rental";
+import { n } from "@/lib/calc";
 import { IncomeEditor, totalIncome } from "@/components/IncomeEditor";
 import { INCOME_KIND_LABELS } from "@/lib/types";
 import {
@@ -40,7 +42,7 @@ export const Route = createFileRoute("/profil")({
 });
 
 function ProfilPage() {
-  const { profile, saveProfile, reset } = useApp();
+  const { profile, assets, saveProfile, reset } = useApp();
   const [importMsg, setImportMsg] = useState("");
   const [editingIncome, setEditingIncome] = useState(false);
   const [notifState, setNotifState] = useState<"granted" | "other">(
@@ -65,6 +67,12 @@ function ProfilPage() {
   };
 
   const incomes = profile.incomes ?? [];
+  const incomeLabels = [
+    ...incomes.map((income) => INCOME_KIND_LABELS[income.kind]),
+    ...assets
+      .filter((asset) => asset.type === "immo" && n(asset.data["loyer"]) > 0)
+      .map((property) => `Loyer · ${String(property.data["name"] ?? property.data["type"] ?? "Bien immobilier")}`),
+  ];
 
   /** Active le rappel et tente d'obtenir la permission système. */
   const toggleReminder = async () => {
@@ -112,13 +120,11 @@ function ProfilPage() {
         <span>
           <span className="block text-sm font-semibold">Mes revenus</span>
           <span className="mt-0.5 block text-[11px] text-muted-foreground">
-            {incomes.length
-              ? incomes.map((i) => INCOME_KIND_LABELS[i.kind]).join(" · ")
-              : "Salaire, locatif, dividendes…"}
+            {incomeLabels.length ? incomeLabels.join(" · ") : "Salaire, locatif, dividendes…"}
           </span>
         </span>
         <span className="flex items-center gap-1 num text-xs text-muted-foreground">
-          {eur(profile.incomeMonthly)}/mois
+          {eur(effectiveIncomeMonthly(profile, assets))}/mois
           <ChevronRight className="size-4" />
         </span>
       </button>
@@ -231,6 +237,8 @@ function ProfilPage() {
       {editingIncome && (
         <IncomeEditor
           incomes={profile.incomes}
+          legacyIncomeMonthly={profile.incomeMonthly}
+          assets={assets}
           onClose={() => setEditingIncome(false)}
           onSave={(next) => {
             update({ incomes: next, incomeMonthly: totalIncome(next) });

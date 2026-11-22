@@ -9,6 +9,8 @@ import { eur, num, rawPct, signedEur } from "@/lib/format";
 import { TYPE_LABELS, type Asset, type AssetType } from "@/lib/types";
 import { AssetModal } from "@/components/AssetModal";
 import { AssetAnalysis } from "@/components/AssetAnalysis";
+import { PropertyDetails } from "@/components/PropertyDetails";
+import { loanSummary } from "@/lib/loans";
 
 export const Route = createFileRoute("/patrimoine")({
   head: () => ({
@@ -131,6 +133,7 @@ function Patrimoine() {
                   <AssetRow
                     key={a.id}
                     asset={a}
+                    assets={assets}
                     share={Math.abs(assetValue(a)) / Math.max(1, side === "actifs" ? t.actifs : t.dettes) * 100}
                     onOpen={() => a.data["ticker"] ? setAnalyzing(a) : setEditing(a)}
                   />
@@ -155,6 +158,7 @@ function Patrimoine() {
       {(editing || creating) && (
         <AssetModal
           asset={editing}
+          assets={assets}
           onClose={() => {
             setEditing(null);
             setCreating(false);
@@ -213,10 +217,11 @@ function CategoryIcon({ type }: { type: AssetType }) {
   return <Icon aria-hidden="true" className="size-4" />;
 }
 
-function AssetRow({ asset, share, onOpen }: { asset: Asset; share: number; onOpen: () => void }) {
+function AssetRow({ asset, assets, share, onOpen }: { asset: Asset; assets: Asset[]; share: number; onOpen: () => void }) {
   const value = assetValue(asset);
   const gain = assetGain(asset);
   const d = asset.data;
+  const creditSummary = asset.type === "credit" ? loanSummary(d) : null;
   let tags: string[] = [];
 
   if (asset.type === "pea") {
@@ -230,51 +235,50 @@ function AssetRow({ asset, share, onOpen }: { asset: Asset; share: number; onOpe
   } else if (asset.type === "crypto") {
     tags.push(`${num(n(d["quantity"]), 4)} × ${num(n(d["prixUnitaire"]))} €`);
   } else if (asset.type === "credit") {
-    tags.push(`${eur(n(d["mensualite"]))}/mois`);
+    tags.push(`${eur(creditSummary?.mensualiteActuelle ?? 0)}/mois`);
     if (d["taux"]) tags.push(`${num(n(d["taux"]))} %`);
   } else if (asset.type === "immo" && d["loyer"]) {
     tags.push(`loyer ${eur(n(d["loyer"]))}`);
   }
 
   tags = tags.slice(0, 1);
-
-  const rembourse =
-    asset.type === "credit" && n(d["capitalInitial"])
-      ? ((n(d["capitalInitial"]) - n(d["capitalRestant"])) / n(d["capitalInitial"])) * 100
-      : null;
+  const rembourse = creditSummary?.pctRembourse ?? null;
 
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="tap card-surface flex w-full flex-col gap-3 p-4 text-left transition-transform active:scale-[0.99]"
-    >
-      <div className="flex items-center gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-elevated text-muted-foreground"><CategoryIcon type={asset.type} /></span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{String(d["name"] ?? d["type"] ?? d["ticker"] ?? "Ligne")}</div>
-          <div className="mt-1 truncate text-xs text-muted-foreground">{tags.join(" · ") || TYPE_LABELS[asset.type]}</div>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className={`num text-sm font-semibold ${asset.type === "credit" ? "text-destructive" : ""}`}>{eur(Math.abs(value))}</div>
-          <div className="num text-[11px] text-muted-foreground">{rawPct(share, 1)}</div>
-          {gain !== 0 && <div className={`num text-[11px] ${gain >= 0 ? "text-primary" : "text-destructive"}`}>{signedEur(gain)}</div>}
-        </div>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-      </div>
-      {rembourse !== null && (
-        <div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-700"
-              style={{ width: `${Math.max(0, Math.min(100, rembourse))}%` }}
-            />
+    <article className="card-surface rounded-2xl p-4">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="tap flex w-full flex-col gap-3 text-left transition-transform active:scale-[0.99]"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-elevated text-muted-foreground"><CategoryIcon type={asset.type} /></span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold">{String(d["name"] ?? d["type"] ?? d["ticker"] ?? "Ligne")}</div>
+            <div className="mt-1 truncate text-xs text-muted-foreground">{tags.join(" · ") || TYPE_LABELS[asset.type]}</div>
           </div>
-          <div className="mt-1 text-[10px] text-muted-foreground">
-            {rawPct(rembourse)} remboursé
+          <div className="shrink-0 text-right">
+            <div className={`num text-sm font-semibold ${asset.type === "credit" ? "text-destructive" : ""}`}>{eur(Math.abs(value))}</div>
+            <div className="num text-[11px] text-muted-foreground">{rawPct(share, 1)}</div>
+            {gain !== 0 && <div className={`num text-[11px] ${gain >= 0 ? "text-primary" : "text-destructive"}`}>{signedEur(gain)}</div>}
           </div>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
         </div>
-      )}
-    </button>
+        {rembourse !== null && (
+          <div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-700"
+                style={{ width: `${Math.max(0, Math.min(100, rembourse))}%` }}
+              />
+            </div>
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              {rawPct(rembourse)} remboursé
+            </div>
+          </div>
+        )}
+      </button>
+      {asset.type === "immo" && <PropertyDetails property={asset} assets={assets} compact />}
+    </article>
   );
 }

@@ -4,6 +4,7 @@ import { useModalBack } from "@/hooks/useModalBack";
 import { X } from "lucide-react";
 import type { Asset } from "@/lib/types";
 import { TYPE_LABELS } from "@/lib/types";
+import { isAutomaticLoan } from "@/lib/loans";
 
 /** Ligne éditable : un actif + la clé de donnée qui porte son montant. */
 interface Row {
@@ -45,6 +46,7 @@ export function QuickUpdate({
   const initialRows = useMemo<Row[]>(() => {
     const rows: Row[] = [];
     for (const a of assets) {
+      if (a.type === "credit" && isAutomaticLoan(a.data)) continue;
       const specs = KEY_BY_TYPE[a.type];
       if (!specs) continue;
       for (const spec of specs) {
