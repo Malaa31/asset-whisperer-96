@@ -28,9 +28,22 @@ import {
 } from "@/lib/import-positions";
 import { useApp, uid } from "@/lib/storage";
 import { parsePositionText } from "@/lib/position-parser";
+import { applyLoanDecisions, matchLoan, parseLoanCaptures } from "@/lib/loan-import";
+import { detectCaptureKind, dominantKind, type CaptureKind } from "@/lib/capture-kind";
+import {
+  ImportLoanReview,
+  isLoanDraftValid,
+  loanDraftToImport,
+  type LoanDraft,
+} from "@/components/ImportLoanReview";
 import type { Asset } from "@/lib/types";
 
 const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
+const KIND_LABEL: Record<CaptureKind, string> = {
+  titres: "positions de PEA / CTO",
+  solde: "solde de livret",
+  credit: "fiche de crédit",
+};
 const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 const PRIVACY_NOTE =
   "Tout est analysé sur ton téléphone : la capture n'est envoyée nulle part. Rien n'est enregistré sans ta validation.";
@@ -45,7 +58,7 @@ export function ImportCaptures({
   onOpenChange: (open: boolean) => void;
 }) {
   const { assets, setAssets } = useApp();
-  const [kind, setKind] = useState<"titres" | "solde">("titres");
+  const [kind, setKind] = useState<CaptureKind>("titres");
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [pastedText, setPastedText] = useState("");
   const [inputMode, setInputMode] = useState<"image" | "text">("image");
@@ -53,6 +66,9 @@ export function ImportCaptures({
   const [extraction, setExtraction] = useState<ImportExtraction | null>(null);
   const [positionRows, setPositionRows] = useState<PositionDraft[]>([]);
   const [savingsRow, setSavingsRow] = useState<SavingsDraft | null>(null);
+  const [loanRows, setLoanRows] = useState<LoanDraft[]>([]);
+  const [loanWarnings, setLoanWarnings] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
   const [stage, setStage] = useState<"choose" | "review">("choose");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -79,12 +95,15 @@ export function ImportCaptures({
       ? controlsForExtraction({ ...extraction, lignes: reviewLines })
       : [];
   const savingsControls = extraction?.kind === "solde" ? controlsForExtraction(extraction) : [];
-  const hasSelectedRows =
-    extraction?.kind === "titres"
+  const loanMode = stage === "review" && loanRows.length > 0;
+  const hasSelectedRows = loanMode
+    ? loanRows.some((row) => row.action !== "ignore")
+    : extraction?.kind === "titres"
       ? positionRows.some((row) => row.action !== "ignore")
       : Boolean(savingsRow && savingsRow.action !== "ignore");
-  const validRows =
-    extraction?.kind === "titres"
+  const validRows = loanMode
+    ? loanRows.every(isLoanDraftValid)
+    : extraction?.kind === "titres"
       ? positionRows.every((row) => {
           if (row.action === "ignore") return true;
           const quantity = parseFrenchNumber(row.quantite);
@@ -113,6 +132,9 @@ export function ImportCaptures({
       setExtraction(null);
       setPositionRows([]);
       setSavingsRow(null);
+      setLoanRows([]);
+      setLoanWarnings([]);
+      setNotice("");
       setStage("choose");
       setMessage("");
       setSearchHits({});
@@ -155,7 +177,7 @@ export function ImportCaptures({
     setMessage("");
     let worker: import("tesseract.js").Worker | null = null;
     try {
-      let sourceText = pastedText;
+      let texts = [pastedText];
       if (inputMode === "image") {
         const { createWorker } = await import("tesseract.js");
         worker = await createWorker("fra+eng", 1, {
@@ -174,9 +196,58 @@ export function ImportCaptures({
           const result = await worker.recognize(prepared);
           recognized.push(result.data.text);
         }
-        sourceText = recognized.join("\n");
+        texts = recognized;
       }
-      const result = parsePositionText(sourceText, kind);
+      // Le type choisi n'est qu'un indice : on suit le vocabulaire des captures.
+      const { kind: detected, others } = dominantKind(texts);
+      const effectiveKind: CaptureKind = detected ?? kind;
+      const notes: string[] = [];
+      if (detected && detected !== kind) {
+        setKind(detected);
+        notes.push(`Captures reconnues comme ${KIND_LABEL[detected]} : analyse adaptée.`);
+      }
+      if (others) notes.push(`${others} capture(s) d'un autre type mise(s) de côté : importe-les séparément.`);
+      setNotice(notes.join(" "));
+      const relevant = texts.filter((text) => {
+        const textKind = detectCaptureKind(text);
+        return !textKind || textKind === effectiveKind;
+      });
+
+      if (effectiveKind === "credit") {
+        const loans = parseLoanCaptures(relevant);
+        if (!loans.prets.length) {
+          setMessage(loans.avertissements[0] ?? "Aucun crédit reconnu.");
+          return;
+        }
+        setExtraction(null);
+        setLoanWarnings(loans.avertissements);
+        setLoanRows(
+          loans.prets.map((pret, index) => {
+            const match = matchLoan(pret, assets);
+            return {
+              id: `loan-${index}-${uid()}`,
+              pret,
+              nom: match ? String(match.data["name"] ?? pret.nom) : pret.nom,
+              capitalInitial: pret.capitalInitial === null ? "" : String(pret.capitalInitial),
+              taux: pret.taux === null ? "" : String(pret.taux),
+              dureeMois: pret.dureeMois === null ? "" : String(pret.dureeMois),
+              dateDebut: pret.dateDebut ?? "",
+              mensualite: pret.mensualite === null ? "" : String(pret.mensualite),
+              refCapital: pret.refCapital === null ? "" : String(pret.refCapital),
+              refDate: pret.refDate ?? "",
+              action: match ? "update" : "create",
+              assetId: match?.id ?? "",
+              bienId: match ? String(match.data["bienId"] ?? "") : "",
+              appliquerPaliers: Boolean(pret.paliers?.length) && !(match && match.data["paliers"]),
+            };
+          }),
+        );
+        setCaptures([]);
+        setStage("review");
+        return;
+      }
+      setLoanRows([]);
+      const result = parsePositionText(relevant.join("\n"), effectiveKind);
       setExtraction(result);
       if (result.kind === "titres") {
         const defaultEnvelope: Envelope = result.enveloppe === "CTO" ? "CTO" : "PEA";
@@ -253,9 +324,37 @@ export function ImportCaptures({
   };
 
   const validateImport = () => {
-    if (!extraction || !validRows || !hasSelectedRows) return;
+    if (!validRows || !hasSelectedRows) return;
     const previousAssets = assets;
     const timestamp = new Date().toISOString();
+    if (loanMode) {
+      const nextAssets = applyLoanDecisions(
+        previousAssets,
+        loanRows.map((row) => ({
+          action: row.action,
+          ...(row.assetId ? { assetId: row.assetId } : {}),
+          ...(row.bienId ? { bienId: row.bienId } : {}),
+          appliquerPaliers: row.appliquerPaliers,
+          pret: loanDraftToImport(row),
+        })),
+        timestamp,
+        uid,
+      );
+      setAssets(nextAssets);
+      close(false);
+      toast.success("Crédits mis à jour", {
+        duration: 10_000,
+        action: {
+          label: "Annuler",
+          onClick: () => {
+            setAssets(previousAssets);
+            toast.success("Import annulé");
+          },
+        },
+      });
+      return;
+    }
+    if (!extraction) return;
     const decisions: ImportDecision[] =
       extraction.kind === "titres"
         ? positionRows.map((row) => ({
@@ -334,7 +433,7 @@ export function ImportCaptures({
                 <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Type de capture
                 </legend>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     aria-pressed={kind === "titres"}
@@ -351,7 +450,20 @@ export function ImportCaptures({
                   >
                     Solde d&apos;un livret
                   </button>
+                  <button
+                    type="button"
+                    aria-pressed={kind === "credit"}
+                    onClick={() => setKind("credit")}
+                    className={`tap rounded-xl border px-3 py-3 text-left text-sm font-semibold ${kind === "credit" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}
+                  >
+                    Crédit
+                  </button>
                 </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {kind === "credit"
+                    ? "Fiche du crédit dans l'appli de ta banque : prends le haut et le bas de la page, et une fiche par prêt (prêt principal et PTZ ensemble pour détecter un lissage)."
+                    : "Le type est vérifié automatiquement d'après le contenu des captures."}
+                </p>
               </fieldset>
               <div className="grid grid-cols-2 gap-2" role="group" aria-label="Méthode d’import">
                 <button type="button" aria-pressed={inputMode === "image"} onClick={() => setInputMode("image")} className={`tap flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold ${inputMode === "image" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}><FileImage className="size-4" aria-hidden="true" /> Choisir des captures</button>
@@ -367,7 +479,7 @@ export function ImportCaptures({
               ) : (
                 <div className="flex flex-col gap-2">
                   <label htmlFor="position-import-text" className="text-sm font-semibold">Texte de la capture</label>
-                  <textarea id="position-import-text" value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={8} disabled={busy} className="w-full resize-y rounded-xl border border-border bg-card px-3 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Colle ici le texte de tes positions ou de ton livret…" />
+                  <textarea id="position-import-text" value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={8} disabled={busy} className="w-full resize-y rounded-xl border border-border bg-card px-3 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Colle ici le texte de tes positions, de ton livret ou de ton crédit…" />
                   <p className="text-xs leading-relaxed text-muted-foreground">Sur iPhone : ouvre la capture dans Photos, maintiens le doigt sur le texte, Tout sélectionner, Copier, puis colle ici.</p>
                 </div>
               )}
@@ -411,8 +523,30 @@ export function ImportCaptures({
                 {busy ? "Lecture en cours…" : inputMode === "image" ? "Analyser les captures" : "Analyser le texte"}
               </button>
             </div>
+          ) : loanMode ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Vérification manuelle</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {loanRows.length > 1 ? `${loanRows.length} crédits reconnus.` : "1 crédit reconnu."} Les modifications restent locales à cette étape.
+                  </p>
+                </div>
+                <span className="flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary">
+                  <ShieldCheck className="size-3" aria-hidden="true" /> Rien d&apos;enregistré
+                </span>
+              </div>
+              {notice && <p className="rounded-lg bg-elevated px-3 py-2 text-xs text-muted-foreground" role="status">{notice}</p>}
+              <ImportLoanReview
+                rows={loanRows}
+                assets={assets}
+                warnings={loanWarnings}
+                onChange={(id, patch) => setLoanRows((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)))}
+              />
+            </div>
           ) : extraction ? (
             <div className="flex flex-col gap-4">
+              {notice && <p className="rounded-lg bg-elevated px-3 py-2 text-xs text-muted-foreground" role="status">{notice}</p>}
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold">Vérification manuelle</p>
