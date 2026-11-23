@@ -149,11 +149,47 @@ export function matchPosition(
   if (!name) return null;
   let best: { asset: Asset; score: number } | null = null;
   for (const asset of candidats) {
-    const candidate = normalize(String(asset.data["name"] ?? ""));
-    const score = nameSimilarity(name, candidate);
+    const existingName = String(asset.data["name"] ?? "");
+    const score = Math.max(
+      nameSimilarity(name, normalize(existingName)),
+      tokenContainment(ligne.nom, existingName),
+    );
     if (score >= 0.76 && (!best || score > best.score)) best = { asset, score };
   }
   return best?.asset ?? null;
+}
+
+/** Mots qui ne distinguent pas deux fonds (« UCITS ETF ACC », « PEA »…). */
+const GENERIC_NAME_WORDS = new Set([
+  "ucits", "etf", "acc", "dist", "capitalisation", "capi", "cap", "distribution", "c", "d", "eur", "usd",
+  "pea", "sa", "se", "nv", "plc", "inc", "the", "de", "du", "des", "la", "le", "et", "fund", "fonds",
+]);
+
+function significantWords(value: string): string[] {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word && !GENERIC_NAME_WORDS.has(word));
+}
+
+/**
+ * Le libellé court est-il contenu mot pour mot dans le long ?
+ * « Amundi MSCI World » ↔ « AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC ».
+ * Il faut au moins deux mots distinctifs, pour que « Amundi » seul ne rapproche pas tous les fonds Amundi.
+ */
+function tokenContainment(left: string, right: string): number {
+  const a = new Set(significantWords(left));
+  const b = new Set(significantWords(right));
+  if (!a.size || !b.size) return 0;
+  const [shorter, longer] = a.size <= b.size ? [a, b] : [b, a];
+  if (![...shorter].every((word) => longer.has(word))) return 0;
+  if (shorter.size === longer.size) return 0.95;
+  if (shorter.size < 2) return 0;
+  // Plus le libellé court couvre le long, plus la correspondance est sûre.
+  return 0.8 + 0.15 * (shorter.size / longer.size);
 }
 
 export function matchSavingsAccount(

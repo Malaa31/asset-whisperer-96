@@ -11,5 +11,93 @@ export const positionParserCases = {
   mobileDetail: `Air Liquide\nFR0000120073\nQuantité\n12\nPRU 150,00 €\nDernier cours 168,30 €\nValorisation 2 019,60 €\n+/- value latente +219,60 €`,
   wrappedNames: `Portefeuille\nAMUNDI MSCI WORLD\nUCITS ETF EUR (C)\n5 parts\n500,00 €\n512,40 €\n2 562,00 €\nAmundi CAC 40\n3 parts\n100,00 €\n110,00 €\n330,00 €`,
   closePruCours: `Portefeuille\nHermès\n60 parts\n1 234,50 €\n1 240,00 €\n74 400,00 €`,
+  // Capture réelle de l'appli Boursorama (PEA), texte tel que lu par l'OCR de l'appli.
+  boursoAppOcr: `13:03 à all > 22:
+< 22 357,47€ eee
+Valeur Montant
+Cours +/- latentes (€)
+Px. revient / Quantité
+
+AMUNDI PEA EMERGENT (MSCI
+
+EMERGING) ESG TRANSITION 2591,61€ >
+
+UCITS ETF
+
+31,61€ +1,98” A 303,03 €
+
+27,91 € / 82
+
+AMUNDI PEA MONDE MSCI 1122440€ >
+
+WORLD UCITS ETF ACC
+
+6,01€ +0,91% A 390,95 €
+
+5,80 € /1867
+
+AMUNDI PEA S&P 500 UCITS 5023,04€ >
+
+ETF ACC
+
+57,08 € +0,94% A 756,43 €
+
+48,48 € / 88
+
+BNP PARIBAS EASY STOXX
+
+EUROPE 600 UCITS ETF 3504,48€ >
+
+CAPITALISATION
+
+20,86€ +0,97% A 134,43 €
+
+20,06 € / 168
+
+CARMAT 1,49€ >
+
+010 € +0,00 * N -330,42 €
+
+2213 € /15
+
+8 e = nf =
+Comptes Ordres Listes Marchés Menu`,
+  // Même écran, ordre de lecture type « Live Text » (colonne de droite après la gauche).
+  boursoAppLiveText: `22 357,47 €
+Valeur
+Cours
+Px. revient / Quantité
+Montant
++/- latentes (€)
+AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF
+31,61 € +1,98 %
+27,91 € / 82
+2 591,61 €
+303,03 €
+AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC
+6,01 € +0,91 %
+5,80 € / 1 867
+11 224,40 €
+390,95 €
+AMUNDI PEA S&P 500 UCITS ETF ACC
+57,08 € +0,94 %
+48,48 € / 88
+5 023,04 €
+756,43 €
+BNP PARIBAS EASY STOXX EUROPE 600 UCITS ETF CAPITALISATION
+20,86 € +0,97 %
+20,06 € / 168
+3 504,48 €
+134,43 €
+CARMAT
+0,10 € +0,00 %
+22,13 € / 15
+1,49 €
+-330,42 €
+Comptes
+Ordres
+Listes
+Marchés
+Menu`,
   ocrNoise: `PEA\nNom Qté PRU Cours Valeur\nAmundi MSCI World LU1681043599 1O\t1O0,OO\t1O2,OO\t1O2O,OO`,
 };

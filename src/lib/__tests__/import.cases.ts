@@ -92,6 +92,26 @@ async function run() {
   const close = parsePositionText(positionParserCases.closePruCours, "titres");
   const c0 = close.kind === "titres" ? close.lignes[0] : undefined;
   check("PRU proche du cours : pas d'inversion", c0?.quantite === 60 && c0?.pru === 1234.5 && c0?.cours === 1240 && c0?.valeur === 74400);
+  const expectedBourso = [
+    ["AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF", 82, 27.91, 31.61, 2591.61],
+    ["AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC", 1867, 5.8, 6.01, 11224.4],
+    ["AMUNDI PEA S&P 500 UCITS ETF ACC", 88, 48.48, 57.08, 5023.04],
+    ["BNP PARIBAS EASY STOXX EUROPE 600 UCITS ETF CAPITALISATION", 168, 20.06, 20.86, 3504.48],
+    ["CARMAT", 15, 22.13, 0.1, 1.49],
+  ] as const;
+  for (const [label, key] of [["OCR", "boursoAppOcr"], ["Live Text", "boursoAppLiveText"]] as const) {
+    const app = parsePositionText(positionParserCases[key], "titres");
+    const lignes = app.kind === "titres" ? app.lignes : [];
+    const same = (a: number | null | undefined, b: number) => a != null && Math.abs(a - b) < 0.005;
+    check(`appli Boursorama (${label}) : 5 lignes, PEA`, app.kind === "titres" && app.enveloppe === "PEA" && lignes.length === 5);
+    expectedBourso.forEach(([nom, q, pru, cours, valeur], i) => {
+      const l = lignes[i];
+      check(
+        `appli Boursorama (${label}) : ${nom.split(" ").slice(0, 4).join(" ")}`,
+        l?.nom === nom && same(l.quantite, q) && same(l.pru, pru) && same(l.cours, cours) && same(l.valeur, valeur) && l.confiance >= 0.7,
+      );
+    });
+  }
   const livretDate = parsePositionText(positionParserCases.livretWithDate, "solde");
   check("livret : la date n'est pas prise pour le solde", livretDate.kind === "solde" && livretDate.solde === 8412.35);
   const livretInline = parsePositionText(positionParserCases.livretInline, "solde");
@@ -127,6 +147,22 @@ async function run() {
     "nom proche utilisé en dernier choix",
     matchPosition({ nom: "Amundi MSCI World ETF" }, [peaWorld], "PEA")?.id === "pea-world",
   );
+  {
+    const world = { ...peaWorld, id: "pea-world-2", data: { ...peaWorld.data, name: "Amundi MSCI World", isin: "" } };
+    const emerging = { ...peaWorld, id: "pea-em", data: { ...peaWorld.data, name: "Amundi PEA Emergent", isin: "" } };
+    const sp = { ...peaWorld, id: "pea-sp", data: { ...peaWorld.data, name: "Amundi S&P 500", isin: "" } };
+    const pool = [world, emerging, sp];
+    check(
+      "libellé long de la banque rapproché du nom court saisi",
+      matchPosition({ nom: "AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC" }, pool, "PEA")?.id === "pea-world-2" &&
+        matchPosition({ nom: "AMUNDI PEA S&P 500 UCITS ETF ACC" }, pool, "PEA")?.id === "pea-sp" &&
+        matchPosition({ nom: "AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF" }, pool, "PEA")?.id === "pea-em",
+    );
+    check(
+      "un seul mot commun (« Amundi ») ne suffit pas",
+      matchPosition({ nom: "AMUNDI EURO STOXX 50" }, pool, "PEA") === null,
+    );
+  }
   check(
     "livret rapproché par libellé",
     matchSavingsAccount({ libelle: "Livret A" }, [unrelated])?.id === "livret-a",
