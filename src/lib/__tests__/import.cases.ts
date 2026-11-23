@@ -93,11 +93,11 @@ async function run() {
   const c0 = close.kind === "titres" ? close.lignes[0] : undefined;
   check("PRU proche du cours : pas d'inversion", c0?.quantite === 60 && c0?.pru === 1234.5 && c0?.cours === 1240 && c0?.valeur === 74400);
   const expectedBourso = [
-    ["AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF", 82, 27.91, 31.61, 2591.61],
-    ["AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC", 1867, 5.8, 6.01, 11224.4],
-    ["AMUNDI PEA S&P 500 UCITS ETF ACC", 88, 48.48, 57.08, 5023.04],
-    ["BNP PARIBAS EASY STOXX EUROPE 600 UCITS ETF CAPITALISATION", 168, 20.06, 20.86, 3504.48],
-    ["CARMAT", 15, 22.13, 0.1, 1.49],
+    ["AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF", 64, 24.37, 30.12, 1927.68],
+    ["AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC", 1530, 5.42, 6.03, 9225.9],
+    ["AMUNDI PEA S&P 500 UCITS ETF ACC", 71, 44.15, 56.74, 4028.54],
+    ["BNP PARIBAS EASY STOXX EUROPE 600 UCITS ETF CAPITALISATION", 142, 19.48, 21.03, 2986.26],
+    ["CARMAT", 12, 18.62, 0.1, 1.2],
   ] as const;
   for (const [label, key] of [["OCR", "boursoAppOcr"], ["Live Text", "boursoAppLiveText"]] as const) {
     const app = parsePositionText(positionParserCases[key], "titres");
@@ -113,11 +113,11 @@ async function run() {
     });
   }
   const expectedBourso2 = [
-    ["AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF", 82, 27.91, 33.09, 2712.97],
-    ["AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC P", 1867, 5.8, 6.08, 11360.69],
-    ["AMUNDI PEA S&P 500 UCITS ETF ACC", 88, 48.48, 57.8, 5086.4],
-    ["BNP PARIBAS EASY STOXX EUROPE 600 UCITS ETF CAPITALISATION", 168, 20.06, 20.98, 3524.64],
-    ["CARMAT", 15, 22.13, 0.1, 1.49],
+    ["AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF", 64, 24.37, 32.47, 2078.08],
+    ["AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC P", 1530, 5.42, 6.11, 9348.3],
+    ["AMUNDI PEA S&P 500 UCITS ETF ACC", 71, 44.15, 57.52, 4083.92],
+    ["BNP PARIBAS EASY STOXX EUROPE 600 UCITS ETF CAPITALISATION", 142, 19.48, 21.19, 3008.98],
+    ["CARMAT", 12, 18.62, 0.1, 1.2],
   ] as const;
   for (const [label, key] of [["2e capture", "boursoAppOcr2"], ["flèches collées", "boursoAppOcr2Stuck"]] as const) {
     const app = parsePositionText(positionParserCases[key], "titres");

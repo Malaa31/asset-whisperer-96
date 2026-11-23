@@ -1,4 +1,6 @@
 import { LoaderCircle, Search, ShieldCheck } from "lucide-react";
+import { checkPosition, checkTotal } from "@/lib/ocr/checks";
+import { resolveInstrument } from "@/lib/ocr/names";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   matchPosition,
@@ -54,7 +56,9 @@ export function ImportCaptureReview({
   onSavingsChange,
   onSearch,
   onSelectHit,
+  accountTotal = null,
 }: {
+  accountTotal?: number | null | undefined;
   extraction: ImportExtraction;
   assets: Asset[];
   absentAssets: Asset[];
@@ -69,8 +73,16 @@ export function ImportCaptureReview({
   onSearch: (row: PositionDraft) => void;
   onSelectHit: (id: string, hit: SearchHit) => void;
 }) {
+  const sum = positionRows.filter((row) => row.action !== "ignore").reduce((acc, row) => acc + (row.valeur ?? 0), 0);
+  const totalAlert = extraction.kind === "titres" ? checkTotal(accountTotal, positionRows.map((row) => row.valeur)) : null;
   return (
     <div className="flex flex-col gap-4">
+      {extraction.kind === "titres" && accountTotal !== null && (
+        <p className={`rounded-lg border px-3 py-2 text-xs ${totalAlert ? "border-orange/60 bg-orange/10 text-orange" : "border-border bg-elevated text-muted-foreground"}`} role="status">
+          Total du compte lu : <b className="num">{formatEuro(accountTotal)}</b> · somme des lignes : <b className="num">{formatEuro(sum)}</b>
+          {totalAlert ? ` — ${totalAlert}` : accountTotal - sum > 0.01 ? " (écart = espèces ou lignes hors capture)" : ""}
+        </p>
+      )}
       {extraction.avertissements.length > 0 && (
         <Alert className="border-amber/40 bg-amber/10 text-foreground">
           <AlertDescription className="text-xs leading-relaxed text-amber">
@@ -161,6 +173,16 @@ function PositionReviewRow({
       String(asset.data["envelope"] ?? "PEA").toUpperCase() === row.enveloppe,
   );
   const matchedAsset = assets.find((asset) => asset.id === row.assetId && asset.type === "pea");
+  // Contrôles de cohérence recalculés à chaque modification : champ douteux = surligné en orange.
+  const flags = checkPosition({
+    nom: row.nom,
+    isin: row.isin.trim() || null,
+    quantite: parseFrenchNumber(row.quantite),
+    pru: row.pru.trim() ? parseFrenchNumber(row.pru) : null,
+    cours: row.cours.trim() ? parseFrenchNumber(row.cours) : null,
+    valeur: row.valeur,
+    nomReconnu: Boolean(row.isin.trim() || row.assetId || resolveInstrument(row.nom)),
+  });
   const setEnvelope = (enveloppe: Envelope) => {
     const match = matchPosition(
       { nom: row.nom, isin: row.isin, ticker: row.ticker },
@@ -174,7 +196,7 @@ function PositionReviewRow({
     });
   };
   return (
-    <article className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+    <article data-position-card className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <label
@@ -187,13 +209,16 @@ function PositionReviewRow({
             id={`${row.id}-name`}
             value={row.nom}
             onChange={(event) => onChange({ nom: event.target.value })}
-            className="mt-1 h-10 w-full rounded-lg border border-border bg-elevated px-2.5 text-sm outline-none focus:border-primary"
+            aria-invalid={Boolean(flags.nom)}
+            data-alert={flags.nom ? "true" : undefined}
+            className={`mt-1 h-10 w-full rounded-lg border px-2.5 text-sm outline-none focus:border-primary ${flags.nom ? "border-orange bg-orange/10" : "border-border bg-elevated"}`}
           />
+          {flags.nom && <span className="mt-1 block text-[11px] leading-snug text-orange">{flags.nom}</span>}
         </div>
         <ConfidenceBadge value={row.confiance} />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <TextField label="ISIN" value={row.isin} onChange={(value) => onChange({ isin: value })} />
+        <TextField label="ISIN" value={row.isin} alert={flags.isin} onChange={(value) => onChange({ isin: value })} />
         <TextField
           label="Ticker"
           value={row.ticker}
@@ -203,14 +228,30 @@ function PositionReviewRow({
           label="Quantité"
           value={row.quantite}
           inputMode="decimal"
+          alert={flags.quantite}
           onChange={(value) => onChange({ quantite: value })}
         />
         <TextField
           label="PRU (€)"
           value={row.pru}
           inputMode="decimal"
+          alert={flags.pru}
           onChange={(value) => onChange({ pru: value })}
         />
+        <TextField
+          label="Cours (€)"
+          value={row.cours}
+          inputMode="decimal"
+          alert={flags.cours}
+          onChange={(value) => onChange({ cours: value })}
+        />
+        <div className="min-w-0">
+          <span className="mb-1 block truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Valorisation lue</span>
+          <div data-alert={flags.valeur ? "true" : undefined} className={`flex h-10 items-center rounded-lg border px-2.5 text-sm num ${flags.valeur ? "border-orange bg-orange/10" : "border-border bg-elevated"}`}>
+            {row.valeur === null ? "—" : formatEuro(row.valeur)}
+          </div>
+          {flags.valeur && <span className="mt-1 block text-[11px] leading-snug text-orange">{flags.valeur}</span>}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
@@ -434,11 +475,14 @@ function TextField({
   value,
   onChange,
   inputMode = "text",
+  alert,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   inputMode?: "text" | "decimal";
+  /** Motif du contrôle de cohérence en échec : champ surligné en orange. */
+  alert?: string | undefined;
 }) {
   return (
     <label className="block min-w-0">
@@ -448,11 +492,19 @@ function TextField({
       <input
         value={value}
         inputMode={inputMode}
+        aria-invalid={Boolean(alert)}
+        data-alert={alert ? "true" : undefined}
+        title={alert}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full rounded-lg border border-border bg-elevated px-2.5 text-sm outline-none focus:border-primary"
+        className={`h-10 w-full rounded-lg border px-2.5 text-sm outline-none focus:border-primary ${alert ? "border-orange bg-orange/10" : "border-border bg-elevated"}`}
       />
+      {alert && <span className="mt-1 block text-[11px] leading-snug text-orange">{alert}</span>}
     </label>
   );
+}
+
+function formatEuro(value: number): string {
+  return `${new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} €`;
 }
 
 function formatNumber(value: unknown): string {

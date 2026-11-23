@@ -27,18 +27,9 @@ import {
   type SavingsLine,
 } from "@/lib/import-positions";
 import { useApp, uid } from "@/lib/storage";
-import { parsePositionText } from "@/lib/position-parser";
+import { pageFromText, runPipelineOnOcr, type PipelineResult } from "@/lib/ocr/pipeline";
 import { applyLoanDecisions, matchLoan, parseLoanCaptures } from "@/lib/loan-import";
-import {
-  CAPTURE_MARKER,
-  captureQuality,
-  detectCaptureKind,
-  dominantKind,
-  needsSecondPass,
-  splitCaptureText,
-  type CaptureKind,
-} from "@/lib/capture-kind";
-import { ocrScale, prepareForOcr, type OcrVariant } from "@/lib/ocr-preprocess";
+import { CAPTURE_MARKER, detectCaptureKind, dominantKind, splitCaptureText, type CaptureKind } from "@/lib/capture-kind";
 import {
   ImportLoanReview,
   isLoanDraftValid,
@@ -83,6 +74,7 @@ export function ImportCaptures({
   const [loanRows, setLoanRows] = useState<LoanDraft[]>([]);
   const [loanWarnings, setLoanWarnings] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
+  const [accountTotal, setAccountTotal] = useState<number | null>(null);
   const [stage, setStage] = useState<"choose" | "review">("choose");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -149,6 +141,7 @@ export function ImportCaptures({
       setLoanRows([]);
       setLoanWarnings([]);
       setNotice("");
+      setAccountTotal(null);
       setStage("choose");
       setMessage("");
       setSearchHits({});
@@ -203,34 +196,22 @@ export function ImportCaptures({
     if (inputMode === "image" ? !captures.length : !pastedText.trim()) return;
     setBusy(true);
     setMessage("");
-    let worker: import("tesseract.js").Worker | null = null;
     try {
-      let texts = splitCaptureText(pastedText);
+      // Même pipeline que l'évaluation : OCR PaddleOCR (images) ou texte collé → lignes et colonnes
+      // → lecture → noms rattachés au référentiel → contrôles de cohérence.
+      let results: PipelineResult[];
       if (inputMode === "image") {
-        const { createWorker } = await import("tesseract.js");
-        worker = await createWorker("fra+eng", 1, {
-          workerPath: "/ocr/worker.min.js",
-          corePath: "/ocr/tesseract-core-simd-lstm.wasm.js",
-          langPath: "/ocr/lang",
-          gzip: false,
-          logger: (event) => {
-            if (event.status === "recognizing text") setProgress(`Lecture de la capture… ${Math.round(event.progress * 100)} %`);
-            else setProgress("Préparation de la lecture sur ton téléphone…");
-          },
-        });
-        const recognized: string[] = [];
-        for (const capture of captures) {
-          let text = (await worker.recognize(await preprocessCapture(capture.file, "standard"))).data.text;
-          // Lecture douteuse (ligne incohérente, champs manquants) : second passage binarisé,
-          // et l'on garde la lecture que l'analyse juge la plus cohérente.
-          if (needsSecondPass(text)) {
-            const retry = (await worker.recognize(await preprocessCapture(capture.file, "binarized"))).data.text;
-            if (captureQuality(retry) > captureQuality(text)) text = retry;
-          }
-          recognized.push(text);
+        setProgress("Préparation de la lecture sur ton téléphone…");
+        const { readCaptureWeb } = await import("@/lib/ocr/engine-web");
+        results = [];
+        for (const [index, capture] of captures.entries()) {
+          setProgress(`Lecture de la capture ${index + 1}/${captures.length}…`);
+          results.push(runPipelineOnOcr(await readCaptureWeb(capture.file)));
         }
-        texts = recognized;
+      } else {
+        results = splitCaptureText(pastedText).map((text) => runPipelineOnOcr(pageFromText(text)));
       }
+      const texts = results.map((result) => result.text);
       // Le type choisi n'est qu'un indice : on suit le vocabulaire des captures.
       const { kind: detected, others } = dominantKind(texts);
       const effectiveKind: CaptureKind = detected ?? kind;
@@ -241,10 +222,12 @@ export function ImportCaptures({
       }
       if (others) notes.push(`${others} capture(s) d'un autre type mise(s) de côté : importe-les séparément.`);
       setNotice(notes.join(" "));
-      const relevant = texts.filter((text) => {
+      const keep = texts.map((text) => {
         const textKind = detectCaptureKind(text);
         return !textKind || textKind === effectiveKind;
       });
+      const relevant = texts.filter((_, index) => keep[index]);
+      const relevantResults = results.filter((_, index) => keep[index]);
 
       if (effectiveKind === "credit") {
         const loans = parseLoanCaptures(relevant);
@@ -280,7 +263,8 @@ export function ImportCaptures({
         return;
       }
       setLoanRows([]);
-      const result = parsePositionText(relevant.join("\n"), effectiveKind);
+      const result = extractionFromPipeline(relevantResults, effectiveKind);
+      setAccountTotal(effectiveKind === "titres" ? relevantResults.find((item) => item.total !== null)?.total ?? null : null);
       setExtraction(result);
       if (result.kind === "titres") {
         const defaultEnvelope: Envelope = result.enveloppe === "CTO" ? "CTO" : "PEA";
@@ -326,7 +310,6 @@ export function ImportCaptures({
         error instanceof Error ? error.message : "Analyse impossible. Réessaie plus tard.",
       );
     } finally {
-      await worker?.terminate();
       setProgress("");
       setBusy(false);
     }
@@ -606,6 +589,7 @@ export function ImportCaptures({
                 </span>
               </div>
               <ImportCaptureReview
+                accountTotal={accountTotal}
                 extraction={extraction}
                 assets={assets}
                 absentAssets={absentAssets}
@@ -689,31 +673,38 @@ async function compressCapture(file: File): Promise<Omit<Capture, "file">> {
   return { name: file.name, dataUrl, size: blob.size };
 }
 
-async function preprocessCapture(file: File, variant: OcrVariant): Promise<HTMLCanvasElement> {
-  let bitmap: ImageBitmap | null = null;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    bitmap = null;
+/** Résultats du pipeline (une capture chacun) → extraction attendue par l'écran de vérification. */
+function extractionFromPipeline(results: PipelineResult[], kind: "titres" | "solde"): ImportExtraction {
+  if (kind === "solde") {
+    const savings = results.find((result) => result.kind === "livret" && result.total !== null) ?? results[0];
+    return {
+      kind: "solde",
+      libelle: savings?.libelle ?? "Livret A",
+      solde: savings?.total ?? null,
+      confiance: savings?.total !== null && savings?.total !== undefined ? 0.85 : 0,
+      avertissements: savings?.warnings ?? ["Solde introuvable."],
+    };
   }
-  const image = bitmap ? null : await loadImage(file);
-  const width = bitmap?.width ?? image?.naturalWidth ?? 0;
-  const height = bitmap?.height ?? image?.naturalHeight ?? 0;
-  if (!width || !height) throw new Error("Cette image ne peut pas être décodée sur cet appareil.");
-  const scale = ocrScale(width, height);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(width * scale));
-  canvas.height = Math.max(1, Math.round(height * scale));
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("Prétraitement indisponible sur cet appareil.");
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  context.drawImage(bitmap ?? image!, 0, 0, canvas.width, canvas.height);
-  bitmap?.close();
-  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-  prepareForOcr({ data: pixels.data, width: canvas.width, height: canvas.height }, variant);
-  context.putImageData(pixels, 0, 0);
-  return canvas;
+  const envelopes = results.map((result) => result.enveloppe).filter(Boolean);
+  const lignes = results.flatMap((result) =>
+    result.positions.map((position) => ({
+      nom: position.nom,
+      isin: position.isin,
+      ticker: null,
+      quantite: position.quantite,
+      pru: position.pru,
+      cours: position.cours,
+      valeur: position.valorisation,
+      devise: "EUR",
+      confiance: position.confiance,
+    })),
+  );
+  return {
+    kind: "titres",
+    enveloppe: envelopes.includes("CTO") && !envelopes.includes("PEA") ? "CTO" : envelopes.length ? "PEA" : "inconnu",
+    lignes,
+    avertissements: lignes.length ? results.flatMap((result) => result.warnings) : ["Aucune ligne de position reconnue. Essaie une capture plus nette, ou « Coller le texte »."],
+  };
 }
 
 /** Pas à pas du raccourci iPhone : la reconnaissance de texte d'Apple, plus précise, sans rien envoyer. */
