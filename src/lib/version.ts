@@ -2,4 +2,4 @@
  * Marqueur de version, affiché dans Profil → Vos données.
  * Témoin de la chaîne dépôt → déploiement → appareil.
  */
-export const BUILD_VERSION = "v47 · 23/11";
+export const BUILD_VERSION = "v48 · 23/11";

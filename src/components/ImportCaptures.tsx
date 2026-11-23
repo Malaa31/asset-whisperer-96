@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Check, ClipboardPaste, FileImage, LoaderCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -29,7 +29,16 @@ import {
 import { useApp, uid } from "@/lib/storage";
 import { parsePositionText } from "@/lib/position-parser";
 import { applyLoanDecisions, matchLoan, parseLoanCaptures } from "@/lib/loan-import";
-import { detectCaptureKind, dominantKind, type CaptureKind } from "@/lib/capture-kind";
+import {
+  CAPTURE_MARKER,
+  captureQuality,
+  detectCaptureKind,
+  dominantKind,
+  needsSecondPass,
+  splitCaptureText,
+  type CaptureKind,
+} from "@/lib/capture-kind";
+import { ocrScale, prepareForOcr, type OcrVariant } from "@/lib/ocr-preprocess";
 import {
   ImportLoanReview,
   isLoanDraftValid,
@@ -38,30 +47,35 @@ import {
 } from "@/components/ImportLoanReview";
 import type { Asset } from "@/lib/types";
 
-const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
 const KIND_LABEL: Record<CaptureKind, string> = {
   titres: "positions de PEA / CTO",
   solde: "solde de livret",
   credit: "fiche de crédit",
 };
-const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 const PRIVACY_NOTE =
   "Tout est analysé sur ton téléphone : la capture n'est envoyée nulle part. Rien n'est enregistré sans ta validation.";
-type Capture = { name: string; dataUrl: string; size: number };
+type Capture = { name: string; dataUrl: string; size: number; file: File };
+const MAX_CAPTURES = 8;
 type SearchHit = { symbol: string; name: string; exchange?: string; type?: string };
 
 export function ImportCaptures({
   open,
   onOpenChange,
+  initialText,
+  onInitialTextConsumed,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Texte reçu du raccourci iPhone (lecture d'Apple), analysé dès l'ouverture. */
+  initialText?: string | null | undefined;
+  onInitialTextConsumed?: (() => void) | undefined;
 }) {
   const { assets, setAssets } = useApp();
   const [kind, setKind] = useState<CaptureKind>("titres");
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [pastedText, setPastedText] = useState("");
   const [inputMode, setInputMode] = useState<"image" | "text">("image");
+  const [autoRun, setAutoRun] = useState(false);
   const [progress, setProgress] = useState("");
   const [extraction, setExtraction] = useState<ImportExtraction | null>(null);
   const [positionRows, setPositionRows] = useState<PositionDraft[]>([]);
@@ -144,8 +158,8 @@ export function ImportCaptures({
   const selectCaptures = async (files: FileList | null) => {
     setMessage("");
     if (!files?.length) return;
-    if (files.length > 4) {
-      setMessage("Choisis au maximum quatre captures.");
+    if (files.length > MAX_CAPTURES) {
+      setMessage(`Choisis au maximum ${MAX_CAPTURES} captures.`);
       return;
     }
     setBusy(true);
@@ -154,13 +168,9 @@ export function ImportCaptures({
       for (const file of Array.from(files)) {
         if (!file.type.startsWith("image/"))
           throw new Error("Un fichier sélectionné n'est pas une image.");
-        const image = await compressCapture(file);
-        if (image.size > MAX_IMAGE_BYTES)
-          throw new Error("Chaque capture doit faire au maximum 2,5 Mo après compression.");
-        compressed.push(image);
-      }
-      if (compressed.reduce((sum, image) => sum + image.size, 0) > MAX_TOTAL_BYTES) {
-        throw new Error("Le poids total des captures ne peut pas dépasser 8 Mo.");
+        // Miniature pour l'aperçu ; la lecture se fait sur l'image d'origine, sans recompression.
+        const preview = await compressCapture(file);
+        compressed.push({ ...preview, file });
       }
       setCaptures(compressed);
     } catch (error) {
@@ -171,13 +181,31 @@ export function ImportCaptures({
     }
   };
 
+  useEffect(() => {
+    if (!open || !initialText) return;
+    setInputMode("text");
+    setPastedText(initialText);
+    setAutoRun(true);
+    onInitialTextConsumed?.();
+  }, [open, initialText, onInitialTextConsumed]);
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text.trim()) setPastedText(text);
+      else setMessage("Le presse-papiers est vide.");
+    } catch {
+      setMessage("Lecture du presse-papiers refusée : colle le texte à la main.");
+    }
+  };
+
   const analyze = async () => {
     if (inputMode === "image" ? !captures.length : !pastedText.trim()) return;
     setBusy(true);
     setMessage("");
     let worker: import("tesseract.js").Worker | null = null;
     try {
-      let texts = [pastedText];
+      let texts = splitCaptureText(pastedText);
       if (inputMode === "image") {
         const { createWorker } = await import("tesseract.js");
         worker = await createWorker("fra+eng", 1, {
@@ -192,9 +220,14 @@ export function ImportCaptures({
         });
         const recognized: string[] = [];
         for (const capture of captures) {
-          const prepared = await preprocessCapture(capture.dataUrl);
-          const result = await worker.recognize(prepared);
-          recognized.push(result.data.text);
+          let text = (await worker.recognize(await preprocessCapture(capture.file, "standard"))).data.text;
+          // Lecture douteuse (ligne incohérente, champs manquants) : second passage binarisé,
+          // et l'on garde la lecture que l'analyse juge la plus cohérente.
+          if (needsSecondPass(text)) {
+            const retry = (await worker.recognize(await preprocessCapture(capture.file, "binarized"))).data.text;
+            if (captureQuality(retry) > captureQuality(text)) text = retry;
+          }
+          recognized.push(text);
         }
         texts = recognized;
       }
@@ -322,6 +355,14 @@ export function ImportCaptures({
       setSearchingId(null);
     }
   };
+
+  useEffect(() => {
+    if (!autoRun || inputMode !== "text" || !pastedText.trim() || busy) return;
+    setAutoRun(false);
+    void analyze();
+    // analyze lit l'état de ce rendu : on ne relance que sur ces dépendances.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, inputMode, pastedText, busy]);
 
   const validateImport = () => {
     if (!validRows || !hasSelectedRows) return;
@@ -469,18 +510,24 @@ export function ImportCaptures({
                 <button type="button" aria-pressed={inputMode === "image"} onClick={() => setInputMode("image")} className={`tap flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold ${inputMode === "image" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}><FileImage className="size-4" aria-hidden="true" /> Choisir des captures</button>
                 <button type="button" aria-pressed={inputMode === "text"} onClick={() => setInputMode("text")} className={`tap flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold ${inputMode === "text" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}><ClipboardPaste className="size-4" aria-hidden="true" /> Coller le texte</button>
               </div>
+              <ShortcutHelp />
               {inputMode === "image" ? (
                 <label className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-primary/50 bg-card px-5 py-8 text-center transition-colors hover:bg-primary/5">
                   <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary"><FileImage className="size-5" aria-hidden="true" /></span>
-                  <span className="text-sm font-semibold">Choisir 1 à 4 captures</span>
-                  <span className="text-xs leading-relaxed text-muted-foreground">Jusqu&apos;à 2,5 Mo par image après compression · 8 Mo au total</span>
+                  <span className="text-sm font-semibold">Choisir 1 à 8 captures</span>
+                  <span className="text-xs leading-relaxed text-muted-foreground">Lues sur ton téléphone, en pleine résolution</span>
                   <input type="file" accept="image/*" multiple className="sr-only" disabled={busy} onChange={(event) => { void selectCaptures(event.currentTarget.files); event.currentTarget.value = ""; }} />
                 </label>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <label htmlFor="position-import-text" className="text-sm font-semibold">Texte de la capture</label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="position-import-text" className="text-sm font-semibold">Texte de la capture</label>
+                    <button type="button" onClick={() => void pasteFromClipboard()} disabled={busy} className="tap flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-primary">
+                      <ClipboardPaste className="size-3.5" aria-hidden="true" /> Coller
+                    </button>
+                  </div>
                   <textarea id="position-import-text" value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={8} disabled={busy} className="w-full resize-y rounded-xl border border-border bg-card px-3 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Colle ici le texte de tes positions, de ton livret ou de ton crédit…" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">Sur iPhone : ouvre la capture dans Photos, maintiens le doigt sur le texte, Tout sélectionner, Copier, puis colle ici.</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">Sur iPhone : ouvre la capture dans Photos, maintiens le doigt sur le texte, Tout sélectionner, Copier, puis colle ici. Plusieurs captures : sépare-les par une ligne « {CAPTURE_MARKER} ».</p>
                 </div>
               )}
               {busy && !extraction && (
@@ -502,7 +549,7 @@ export function ImportCaptures({
                       />
                       <span className="min-w-0 flex-1 truncate text-xs">{capture.name}</span>
                       <span className="shrink-0 num text-[11px] text-muted-foreground">
-                        {formatBytes(capture.size)}
+                        {formatBytes(capture.file.size)}
                       </span>
                     </div>
                   ))}
@@ -604,7 +651,7 @@ export function ImportCaptures({
   );
 }
 
-async function compressCapture(file: File): Promise<Capture> {
+async function compressCapture(file: File): Promise<Omit<Capture, "file">> {
   let bitmap: ImageBitmap | null = null;
   try {
     bitmap = await createImageBitmap(file);
@@ -615,7 +662,7 @@ async function compressCapture(file: File): Promise<Capture> {
   const width = bitmap?.width ?? image?.naturalWidth ?? 0;
   const height = bitmap?.height ?? image?.naturalHeight ?? 0;
   if (!width || !height) throw new Error("Cette image ne peut pas être décodée sur cet appareil.");
-  const scale = Math.min(1, 2000 / Math.max(width, height));
+  const scale = Math.min(1, 600 / Math.max(width, height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(width * scale));
   canvas.height = Math.max(1, Math.round(height * scale));
@@ -642,23 +689,61 @@ async function compressCapture(file: File): Promise<Capture> {
   return { name: file.name, dataUrl, size: blob.size };
 }
 
-async function preprocessCapture(dataUrl: string): Promise<HTMLCanvasElement> {
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const element = new Image();
-    element.onload = () => resolve(element);
-    element.onerror = () => reject(new Error("Cette image ne peut pas être décodée sur cet appareil."));
-    element.src = dataUrl;
-  });
-  const scale = Math.min(image.naturalWidth < 1300 ? 2 : 1, 3000 / image.naturalWidth, 3000 / image.naturalHeight);
+async function preprocessCapture(file: File, variant: OcrVariant): Promise<HTMLCanvasElement> {
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    bitmap = null;
+  }
+  const image = bitmap ? null : await loadImage(file);
+  const width = bitmap?.width ?? image?.naturalWidth ?? 0;
+  const height = bitmap?.height ?? image?.naturalHeight ?? 0;
+  if (!width || !height) throw new Error("Cette image ne peut pas être décodée sur cet appareil.");
+  const scale = ocrScale(width, height);
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const context = canvas.getContext("2d");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("Prétraitement indisponible sur cet appareil.");
-  context.filter = "grayscale(1) contrast(1.35)";
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  context.filter = "none";
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(bitmap ?? image!, 0, 0, canvas.width, canvas.height);
+  bitmap?.close();
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  prepareForOcr({ data: pixels.data, width: canvas.width, height: canvas.height }, variant);
+  context.putImageData(pixels, 0, 0);
   return canvas;
+}
+
+/** Pas à pas du raccourci iPhone : la reconnaissance de texte d'Apple, plus précise, sans rien envoyer. */
+function ShortcutHelp() {
+  const [origin, setOrigin] = useState("https://asset-whisperer-96.vercel.app");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const steps = [
+    "App Raccourcis → « + » → nomme-le « Importer dans Patrimoine ». Dans ⓘ, active « Afficher dans la feuille de partage » (Images).",
+    "Ajoute « Répéter avec chaque élément » sur l'entrée du raccourci.",
+    `Dans la boucle : « Extraire le texte de l'image » (Élément de répétition), puis « Texte » : ${CAPTURE_MARKER}, un retour à la ligne, et la variable « Texte extrait ».`,
+    "Après la boucle : « Combiner le texte » (Résultats de la répétition, avec Nouvelles lignes), puis « Copier dans le presse-papiers ».",
+    `« Encoder en URL » le texte combiné, puis « Ouvrir les URL » avec : ${origin}/patrimoine#import= suivi du texte encodé.`,
+  ];
+  return (
+    <details className="rounded-xl border border-border bg-card px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+      <summary className="cursor-pointer py-1 text-sm font-semibold text-foreground">
+        Raccourci iPhone · lecture d&apos;Apple, plus précise
+      </summary>
+      <ol className="mt-2 flex list-decimal flex-col gap-1.5 pl-4">
+        {steps.map((step) => (
+          <li key={step} className="break-words">{step}</li>
+        ))}
+      </ol>
+      <p className="mt-2">
+        Ensuite : dans Photos, sélectionne tes captures → Partager → « Importer dans Patrimoine ». L&apos;analyse démarre
+        seule. Le texte passe après le « # » de l&apos;adresse, partie jamais envoyée au serveur. Appli installée sur
+        l&apos;écran d&apos;accueil : ouvre-la, choisis « Coller le texte », puis « Coller ».
+      </p>
+    </details>
+  );
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {

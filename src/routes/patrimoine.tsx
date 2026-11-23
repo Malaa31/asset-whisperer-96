@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   ChevronRight,
@@ -53,6 +53,25 @@ function Patrimoine() {
   const [creating, setCreating] = useState(false);
   const [pointing, setPointing] = useState(false);
   const [captureImportOpen, setCaptureImportOpen] = useState(false);
+  const [shortcutText, setShortcutText] = useState<string | null>(null);
+
+  // Raccourci iPhone : le texte lu par Apple arrive après « #import= » (jamais envoyé au serveur).
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.startsWith("#import=")) return;
+    let text = "";
+    try {
+      text = decodeURIComponent(hash.slice("#import=".length));
+    } catch {
+      text = "";
+    }
+    // On retire aussitôt le texte de l'adresse (historique, partage).
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (text.trim()) {
+      setShortcutText(text);
+      setCaptureImportOpen(true);
+    }
+  }, []);
 
   const t = useMemo(() => totals(assets), [assets]);
   const list = assets.filter((a) =>
@@ -269,7 +288,12 @@ function Patrimoine() {
           onClose={() => setAnalyzing(null)}
         />
       )}
-      <ImportCaptures open={captureImportOpen} onOpenChange={setCaptureImportOpen} />
+      <ImportCaptures
+        open={captureImportOpen}
+        onOpenChange={setCaptureImportOpen}
+        initialText={shortcutText}
+        onInitialTextConsumed={() => setShortcutText(null)}
+      />
     </main>
   );
 }
