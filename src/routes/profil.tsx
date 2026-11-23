@@ -22,6 +22,8 @@ import {
 } from "@/lib/types";
 
 import { daysSinceBackup, exportBackup, restoreBackup } from "@/lib/backup";
+import { useVault } from "@/lib/vault-sync";
+import { VaultSection } from "@/components/VaultSection";
 
 export const Route = createFileRoute("/profil")({
   head: () => ({
@@ -43,6 +45,7 @@ export const Route = createFileRoute("/profil")({
 
 function ProfilPage() {
   const { profile, assets, saveProfile, reset } = useApp();
+  const vault = useVault();
   const [importMsg, setImportMsg] = useState("");
   const [editingIncome, setEditingIncome] = useState(false);
   const [notifState, setNotifState] = useState<"granted" | "other">(
@@ -188,7 +191,9 @@ function ProfilPage() {
           <span className="text-[10px] text-muted-foreground">{BUILD_VERSION}</span>
         </div>
         <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-          Tout est stocké sur cet appareil.{" "}
+          {vault.identity
+            ? "Stocké sur cet appareil · copie chiffrée dans ton coffre. "
+            : "Tout est stocké sur cet appareil. "}
           {backupAge === undefined
             ? "Aucune sauvegarde exportée pour l'instant."
             : `Dernier export il y a ${backupAge} jour${backupAge > 1 ? "s" : ""}.`}{" "}
@@ -223,6 +228,8 @@ function ProfilPage() {
           {importMsg && <p className="text-[11px] text-destructive">{importMsg}</p>}
         </div>
       </section>
+
+      <VaultSection />
 
       <button
         type="button"
