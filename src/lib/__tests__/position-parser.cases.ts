@@ -1,0 +1,165 @@
+export const positionParserCases = {
+  peaWithIsinAndHeaders: `Mon PEA\nNom Quantité PRU Cours Valorisation +/- value\nAmundi MSCI World LU1681043599 12\t410,50\t432,10\t5185,20\t+5,27%\nTotal portefeuille 5 185,20`,
+  mobileStack: `Compte titres CTO\nAir Liquide\n10\n142,00 €\n145,00 €\n1450,00 €\nSanofi\n5\n90,00 €\n95,00 €\n475,00 €`,
+  noIsin: `Portefeuille\nApple\n2,5\n180,00 €\n190,00 €\n475,00 €\nMicrosoft\n3\n300,00 €\n310,00 €\n930,00 €\nLiquidités 120,00 €`,
+  livretA: `Livret A\nPlafond 22 950,00 €\nTaux 3,00 %\nSolde\n12345,67 €\nIntérêts acquis 125,00 €`,
+  boursoTable: `Mon PEA\nValeur Quantité PRU Cours Valorisation +/- values\nAMUNDI MSCI WORLD UCITS ETF LU1681043599 38 452,13 € 498,20 € 18 931,60 € +10,19 %\nBNP PARIBAS FR0000131104 25 61,40 € 58,90 € 1 472,50 € -4,07 %\nTotal 20 404,10 €`,
+  tradeRepublicCards: `Portefeuille\nAir Liquide\n12,5 actions\n2 103,75 €\n+4,3 %\nTotalEnergies\n30 actions\n1 812,00 €\n-2,1 %`,
+  livretWithDate: `LIVRET A\nTaux annuel 1,70 %\nPlafond 22 950,00 €\nSolde au 23/11/2026\n8 412,35 €`,
+  livretInline: `Livret A n° 1234\nSolde disponible : 15 300,00 €\nPlafond 22 950 €`,
+  etfNamesWithNumbers: `Mon PEA\nNom Quantité PRU Cours Valorisation\nAMUNDI PEA S&P 500 UCITS ETF FR0013412285 40 30,10 € 35,20 € 1 408,00 €\nLYXOR CAC 40 FR0007052782 10 70,00 € 75,50 € 755,00 €`,
+  mobileDetail: `Air Liquide\nFR0000120073\nQuantité\n12\nPRU 150,00 €\nDernier cours 168,30 €\nValorisation 2 019,60 €\n+/- value latente +219,60 €`,
+  wrappedNames: `Portefeuille\nAMUNDI MSCI WORLD\nUCITS ETF EUR (C)\n5 parts\n500,00 €\n512,40 €\n2 562,00 €\nAmundi CAC 40\n3 parts\n100,00 €\n110,00 €\n330,00 €`,
+  closePruCours: `Portefeuille\nHermès\n60 parts\n1 234,50 €\n1 240,00 €\n74 400,00 €`,
+  // Capture réelle de l'appli Boursorama (PEA), texte tel que lu par l'OCR de l'appli.
+  boursoAppOcr: `13:03 à all > 22:
+< 22 357,47€ eee
+Valeur Montant
+Cours +/- latentes (€)
+Px. revient / Quantité
+
+AMUNDI PEA EMERGENT (MSCI
+
+EMERGING) ESG TRANSITION 2591,61€ >
+
+UCITS ETF
+
+31,61€ +1,98” A 303,03 €
+
+27,91 € / 82
+
+AMUNDI PEA MONDE MSCI 1122440€ >
+
+WORLD UCITS ETF ACC
+
+6,01€ +0,91% A 390,95 €
+
+5,80 € /1867
+
+AMUNDI PEA S&P 500 UCITS 5023,04€ >
+
+ETF ACC
+
+57,08 € +0,94% A 756,43 €
+
+48,48 € / 88
+
+BNP PARIBAS EASY STOXX
+
+EUROPE 600 UCITS ETF 3504,48€ >
+
+CAPITALISATION
+
+20,86€ +0,97% A 134,43 €
+
+20,06 € / 168
+
+CARMAT 1,49€ >
+
+010 € +0,00 * N -330,42 €
+
+2213 € /15
+
+8 e = nf =
+Comptes Ordres Listes Marchés Menu`,
+  // Même écran, ordre de lecture type « Live Text » (colonne de droite après la gauche).
+  boursoAppLiveText: `22 357,47 €
+Valeur
+Cours
+Px. revient / Quantité
+Montant
++/- latentes (€)
+AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF
+31,61 € +1,98 %
+27,91 € / 82
+2 591,61 €
+303,03 €
+AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC
+6,01 € +0,91 %
+5,80 € / 1 867
+11 224,40 €
+390,95 €
+AMUNDI PEA S&P 500 UCITS ETF ACC
+57,08 € +0,94 %
+48,48 € / 88
+5 023,04 €
+756,43 €
+BNP PARIBAS EASY STOXX EUROPE 600 UCITS ETF CAPITALISATION
+20,86 € +0,97 %
+20,06 € / 168
+3 504,48 €
+134,43 €
+CARMAT
+0,10 € +0,00 %
+22,13 € / 15
+1,49 €
+-330,42 €
+Comptes
+Ordres
+Listes
+Marchés
+Menu`,
+  // 2e capture réelle : montant seul entre deux lignes du nom, virgule perdue (« 508640€ »).
+  boursoAppOcr2: `15:49 3 all > GP
+< 22 698,64€ eee
+Valeur Montant
+Cours +/- latentes (€)
+Px. revient / Quantité
+AMUNDI PEA EMERGENT
+(MSCI EMERGING) ESG 2712,97€ >
+TRANSITION UCITS ETF
+33,09€ +6,49% A 424,39 €
+27,91 € / 82
+AMUNDI PEA MONDE MSCI
+11 360,69 €
+WORLD UCITS ETF ACC P
+6,08€ +2,05% A1 527,24 €
+5,80 € /1867
+AMUNDI PEA S&P 500 UCITS 508640€ >
+ETF ACC
+57,80 € +214% A 819,79 €
+48,48 € / 88
+BNP PARIBAS EASY STOXX
+EUROPE 600 UCITS ETF 3524,64€ >
+CAPITALISATION
+20,98€ +1,57% A 154,59 €
+20,06 € / 168
+CARMAT 1,49€ >
+010 € +0,00 * Ny -330,42 €
+2213 € /15
+Plan d’Epargne programmé | a
+8 e Ea M =
+Comptes Ordres Listes Marchés Menu`,
+  // Même écran, flèches collées aux montants comme sur l'iPhone (« A424,39 € », « N-330,42 € »).
+  boursoAppOcr2Stuck: `15:49 3 all > GP
+< 22 698,64€ eee
+Valeur Montant
+Cours +/- latentes (€)
+Px. revient / Quantité
+AMUNDI PEA EMERGENT
+(MSCI EMERGING) ESG 2712,97€ >
+TRANSITION UCITS ETF
+33,09€ +6,49% A424,39 €
+27,91 € / 82
+AMUNDI PEA MONDE MSCI
+11 360,69 €
+WORLD UCITS ETF ACC P
+6,08€ +2,05% A1 527,24 €
+5,80 € /1867
+AMUNDI PEA S&P 500 UCITS 508640€ >
+ETF ACC
+57,80 € +214% A 819,79 €
+48,48 € / 88
+BNP PARIBAS EASY STOXX
+EUROPE 600 UCITS ETF 3524,64€ >
+CAPITALISATION
+20,98€ +1,57% A154,59 €
+20,06 € / 168
+CARMAT 1,49€ >
+010 € +0,00 * N-330,42 €
+2213 € /15
+Plan d’Epargne programmé | a
+8 e Ea M =
+Comptes Ordres Listes Marchés Menu`,
+  ocrNoise: `PEA\nNom Qté PRU Cours Valeur\nAmundi MSCI World LU1681043599 1O\t1O0,OO\t1O2,OO\t1O2O,OO`,
+};
