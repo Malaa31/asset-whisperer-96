@@ -43,8 +43,8 @@ check("variante binarisée : uniquement du noir et du blanc", [...values].every(
 
 console.log("\nSECOND PASSAGE DE L'OCR");
 check("bonne lecture : pas de second passage", !needsSecondPass(positionParserCases.boursoAppOcr) && !needsSecondPass(positionParserCases.boursoAppOcr2));
-const degraded = positionParserCases.boursoAppOcr.replace("1122440€", "1224,40€");
-check("ligne illisible (« 1224,40 € » pour 11 224,40 €) : second passage demandé", needsSecondPass(degraded));
+const degraded = positionParserCases.boursoAppOcr.replace("922590€", "1225,90€");
+check("ligne illisible (« 1225,90 € » pour 9 225,90 €) : second passage demandé", needsSecondPass(degraded));
 check("la meilleure lecture l'emporte", captureQuality(positionParserCases.boursoAppOcr) > captureQuality(degraded));
 check("livret lu : pas de second passage", !needsSecondPass(positionParserCases.livretA));
 
@@ -52,23 +52,23 @@ console.log("\nTEXTE ENVOYÉ PAR LE RACCOURCI IPHONE");
 check("sans séparateur : une seule capture", splitCaptureText("Livret A\nSolde 12,00 €").length === 1);
 const shortcut = [positionParserCases.boursoAppLiveText, positionParserCases.livretA].map((text) => `${CAPTURE_MARKER}\n${text}`).join("\n");
 const parts = splitCaptureText(shortcut);
-check("séparateur « === capture === » : une entrée par capture", parts.length === 2 && parts[0]!.startsWith("22 357,47 €") && parts[1]!.startsWith("Livret A"));
+check("séparateur « === capture === » : une entrée par capture", parts.length === 2 && parts[0]!.startsWith("18 169,58 €") && parts[1]!.startsWith("Livret A"));
 check("séparateur tolérant (espaces, casse)", splitCaptureText("A\n  ==  Capture ==  \nB").length === 2);
 const loans = `${CAPTURE_MARKER}
-Montant de votre prêt 117 000,00 €
-Capital restant dû 88 523,83 €
-Taux 1,30 %
+Montant de votre prêt 131 500,00 €
+Capital restant dû 91 466,66 €
+Taux 1,15 %
 Durée 300 mois
-Date d'échéance 04/01/2045
+Date d'échéance 04/02/2046
 ${CAPTURE_MARKER}
-Montant de l'amortissement 690,65 €
-Capital amorti 594,75 €
-Intérêts dus 95,90 €
+Montant de l'amortissement 687,52 €
+Capital amorti 599,86 €
+Intérêts dus 87,66 €
 Assurance due 0,00 €
-Capital restant dû après amortissement 87 929,08 €
+Capital restant dû après amortissement 90 866,80 €
 Date du prochain amortissement 04/12/2026`;
 const merged = parseLoanCaptures(splitCaptureText(loans), new Date(2026, 10, 23, 15, 40)).prets;
-check("deux captures d'un même crédit reçues du raccourci : fusionnées", merged.length === 1 && merged[0]?.captures === 2 && merged[0]?.mensualite === 690.65 && merged[0]?.refDate === "2026-11");
+check("deux captures d'un même crédit reçues du raccourci : fusionnées", merged.length === 1 && merged[0]?.captures === 2 && merged[0]?.mensualite === 687.52 && merged[0]?.refDate === "2026-11");
 
 console.log(failures ? `\n${failures} test(s) en échec` : "\nTous les tests passent");
 if (failures) process.exitCode = 1;

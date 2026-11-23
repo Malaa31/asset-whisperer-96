@@ -12,7 +12,7 @@ import type { ImportExtraction, PositionLine } from "./import-positions";
  *
  * L'OCR est imparfait : les espaces servent à la fois de séparateur de
  * milliers et de colonnes, la virgule décimale disparaît parfois
- * (« 1122440€ » pour 11 224,40 €), le % devient ” ou *. Chaque nombre
+ * (« 922590€ » pour 9 225,90 €), le % devient ” ou *. Chaque nombre
  * ambigu est donc lu de toutes les façons plausibles et l'on garde la
  * lecture qui vérifie quantité × cours ≈ valeur, puis
  * (cours − PRU) × quantité ≈ plus-value quand elle est affichée.
@@ -23,7 +23,7 @@ const DATE_RE = /\b\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?\b|\b\d{1,2}[:h]\d{2}\b/g
 // \b ne connaît pas les lettres accentuées : on utilise des bornes explicites.
 const END = "(?![0-9A-Za-zÀ-ÿ])";
 const SUMMARY_RE = new RegExp(
-  `(?<![A-Za-zÀ-ÿ])(?:total|sous-total|solde esp[eè]ces|esp[eè]ces|liquidit[eé]s?|plus.?values? latentes? totales?|valorisation totale|plafond|frais)${END}`,
+  `(?<![A-Za-zÀ-ÿ])(?:total|sous-total|solde esp[eè]ces|esp[eè]ces|liquidit[eé]s?|plus.?values? latentes? totales?|valorisation totale|valeur totale|valeur du portefeuille|total(?:e|isé)?|portef[a-z]{0,2}u[i1l]{1,2}e|plafond|frais)${END}`,
   "i",
 );
 const UI_NOISE_RE =
@@ -88,8 +88,12 @@ export function parsePositionText(text: string, kind: "titres" | "solde"): Impor
   const candidates: ParseResult[] = [parseLines(lines, -1, [])];
   const headerIndex = lines.findIndex(isHeaderLine);
   if (headerIndex >= 0) {
-    const columns = headerColumns(lines[headerIndex]!).filter((column) => column !== "variation") as Field[];
-    if (columns.length >= 2) candidates.push(parseLines(lines, headerIndex, columns));
+    // On garde la place des colonnes de variation pour aligner les nombres, sans lire leur valeur.
+    const columns = headerColumns(lines[headerIndex]!);
+    if (columns.filter((column) => column !== "variation").length >= 2) {
+      candidates.push(parseLines(lines, headerIndex, columns));
+      candidates.push(parseTable(lines, headerIndex, columns));
+    }
   }
   const quality = (result: ParseResult) =>
     result.positions.length * 10 + result.positions.reduce((sum, line) => sum + line.confiance, 0);
@@ -108,7 +112,7 @@ export function parsePositionText(text: string, kind: "titres" | "solde"): Impor
   };
 }
 
-function parseLines(lines: string[], headerIndex: number, numericColumns: Field[]): ParseResult {
+function parseLines(lines: string[], headerIndex: number, numericColumns: Column[]): ParseResult {
   const positions: PositionLine[] = [];
   const warnings: string[] = [];
   let name = "";
@@ -126,7 +130,16 @@ function parseLines(lines: string[], headerIndex: number, numericColumns: Field[
       const best: Mapped = (hasNumbers ? bestInterpretation(chunks, numericColumns) : null) ?? emptyMapped();
       if (hasLabels) {
         // Un champ étiqueté (« Quantité 12 ») est plus sûr qu'une colonne devinée.
+        const fromChunks = best.values;
         best.values = { ...best.values, ...labeled };
+        // Quantité et cours étiquetés : un montant non étiqueté égal à leur produit est la valorisation.
+        if (labeled.quantite && labeled.cours && labeled.valeur === undefined) {
+          const target = labeled.quantite * labeled.cours;
+          const amounts = chunks.flatMap((chunk) => chunkReadings(chunk).flatMap((reading) => reading.tokens)).filter((token) => token.kind === "money" || token.kind === "plain");
+          const hit = amounts.find((token) => Math.abs(token.value - target) / Math.max(target, 0.01) <= 0.02);
+          if (hit) best.values.valeur = hit.value;
+          else if (fromChunks.valeur === labeled.quantite) delete best.values.valeur;
+        }
         if (!("cours" in labeled) && best.computedCours) delete best.values.cours;
         best.computedCours = false;
         completeCours(best);
@@ -232,7 +245,7 @@ function parseLines(lines: string[], headerIndex: number, numericColumns: Field[
     if (
       lineName &&
       !lineIsin &&
-      !numericColumns.length &&
+      (!numericColumns.length || nameOpen) &&
       lineChunks.length === 1 &&
       only &&
       only.suffix === null &&
@@ -264,7 +277,7 @@ function parseLines(lines: string[], headerIndex: number, numericColumns: Field[
       }
     } else {
       if (lineIsin && !isin) isin = lineIsin;
-      // Le montant seul sur une ligne au milieu du nom (« AMUNDI PEA MONDE MSCI » / « 11 360,69 € » /
+      // Le montant seul sur une ligne au milieu du nom (« AMUNDI PEA MONDE MSCI » / « 9 348,30 € » /
       // « WORLD UCITS ETF ACC ») ne clôt pas le nom ; tout autre chiffre, si.
       const amountInsideName =
         nameOpen &&
@@ -286,6 +299,64 @@ function parseLines(lines: string[], headerIndex: number, numericColumns: Field[
   return { positions, warnings };
 }
 
+/**
+ * Lecture d'un tableau à en-têtes : une position commence à la ligne qui porte ses nombres ;
+ * les lignes de texte qui suivent (suite d'un nom tronqué, ISIN) lui appartiennent.
+ */
+function parseTable(lines: string[], headerIndex: number, columns: Column[]): ParseResult {
+  const positions: PositionLine[] = [];
+  const warnings: string[] = [];
+  const needed = Math.max(2, columns.filter((column) => column !== "variation").length - 1);
+  let current: { name: string; isin: string | null; chunks: Chunk[] } | null = null;
+
+  const flush = () => {
+    if (!current) return;
+    const best = bestInterpretation(current.chunks, columns);
+    const name = current.name.trim();
+    if (best && name && best.values.quantite != null && best.values.valeur != null) {
+      positions.push({
+        nom: name,
+        isin: current.isin,
+        ticker: null,
+        quantite: best.values.quantite,
+        pru: best.values.pru ?? null,
+        cours: best.values.cours ?? null,
+        valeur: best.values.valeur,
+        devise: "EUR",
+        confiance: Math.min(0.98, 0.55 + (current.isin ? 0.25 : 0) + (best.consistent ? 0.18 : 0)),
+      });
+    } else if (name && current.chunks.length) {
+      warnings.push(`${name} : chiffres illisibles ou incohérents, ligne non importée.`);
+    }
+    current = null;
+  };
+
+  lines.forEach((rawLine, index) => {
+    if (index <= headerIndex) return;
+    if (SUMMARY_RE.test(rawLine)) {
+      flush();
+      return;
+    }
+    const lineIsin = [...rawLine.matchAll(ISIN_RE)].map((match) => match[0]).find(isValidIsin) ?? null;
+    const isinAt = lineIsin ? rawLine.indexOf(lineIsin) : -1;
+    const namePrefix = isinAt > 0 ? rawLine.slice(0, isinAt) : "";
+    const numericPart = (isinAt >= 0 ? rawLine.slice(isinAt + 12) : rawLine).replace(DATE_RE, " ");
+    const { chunks, rest } = extractChunks(numericPart);
+    const name = cleanName(`${namePrefix} ${rest}`);
+    const cells = chunks.filter((chunk) => chunk.suffix !== "pct").length;
+    if (cells >= needed) {
+      flush();
+      current = { name, isin: lineIsin, chunks };
+      return;
+    }
+    if (!current) return;
+    if (lineIsin && !current.isin) current.isin = lineIsin;
+    if (name && current.name.length + name.length < MAX_NAME_LENGTH) current.name = `${current.name} ${name}`;
+  });
+  flush();
+  return { positions, warnings };
+}
+
 function emptyMapped(): Mapped {
   return { values: {}, score: 0, consistent: false, computedCours: false, pvMatched: false, unitQuantity: false };
 }
@@ -294,7 +365,9 @@ function emptyMapped(): Mapped {
 function hasQuantityAndAmount(chunks: Chunk[]): boolean {
   const plain = chunks.some((chunk) => !chunk.signed && (chunk.suffix === "qty" || chunk.suffix === null));
   const money = chunks.some((chunk) => !chunk.signed && chunk.suffix === "money");
-  return plain && money;
+  // Ligne de tableau sans unités : trois nombres ou plus forment déjà une position complète.
+  const unsigned = chunks.filter((chunk) => !chunk.signed && chunk.suffix !== "pct").length;
+  return (plain && money) || unsigned >= 3;
 }
 
 // --- Découpage des nombres -------------------------------------------------
@@ -310,7 +383,7 @@ function extractChunks(line: string): { chunks: Chunk[]; rest: string } {
     let end = start + raw.length;
     const after = line.slice(end);
     // Un nombre collé à des lettres (ex. « S&P500 », « 2x ») fait partie du nom…
-    // sauf une flèche lue comme une lettre isolée devant un montant (« A424,39 € », « N-330,42 € »).
+    // sauf une flèche lue comme une lettre isolée devant un montant (« A518,40 € », « N-222,24 € »).
     const before = line[start - 1] ?? " ";
     const isolatedLetter = /^\s?$/.test(line[start - 2] ?? "") && /[A-Za-z]/.test(before);
     const moneyAfter = /^\s*(?:€|eur\b)/i.test(after);
@@ -331,7 +404,7 @@ function extractChunks(line: string): { chunks: Chunk[]; rest: string } {
     const nextWord = /^\s+([^\s]+)/.exec(after)?.[1] ?? "";
     if (
       suffix === null &&
-      /^\d{1,4}$/.test(raw) &&
+      /^\d[\dOIlS]{0,3}$/.test(raw) &&
       /^[A-Za-zÀ-ÿ&'().-]*[A-Za-zÀ-ÿ]{2,}[A-Za-zÀ-ÿ&'().-]*$/.test(nextWord) &&
       !UNIT_RE.test(nextWord) &&
       !/^eur$/i.test(nextWord)
@@ -361,7 +434,7 @@ function chunkReadings(chunk: Chunk): Reading[] {
     // Variation ou plus-value : un seul nombre, jamais découpé.
     const value = toNumber(chunk.groups.join(""));
     if (value === null) return [];
-    const kind: Token["kind"] = chunk.suffix === "money" ? "delta" : "pct";
+    const kind: Token["kind"] = chunk.suffix === "pct" ? "pct" : "delta";
     readings.push({ tokens: [{ value: chunk.sign * value, kind }], penalty: 0 });
     if (kind === "delta" && !/[.,]/.test(chunk.groups.join("")) && value >= 100) {
       readings.push({ tokens: [{ value: (chunk.sign * value) / 100, kind }], penalty: 0.3 });
@@ -395,7 +468,7 @@ function chunkReadings(chunk: Chunk): Reading[] {
     const leadingZero = /^0\d/.test(last);
     readings.push({ tokens, penalty: splits * 0.5 + (leadingZero ? 3 : 0) });
     if (missingComma) {
-      // « 1122440€ » = 11 224,40 € ; « 010 € » = 0,10 €.
+      // « 922590€ » = 9 225,90 € ; « 010 € » = 0,10 €.
       readings.push({
         tokens: [...tokens.slice(0, -1), { value: lastToken.value / 100, kind: "money" }],
         penalty: splits * 0.5 + 0.7,
@@ -405,7 +478,7 @@ function chunkReadings(chunk: Chunk): Reading[] {
   return readings;
 }
 
-function bestInterpretation(chunks: Chunk[], columns: Field[]): Mapped | null {
+function bestInterpretation(chunks: Chunk[], columns: Column[]): Mapped | null {
   const options = chunks.map(chunkReadings).filter((list) => list.length);
   if (!options.length) return null;
   let best: Mapped | null = null;
@@ -429,22 +502,26 @@ function bestInterpretation(chunks: Chunk[], columns: Field[]): Mapped | null {
   return best;
 }
 
-function mapTokens(tokens: Token[], columns: Field[]): Mapped | null {
+function mapTokens(tokens: Token[], columns: Column[]): Mapped | null {
   const numbers = tokens.filter((token) => token.kind === "money" || token.kind === "plain" || token.kind === "qty");
   const deltas = tokens.filter((token) => token.kind === "delta");
   if (!numbers.length) return null;
 
   if (columns.length) {
+    // Tableau : chaque nombre (montants signés compris) occupe sa colonne, dans l'ordre.
+    const cells = tokens.filter((token) => token.kind !== "pct");
     const values: Partial<Record<Field, number>> = {};
     columns.forEach((column, i) => {
-      const token = numbers[i];
-      if (token) values[column] = token.value;
+      const token = cells[i];
+      if (token && column !== "variation") values[column] = Math.abs(token.value);
     });
-    let score = numbers.length === columns.length ? 4 : -2 * Math.abs(numbers.length - columns.length);
+    const expectedCells = columns.length;
+    const missingVariation = cells.length === expectedCells - columns.filter((column) => column === "variation").length;
+    let score = cells.length === expectedCells || missingVariation ? 4 : -2 * Math.abs(cells.length - expectedCells);
     const consistent = isConsistent(values);
     if (consistent) score += 6;
     // Une quantité porte rarement le symbole €.
-    if (values.quantite != null && numbers[columns.indexOf("quantite")]?.kind === "money") score -= 1;
+    if (values.quantite != null && cells[columns.indexOf("quantite")]?.kind === "money") score -= 1;
     return completeCours({ ...emptyMapped(), values, score, consistent });
   }
 
@@ -482,7 +559,9 @@ function mapTokens(tokens: Token[], columns: Field[]): Mapped | null {
   if (bestTriplet) return bestTriplet;
 
   const quantity = numbers.find((token) => token.kind === "qty") ?? numbers.find((token) => token.kind === "plain");
-  const money = numbers.filter((token) => token !== quantity);
+  // Quantité avec son unité et montants en € : un chiffre nu isolé est du bruit (flèche lue « 7 »).
+  const hasMoney = numbers.some((token) => token.kind === "money");
+  const money = numbers.filter((token) => token !== quantity && (quantity?.kind !== "qty" || !hasMoney || token.kind === "money"));
   const values: Partial<Record<Field, number>> = {};
   if (quantity) values.quantite = quantity.value;
   if (money.length === 1) values.valeur = money[0]!.value;
@@ -553,9 +632,9 @@ const word = (source: string) => new RegExp(`(?<![A-Za-zÀ-ÿ])(?:${source})${EN
 const HEADER_SPECS: Array<[Column, RegExp]> = [
   ["quantite", word("qt[eé]s?|quantit[eé]s?|nb|nombre")],
   ["pru", word("pru|px\\.? ?(?:de )?revient|prix de revient|prix moyen|pam")],
-  ["cours", word("dernier cours|cours|dernier|prix actuel")],
-  ["valeur", word("valorisation|montant|valeur")],
-  ["variation", /(?:\+\s*\/\s*-|plus.?values?|moins.?values?|variation|perf|gains?|\bpv\b)/i],
+  ["cours", word("dernier cours|cours|dernier|prix actuel|prix(?! de revient| moyen| d.achat)")],
+  ["valeur", word("valorisation|montant|valeur|valo")],
+  ["variation", /(?:\+\s*[\/lI|]\s*-|plus.?values?|moins.?values?|variation|perf|gains?|\bpv\b|\bp\/l\b)/i],
 ];
 const HEADER_FILLER_RE =
   /(?<![A-Za-zÀ-ÿ])(?:px|prix|revient|latentes?|unitaire|actuel(?:le)?|moyen|values?|eur|euros?|de|du|des|la|le|en|par|achat)(?![A-Za-zÀ-ÿ])/gi;
@@ -652,22 +731,42 @@ export function isValidIsin(isin: string): boolean {
 
 function parseSavings(lines: string[]): Extract<ImportExtraction, { kind: "solde" }> {
   const label = lines.find((line) => /livret\s*a\b/i.test(line)) ?? lines.find((line) => /livret|ldds|lep/i.test(line)) ?? "Livret A";
+  const libelleOf = (line: string) => (/livret\s*a\b/i.test(line) ? "Livret A" : /ldds/i.test(line) ? "LDDS" : /\blep\b/i.test(line) ? "LEP" : cleanName(line));
   const excluded = /plafond|taux|int[eé]r[eê]ts?|versement|retrait/i;
   const amountsOf = (line: string): number[] => {
+    // Numéro de compte (« N° 88498820220 ») : jamais un solde.
+    if (/\bn[°o]\s?\d|num[ée]ro|^n°/i.test(line)) return [];
     const { chunks } = extractChunks(line.replace(DATE_RE, " "));
-    // Sur un écran de livret, un groupe de chiffres est toujours un seul montant.
+    // Sur un écran de livret, un groupe de chiffres est toujours un seul montant, en euros ou avec décimales.
     return chunks
       .filter((chunk) => chunk.suffix !== "pct" && !chunk.signed)
+      .filter((chunk) => chunk.suffix === "money" || /[.,]\d{2}$/.test(chunk.groups.join("")))
       .map((chunk) => toNumber(chunk.groups.join("")))
       .filter((value): value is number => value !== null);
   };
 
   let solde: number | null = null;
   let confiance = 0;
+  // Écran listant plusieurs comptes : le montant sur la ligne du Livret A, ou juste en dessous.
+  const accountRe = /livret\s*a\b|\bldds\b|\blep\b|compte\s*(?:de\s*d[ée]p[ôo]t|courant|ch[èe]que)|livret\s*jeune|\bpel\b|\bcel\b/i;
+  const accounts = lines.filter((line) => accountRe.test(line));
+  if (accounts.length >= 2) {
+    const index = lines.findIndex((line) => /livret\s*a\b/i.test(line));
+    for (let j = index; index >= 0 && j < lines.length && j <= index + 2; j++) {
+      if (j > index && accountRe.test(lines[j]!)) break;
+      const amounts = amountsOf(lines[j]!.replace(/livret\s*a\b/i, ""));
+      if (amounts.length) {
+        solde = amounts[0]!;
+        confiance = 0.85;
+        break;
+      }
+    }
+  }
+  const soldeLabel = /\bsolde|montant disponible|(?<![ée]pargne\s?)disponible\b|\bencours\b/i;
   for (let i = 0; i < lines.length && solde === null; i++) {
     const line = lines[i]!;
-    if (!/\b(?:solde|montant disponible|disponible|encours)\b/i.test(line) || excluded.test(line)) continue;
-    const inline = amountsOf(line.replace(/.*?\b(?:solde|montant disponible|disponible|encours)\b/i, ""));
+    if (!soldeLabel.test(line) || excluded.test(line) || /[ée]pargne\s?disponible/i.test(line)) continue;
+    const inline = amountsOf(line.replace(new RegExp(`.*?(?:${soldeLabel.source})(?:\\s?au\\s?[\\d/.]+)?`, "i"), ""));
     if (inline.length) {
       solde = inline[0]!;
       confiance = 0.95;
@@ -697,7 +796,7 @@ function parseSavings(lines: string[]): Extract<ImportExtraction, { kind: "solde
   }
   return {
     kind: "solde",
-    libelle: cleanName(label) || "Livret A",
+    libelle: libelleOf(label) || "Livret A",
     solde,
     confiance,
     avertissements: solde === null ? ["Solde introuvable : vérifie le texte collé."] : [],

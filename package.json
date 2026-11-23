@@ -9,7 +9,12 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "corpus:generate": "tsx scripts/ocr/corpus/generate.ts",
+    "eval:ocr": "tsx scripts/ocr/evaluate.ts",
+    "fixture:real": "tsx scripts/ocr/real-fixture.ts",
+    "test:ocr": "vitest run --config vitest.ocr.config.ts",
+    "e2e:ocr": "tsx scripts/ocr/e2e-web.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -52,6 +57,8 @@
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
+    "onnxruntime-web": "1.23.2",
+    "ppu-paddle-ocr": "6.7.1",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.0",
@@ -61,7 +68,6 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
-    "tesseract.js": "^7.0.0",
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
@@ -81,10 +87,14 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "nitro": "3.0.260603-beta",
+    "onnxruntime-node": "1.23.2",
+    "playwright-core": "1.56.1",
     "prettier": "^3.7.3",
+    "tsx": "4.20.6",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.73.0",
-    "vite": "^8.3.8"
+    "vite": "^8.3.8",
+    "vitest": "5.1.1"
   },
   "overrides": {
     "brace-expansion@^1.1.7": "1.1.21",

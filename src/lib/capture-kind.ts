@@ -9,7 +9,7 @@ const SIGNALS: Record<CaptureKind, RegExp[]> = {
     /\bplus values?\b/, /\blatentes?\b/, /\bucits\b/, /\betf\b/, /\bpea\b/, /\bcto\b/, /\bcompte titres?\b/,
     /\bportefeuille\b/, /\bactions\b/, /\bparts\b/,
   ],
-  solde: [/\blivret\b/, /\bldds\b/, /\blep\b/, /\bplafond\b/, /\binterets acquis\b/, /\bepargne\b/, /\bsolde\b/],
+  solde: [/\blivret ?a?\b/, /\bldds\b/, /\blep\b/, /\bplafond\b/, /\binterets acquis\b/, /\bepargne\b/, /\bsolde\b/, /\bremuneration\b/],
   credit: [
     /\bpret\b/, /\bcredit\b/, /\bcapital restant\b/, /\bmensualite\b/, /\becheances?\b/, /\bamortissements?\b/,
     /\bduree\b/, /\bemprunte\b/, /\btaeg\b/, /\bptz\b/, /\bremboursements?\b/, /\btaux\b/,
@@ -20,9 +20,13 @@ const ISIN_RE = /\b[A-Z]{2}[A-Z0-9]{9}\d\b/;
 /** Devine le type d'une capture d'après son vocabulaire. `null` si rien de net. */
 export function detectCaptureKind(text: string): CaptureKind | null {
   const normalized = ` ${normalizeLabel(text)} `;
+  // Mots collés par l'OCR (« Plafondréglementaire », « Soldeau ») : on teste aussi sans espaces.
+  const compact = normalized.replace(/ /g, "");
+  const hit = (pattern: RegExp) =>
+    pattern.test(normalized) || new RegExp(pattern.source.replace(/\\b/g, "").replace(/ \??/g, ""), pattern.flags).test(compact);
   const scores = (Object.keys(SIGNALS) as CaptureKind[]).map((kind) => ({
     kind,
-    score: SIGNALS[kind].filter((pattern) => pattern.test(normalized)).length + (kind === "titres" && ISIN_RE.test(text) ? 2 : 0),
+    score: SIGNALS[kind].filter(hit).length + (kind === "titres" && ISIN_RE.test(text) ? 2 : 0),
   }));
   scores.sort((a, b) => b.score - a.score);
   const [first, second] = scores;

@@ -14,7 +14,7 @@ export interface PixelImage {
   height: number;
 }
 
-export type OcrVariant = "standard" | "binarized";
+export type OcrVariant = "standard" | "binarized" | "gray";
 
 const MAX_PIXELS = 8_000_000;
 
@@ -34,6 +34,16 @@ export function ocrScale(width: number, height: number): number {
 export function prepareForOcr(image: PixelImage, variant: OcrVariant = "standard"): { inverted: boolean } {
   const { data, width, height } = image;
   const count = width * height;
+  if (variant === "gray") {
+    // Niveaux de gris seuls : mesuré meilleur pour PaddleOCR (les grands chiffres gras restent lisibles).
+    for (let p = 0; p < count * 4; p += 4) {
+      const value = Math.round(0.299 * data[p]! + 0.587 * data[p + 1]! + 0.114 * data[p + 2]!);
+      data[p] = value;
+      data[p + 1] = value;
+      data[p + 2] = value;
+    }
+    return { inverted: false };
+  }
   const gray = new Uint8Array(count);
   const histogram = new Uint32Array(256);
   for (let i = 0, p = 0; i < count; i++, p += 4) {

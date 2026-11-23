@@ -30,3 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# OCR : données réelles et artefacts générés (jamais dans le dépôt)
+fixtures/real/
+fixtures/synthetic/
+.cache/ocr/
+reports/ocr/
