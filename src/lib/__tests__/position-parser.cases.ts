@@ -99,5 +99,67 @@ Ordres
 Listes
 Marchés
 Menu`,
+  // 2e capture réelle : montant seul entre deux lignes du nom, virgule perdue (« 508640€ »).
+  boursoAppOcr2: `15:49 3 all > GP
+< 22 698,64€ eee
+Valeur Montant
+Cours +/- latentes (€)
+Px. revient / Quantité
+AMUNDI PEA EMERGENT
+(MSCI EMERGING) ESG 2712,97€ >
+TRANSITION UCITS ETF
+33,09€ +6,49% A 424,39 €
+27,91 € / 82
+AMUNDI PEA MONDE MSCI
+11 360,69 €
+WORLD UCITS ETF ACC P
+6,08€ +2,05% A1 527,24 €
+5,80 € /1867
+AMUNDI PEA S&P 500 UCITS 508640€ >
+ETF ACC
+57,80 € +214% A 819,79 €
+48,48 € / 88
+BNP PARIBAS EASY STOXX
+EUROPE 600 UCITS ETF 3524,64€ >
+CAPITALISATION
+20,98€ +1,57% A 154,59 €
+20,06 € / 168
+CARMAT 1,49€ >
+010 € +0,00 * Ny -330,42 €
+2213 € /15
+Plan d’Epargne programmé | a
+8 e Ea M =
+Comptes Ordres Listes Marchés Menu`,
+  // Même écran, flèches collées aux montants comme sur l'iPhone (« A424,39 € », « N-330,42 € »).
+  boursoAppOcr2Stuck: `15:49 3 all > GP
+< 22 698,64€ eee
+Valeur Montant
+Cours +/- latentes (€)
+Px. revient / Quantité
+AMUNDI PEA EMERGENT
+(MSCI EMERGING) ESG 2712,97€ >
+TRANSITION UCITS ETF
+33,09€ +6,49% A424,39 €
+27,91 € / 82
+AMUNDI PEA MONDE MSCI
+11 360,69 €
+WORLD UCITS ETF ACC P
+6,08€ +2,05% A1 527,24 €
+5,80 € /1867
+AMUNDI PEA S&P 500 UCITS 508640€ >
+ETF ACC
+57,80 € +214% A 819,79 €
+48,48 € / 88
+BNP PARIBAS EASY STOXX
+EUROPE 600 UCITS ETF 3524,64€ >
+CAPITALISATION
+20,98€ +1,57% A154,59 €
+20,06 € / 168
+CARMAT 1,49€ >
+010 € +0,00 * N-330,42 €
+2213 € /15
+Plan d’Epargne programmé | a
+8 e Ea M =
+Comptes Ordres Listes Marchés Menu`,
   ocrNoise: `PEA\nNom Qté PRU Cours Valeur\nAmundi MSCI World LU1681043599 1O\t1O0,OO\t1O2,OO\t1O2O,OO`,
 };

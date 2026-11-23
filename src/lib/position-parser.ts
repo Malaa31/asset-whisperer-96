@@ -196,6 +196,15 @@ function parseLines(lines: string[], headerIndex: number, numericColumns: Field[
     const extracted = extractChunks(numericPart);
     let lineChunks = extracted.chunks;
     let lineName = cleanName(`${namePrefix} ${extracted.rest}`);
+    // Flèches et pictos lus comme des lettres (« A », « Ny ») sur une ligne de chiffres : pas un nom.
+    if (
+      lineName &&
+      !lineIsin &&
+      lineChunks.length >= 2 &&
+      lineName.split(" ").every((word) => word.replace(/[^A-Za-zÀ-ÿ]/g, "").length <= 2)
+    ) {
+      lineName = "";
+    }
 
     // Champ étiqueté : « Quantité 12 », « PRU 410,50 € », ou l'étiquette seule puis la valeur.
     const label = lineIsin ? null : labelOf(extracted.rest.replace(/[|•·€%:]/g, " ").replace(/\s+/g, " ").trim());
@@ -255,7 +264,15 @@ function parseLines(lines: string[], headerIndex: number, numericColumns: Field[
       }
     } else {
       if (lineIsin && !isin) isin = lineIsin;
-      if (lineChunks.length) nameOpen = false;
+      // Le montant seul sur une ligne au milieu du nom (« AMUNDI PEA MONDE MSCI » / « 11 360,69 € » /
+      // « WORLD UCITS ETF ACC ») ne clôt pas le nom ; tout autre chiffre, si.
+      const amountInsideName =
+        nameOpen &&
+        !chunks.length &&
+        lineChunks.length === 1 &&
+        lineChunks[0]!.suffix === "money" &&
+        !lineChunks[0]!.signed;
+      if (lineChunks.length && !amountInsideName) nameOpen = false;
     }
     chunks.push(...lineChunks);
 
@@ -289,12 +306,15 @@ function extractChunks(line: string): { chunks: Chunk[]; rest: string } {
   NUMBER_RE.lastIndex = 0;
   for (let match = NUMBER_RE.exec(line); match; match = NUMBER_RE.exec(line)) {
     const start = match.index;
-    // Un nombre collé à des lettres (ex. « S&P500 », « 2x ») fait partie du nom.
-    const before = line[start - 1] ?? " ";
-    if (/[A-Za-zÀ-ÿ]/.test(before)) continue;
     let raw = match[0];
     let end = start + raw.length;
     const after = line.slice(end);
+    // Un nombre collé à des lettres (ex. « S&P500 », « 2x ») fait partie du nom…
+    // sauf une flèche lue comme une lettre isolée devant un montant (« A424,39 € », « N-330,42 € »).
+    const before = line[start - 1] ?? " ";
+    const isolatedLetter = /^\s?$/.test(line[start - 2] ?? "") && /[A-Za-z]/.test(before);
+    const moneyAfter = /^\s*(?:€|eur\b)/i.test(after);
+    if (/[A-Za-zÀ-ÿ]/.test(before) && !(isolatedLetter && moneyAfter)) continue;
     if (/^[A-Za-zÀ-ÿ]/.test(after) && !UNIT_RE.test(after) && !SUFFIX_RE.test(after)) continue;
 
     let suffix: Chunk["suffix"] = null;
@@ -603,7 +623,7 @@ function headerColumns(header: string): Column[] {
 /** Nom nettoyé, ou chaîne vide si ce n'est que du bruit (flèches lues « A », chevrons, guillemets…). */
 function cleanName(value: string): string {
   const name = value
-    .replace(/[|•·€%<>›»”“"*°]/g, " ")
+    .replace(/[|•·€%<>›»”“"*°?!]/g, " ")
     .replace(UNIT_RE, " ")
     .replace(/\s+/g, " ")
     .replace(/^[\s:–+\-/]+|[\s:–+\-/]+$/g, "")
