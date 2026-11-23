@@ -1,4 +1,5 @@
 import type { Asset } from "./types";
+import { isAutomaticLoan, remainingCapital } from "./loans";
 
 export function n(v: unknown): number {
   const x = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
@@ -17,7 +18,7 @@ export function assetValue(a: Asset): number {
     case "crypto":
       return n(d["quantity"]) * n(d["prixUnitaire"]);
     case "credit":
-      return -n(d["capitalRestant"]);
+      return isAutomaticLoan(d) ? -remainingCapital(d) : -n(d["capitalRestant"]);
     default:
       return n(d["amount"]);
   }

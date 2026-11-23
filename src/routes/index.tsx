@@ -1,20 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, RefreshCw, TrendingUp } from "lucide-react";
+import { BellRing, CalendarCheck, Check, ChevronRight, Eye, EyeOff, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/lib/storage";
+import type { HistoryPoint } from "@/lib/storage";
 import { totals } from "@/lib/calc";
 import { profileGoals } from "@/lib/goals";
 import { daysSinceBackup } from "@/lib/backup";
-import { eur, pct, rawPct, sinceLabel } from "@/lib/format";
+import { eur, pct, rawPct, signedEur, sinceLabel } from "@/lib/format";
 import { GoalPanel } from "@/components/GoalPanel";
 import { AllocationCard } from "@/components/AllocationCard";
+import { NetWorthChart } from "@/components/NetWorthChart";
 import { contributionDue, currentMonth, maybeNotify } from "@/lib/reminder";
 import { optimizePlan } from "@/lib/monthly-plan";
 import { useAnalyses } from "@/lib/useAnalyses";
 import { useSectors } from "@/lib/useSectors";
 import { lastPriceUpdate, refreshPrices } from "@/lib/prices";
 import type { Asset } from "@/lib/types";
+
+const HISTORY_PERIODS = ["1S", "1M", "3M", "YTD", "1A", "Tout"] as const;
+type HistoryPeriod = (typeof HISTORY_PERIODS)[number];
+
+function periodStart(period: HistoryPeriod, now: Date): Date | null {
+  if (period === "Tout") return null;
+  if (period === "YTD") return new Date(now.getFullYear(), 0, 1);
+  const days = period === "1S" ? 7 : period === "1M" ? 30 : period === "3M" ? 90 : 365;
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -35,11 +47,39 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const { profile, assets, setAssets, saveProfile } = useApp();
+  const { profile, assets, setAssets, saveProfile, history } = useApp();
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | undefined>(undefined);
+  const [period, setPeriod] = useState<HistoryPeriod>("1M");
 
   const t = useMemo(() => totals(assets), [assets]);
+  const periodHistory = useMemo(() => {
+    const now = new Date();
+    const start = periodStart(period, now)?.getTime();
+    return [...history]
+      .filter((point) => {
+        const time = new Date(point.date).getTime();
+        return Number.isFinite(time) && time <= now.getTime() && (start === null || start === undefined || time >= start);
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [history, period]);
+  const chartHistory = useMemo(() => {
+    if (!periodHistory.length) return [];
+    const points = [...periodHistory];
+    const today = new Date().toISOString().slice(0, 10);
+    const last = points[points.length - 1]!;
+    if (last.date.slice(0, 10) === today) points[points.length - 1] = { ...last, value: t.net };
+    else points.push({ date: new Date().toISOString(), value: t.net });
+    return points;
+  }, [periodHistory, t.net]);
+  const hasPeriodComparison =
+    periodHistory.length > 1 ||
+    (periodHistory.length === 1 && periodHistory[0]!.date.slice(0, 10) !== new Date().toISOString().slice(0, 10));
+  const periodChange = hasPeriodComparison ? t.net - periodHistory[0]!.value : null;
+  const periodChangePct =
+    periodChange !== null && periodHistory[0]!.value !== 0
+      ? (periodChange / Math.abs(periodHistory[0]!.value)) * 100
+      : 0;
   const goals = useMemo(() => profileGoals(profile), [profile]);
   const activeGoal = goals.find((g) => g.id === profile?.activeGoalId) ?? goals[0];
   const dca = activeGoal?.dca ?? 0;
@@ -91,57 +131,83 @@ function Dashboard() {
   );
 
   return (
-    <div className="fade-up px-5 pt-8">
-      <header className="flex items-center justify-between">
+    <main className="fade-up flex flex-col gap-5 px-5 pb-6 pt-7">
+      <header className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Bonjour
-          </p>
-          <h1 className="font-display text-[1.75rem] leading-tight tracking-tight">
-            {profile?.name}
-          </h1>
+          <p className="text-xs font-medium text-muted-foreground">Bonjour,</p>
+          <h1 className="font-display text-2xl leading-tight tracking-tight">{profile?.name}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             aria-label="Mode discret"
             onClick={() => profile && saveProfile({ ...profile, hideAmounts: !profile.hideAmounts })}
-            className="tap flex size-9 items-center justify-center rounded-full border border-border bg-card text-muted-foreground"
+            className="tap flex size-11 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground"
           >
             {profile?.hideAmounts ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
           </button>
           <button
             type="button"
+            aria-label={`Actualiser les cours — ${sinceLabel(lastUpdate)}`}
             onClick={() => void refresh()}
-            className="tap flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-[11px] text-muted-foreground"
+            className="tap flex size-11 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground"
           >
-            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
-            {sinceLabel(lastUpdate)}
+            <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
         </div>
       </header>
 
-      <section className="card-surface mt-6 p-6">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Patrimoine net
-        </p>
-        <div className="mt-2 font-display text-[2.75rem] leading-none tracking-tight">
-          {eur(t.net)}
-        </div>
-        {t.gain !== 0 && (
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-primary">
-            <TrendingUp className="size-3.5" />
-            {eur(t.gain)} ({pct((t.gain / Math.max(1, t.actifs - t.gain)) * 100)})
+      <section aria-labelledby="net-worth-title">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p id="net-worth-title" className="text-xs font-medium text-muted-foreground">Patrimoine net</p>
+            <p className="mt-2 font-display text-[3.25rem] leading-none tracking-[-0.06em] sm:text-6xl">{eur(t.net)}</p>
           </div>
-        )}
-        <p className="mt-5 border-t border-border pt-4 text-[11px] text-muted-foreground">
-          Actifs <span className="num text-foreground">{eur(t.actifs)}</span>
-          {"  ·  "}
-          Dettes <span className="num text-destructive">{eur(t.dettes)}</span>
-        </p>
+          {t.gain !== 0 && (
+            <span className={`mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold ${t.gain >= 0 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+              {t.gain < 0 ? <TrendingDown className="size-3.5" /> : <TrendingUp className="size-3.5" />}
+              {signedEur(t.gain)} ({pct((t.gain / Math.max(1, t.actifs - t.gain)) * 100)})
+            </span>
+          )}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex items-center gap-1 rounded-full bg-elevated p-1" aria-label="Période d'évolution">
+            {HISTORY_PERIODS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={period === item}
+                onClick={() => setPeriod(item)}
+                className={`rounded-full px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${period === item ? "bg-card text-primary" : "text-muted-foreground"}`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+          {periodChange !== null ? (
+            <p className={`num text-xs font-semibold ${periodChange >= 0 ? "text-success" : "text-destructive"}`}>
+              {signedEur(periodChange)} <span className="text-muted-foreground">({pct(periodChangePct)})</span>
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Variation de la période</p>
+          )}
+        </div>
+        <div className="mt-3">
+          <NetWorthChart data={chartHistory} />
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">{sinceLabel(lastUpdate)}</p>
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4">
+          <div><p className="text-[11px] text-muted-foreground">Brut</p><p className="mt-1 num text-sm font-semibold">{eur(t.actifs)}</p></div>
+          <div><p className="text-[11px] text-muted-foreground">Dettes</p><p className="mt-1 num text-sm font-semibold">{eur(t.dettes)}</p></div>
+        </div>
       </section>
 
-      {assets.length > 0 && <AllocationCard assets={assets} realSectors={realSectors} />}
+      <section aria-label="Indicateurs clés" className="grid grid-cols-2 gap-3">
+        <div className="card-surface p-4"><p className="text-xs text-muted-foreground">Lignes suivies</p><p className="mt-2 font-display text-2xl">{assets.length}</p><p className="mt-1 text-[11px] text-muted-foreground">dans votre patrimoine</p></div>
+        <div className="card-surface p-4"><p className="text-xs text-muted-foreground">Versement mensuel</p><p className="mt-2 font-display text-2xl">{eur(dca)}</p><p className="mt-1 text-[11px] text-muted-foreground">objectif en cours</p></div>
+      </section>
+
+      {assets.length > 0 && <AllocationCard assets={assets} realSectors={realSectors} />} 
 
       {outcome.buffer.months !== undefined && !outcome.buffer.sufficient && (
         <p className="mt-4 rounded-xl border border-amber/40 bg-amber/10 px-3 py-2.5 text-[11px] text-muted-foreground">
@@ -196,7 +262,7 @@ function Dashboard() {
         </p>
       )}
 
-</div>
+</main>
   );
 }
 

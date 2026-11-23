@@ -23,6 +23,8 @@ import type { Asset, AssetType } from "@/lib/types";
 import { TYPE_LABELS } from "@/lib/types";
 import { uid } from "@/lib/storage";
 import { SymbolSearch, type SelectedSymbol } from "./SymbolSearch";
+import { CreditAmortizationSection } from "./CreditAmortizationSection";
+import { PropertyDetails } from "./PropertyDetails";
 import { fetchQuote } from "@/lib/market";
 
 type Field = {
@@ -69,7 +71,14 @@ const FIELDS: Record<AssetType, Field[]> = {
     { key: "dpe", label: "DPE" },
     { key: "annee", label: "Année", type: "number" },
     { key: "valeurEstimee", label: "Valeur estimée", type: "number" },
-    { key: "loyer", label: "Loyer mensuel", type: "number" },
+    { key: "prixAchat", label: "Prix d'achat", type: "number" },
+    { key: "loyer", label: "Loyer mensuel hors charges", type: "number" },
+    { key: "chargesCopro", label: "Charges de copropriété non récupérables / an", type: "number" },
+    { key: "taxeFonciere", label: "Taxe foncière / an", type: "number" },
+    { key: "assurancePNO", label: "Assurance PNO / an", type: "number" },
+    { key: "fraisGestionPct", label: "Frais de gestion (%)", type: "number" },
+    { key: "vacancePct", label: "Vacance locative (%)", type: "number" },
+    { key: "autresCharges", label: "Autres charges / an", type: "number" },
   ],
   crypto: [
     { key: "name", label: "Nom" },
@@ -90,10 +99,6 @@ const FIELDS: Record<AssetType, Field[]> = {
     { key: "type", label: "Type", placeholder: "Prêt immobilier, conso, auto…" },
     { key: "name", label: "Nom" },
     { key: "preteur", label: "Prêteur" },
-    { key: "capitalInitial", label: "Capital initial", type: "number" },
-    { key: "capitalRestant", label: "Capital restant", type: "number" },
-    { key: "taux", label: "Taux (%)", type: "number" },
-    { key: "mensualite", label: "Mensualité", type: "number" },
     { key: "dureeRestante", label: "Durée restante (mois)", type: "number" },
     { key: "dateFin", label: "Date de fin" },
   ],
@@ -104,15 +109,17 @@ const ESSENTIAL: Record<AssetType, string[]> = {
   pea: ["name", "quantity", "pru", "currentPrice"],
   av: ["name", "fondsEurosAmount", "ucAmount"],
   livret: ["name", "type", "amount"],
-  immo: ["type", "name", "valeurEstimee"],
+  immo: ["type", "name", "valeurEstimee", "loyer"],
   crypto: ["name", "ticker", "quantity", "prixUnitaire"],
   cash: ["name", "amount"],
   autre: ["name", "amount"],
-  credit: ["name", "capitalRestant", "mensualite"],
+  credit: ["name", "type"],
 };
 
 /** Métadonnées sans champ dédié, conservées à l'enregistrement. */
-const PRESERVED = ["envelope", "region", "sector", "currency", "isin", "lastPriceUpdate"];
+const PRESERVED = ["envelope", "region", "sector", "currency", "isin", "lastPriceUpdate", "bienId", "dateDebut", "paliers", "refDate", "refCapital"];
+const CREDIT_NUMBER_FIELDS = ["capitalInitial", "capitalRestant", "dureeMois", "taux", "mensualite", "refCapital"];
+const CREDIT_TEXT_FIELDS = ["bienId", "dateDebut", "paliers", "refDate"];
 
 /** Champs pris en charge par le trio quantité · prix · total. */
 const TRIANGLE_KEYS: Record<string, string[] | undefined> = {
@@ -133,11 +140,13 @@ const TYPE_CARDS: Array<{ type: AssetType; Icon: typeof Home; color: string }> =
 
 export function AssetModal({
   asset,
+  assets = [],
   onClose,
   onSave,
   onDelete,
 }: {
   asset: Asset | null;
+  assets?: Asset[];
   onClose: () => void;
   onSave: (a: Asset) => void;
   onDelete?: (id: string) => void;
@@ -180,6 +189,15 @@ export function AssetModal({
   );
 
   const searchable = type === "pea" || type === "crypto";
+  const propertyPreview: Asset | null = type === "immo" && (asset || data["name"] || data["valeurEstimee"] || data["loyer"])
+    ? {
+        id: asset?.id ?? "__property_draft__",
+        type: "immo",
+        data: { ...(asset?.data ?? {}), ...data },
+        createdAt: asset?.createdAt ?? "",
+        updatedAt: asset?.updatedAt ?? "",
+      }
+    : null;
 
   const applySymbol = (s: SelectedSymbol) => {
     if (type === "crypto") {
@@ -253,6 +271,16 @@ export function AssetModal({
       if (v === undefined || v === "") continue;
       clean[f.key] = f.type === "number" ? Number(v.replace(",", ".")) : v;
     }
+    if (type === "credit") {
+      for (const key of CREDIT_NUMBER_FIELDS) {
+        const value = data[key];
+        if (value !== undefined && value !== "") clean[key] = Number(value.replace(",", "."));
+      }
+      for (const key of CREDIT_TEXT_FIELDS) {
+        const value = data[key];
+        if (value !== undefined && value !== "") clean[key] = value;
+      }
+    }
     for (const k of PRESERVED) {
       const v = data[k];
       if (v !== undefined && v !== "" && clean[k] === undefined) clean[k] = v;
@@ -267,7 +295,7 @@ export function AssetModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
+    <div className="mobile-sheet fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <button
           type="button"
@@ -346,6 +374,10 @@ export function AssetModal({
           />
         )}
 
+        {propertyPreview && (
+          <PropertyDetails property={propertyPreview} assets={assets} />
+        )}
+
         {type && (mode === "manual" || !searchable) && (
           <div className="space-y-3">
             {FIELDS[type]
@@ -356,6 +388,14 @@ export function AssetModal({
               .map((f) => (
                 <FieldInput key={f.key} f={f} data={data} setData={setData} />
               ))}
+
+            {type === "credit" && (
+              <CreditAmortizationSection
+                data={data}
+                setData={setData}
+                properties={assets.filter((item) => item.type === "immo")}
+              />
+            )}
 
             {TRIANGLE_KEYS[type] && (
               <AmountTriangle

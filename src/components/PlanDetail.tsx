@@ -89,7 +89,7 @@ export function PlanDetail({
   }, 0);
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
+    <div className="mobile-sheet fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <button
           type="button"
@@ -113,11 +113,13 @@ export function PlanDetail({
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-5 py-5 pb-[calc(4rem+env(safe-area-inset-bottom))]">
-        <p className="font-display text-[2rem] leading-none">{eur(dca)}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          à répartir · profil {RISK_LABELS[profile.riskProfile].toLowerCase()}
-          {plan.manual ? " · répartition personnalisée" : ""}
-        </p>
+        <section className="card-surface rounded-3xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">À investir ce mois</p>
+          <p className="mt-3 font-display text-4xl leading-none tracking-tight text-primary">{eur(dca)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Profil {RISK_LABELS[profile.riskProfile].toLowerCase()}{plan.manual ? " · répartition personnalisée" : ""}</p>
+          {plan.lines.length > 0 && <div className="mt-5 flex h-2 overflow-hidden rounded-full bg-elevated" aria-label="Répartition du versement">{plan.lines.map((line, index) => <span key={line.assetId} className={index % 2 === 0 ? "bg-primary" : "bg-primary/50"} style={{ width: `${line.weight}%` }} />)}</div>}
+          <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground"><span>{plan.lines.length} placement{plan.lines.length > 1 ? "s" : ""}</span><span>{plan.manual ? "Personnalisé" : "Équilibré selon votre profil"}</span></div>
+        </section>
 
         {showInfo && (
           <p className="mt-4 rounded-xl bg-elevated p-3 text-[11px] leading-relaxed text-muted-foreground">

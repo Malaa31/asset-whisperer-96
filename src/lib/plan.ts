@@ -1,4 +1,5 @@
 import { assetValue } from "./calc";
+import { effectiveIncomeMonthly } from "./rental";
 import { BUFFER_BY_PROFILE } from "./policy";
 import type { Asset, Goal, Profile } from "./types";
 
@@ -133,7 +134,7 @@ export function bufferStatus(assets: Asset[], profile: Profile | null): BufferSt
   const risk = profile?.riskProfile ?? "equilibre";
   const threshold = BUFFER_BY_PROFILE[risk] ?? 9;
   const amount = assets.filter(isBuffer).reduce((s, a) => s + assetValue(a), 0);
-  const income = profile?.incomeMonthly ?? 0;
+  const income = effectiveIncomeMonthly(profile, assets);
   if (income <= 0) return { amount, threshold, sufficient: false };
   const months = amount / income;
   return { amount, months, threshold, sufficient: months >= threshold };

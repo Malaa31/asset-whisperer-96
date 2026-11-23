@@ -40,7 +40,7 @@ export function GoalEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
+    <div className="mobile-sheet fixed inset-0 z-50 mx-auto flex h-[100dvh] max-w-[480px] flex-col overflow-hidden bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
         <button
           type="button"
@@ -63,7 +63,7 @@ export function GoalEditor({
                 key={k}
                 type="button"
                 onClick={() => pickKind(k)}
-                className={`tap rounded-xl border p-3 text-left ${
+                className={`tap min-h-16 rounded-xl border p-3 text-left transition-colors ${
                   form.kind === k ? "border-primary bg-primary/10" : "border-border bg-card"
                 }`}
               >
