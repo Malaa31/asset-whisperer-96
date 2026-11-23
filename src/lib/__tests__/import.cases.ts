@@ -1,12 +1,12 @@
 import type { Asset } from "../types";
+import { parsePositionText } from "../position-parser";
+import { positionParserCases } from "./position-parser.cases";
 import {
   applyImportDecisions,
-  consumeImportQuota,
   controlsForExtraction,
   matchPosition,
   matchSavingsAccount,
   parseFrenchNumber,
-  type ImportQuotaStore,
 } from "../import-positions";
 
 let passed = 0;
@@ -57,6 +57,18 @@ const untouched: Asset = {
 };
 
 async function run() {
+  console.log("\nIMPORT DE CAPTURES — PARSEUR LOCAL");
+  const headers = parsePositionText(positionParserCases.peaWithIsinAndHeaders, "titres");
+  check("en-têtes et ISIN valides mappés dans les colonnes", headers.kind === "titres" && headers.enveloppe === "PEA" && headers.lignes[0]?.isin === "LU1681043599" && headers.lignes[0]?.quantite === 12 && headers.lignes[0]?.valeur === 5185.2);
+  const mobile = parsePositionText(positionParserCases.mobileStack, "titres");
+  check("mise en page mobile avec valeurs sur plusieurs lignes", mobile.kind === "titres" && mobile.enveloppe === "CTO" && mobile.lignes.length === 2 && mobile.lignes[0]?.valeur === 1450);
+  const noIsin = parsePositionText(positionParserCases.noIsin, "titres");
+  check("liste sans ISIN inférée par quantité × cours", noIsin.kind === "titres" && noIsin.lignes[0]?.quantite === 2.5 && noIsin.lignes[0]?.valeur === 475);
+  const savings = parsePositionText(positionParserCases.livretA, "solde");
+  check("solde du livret préféré au plafond et au taux", savings.kind === "solde" && savings.solde === 12345.67);
+  const noisy = parsePositionText(positionParserCases.ocrNoise, "titres");
+  check("confusions OCR numériques corrigées", noisy.kind === "titres" && noisy.lignes[0]?.quantite === 10 && noisy.lignes[0]?.cours === 102);
+
   console.log("\nIMPORT DE CAPTURES — NOMBRES FRANÇAIS");
   check("séparateurs de milliers et virgule décimale", parseFrenchNumber("1 234,56 €") === 1234.56);
   check("entier français avec espaces", parseFrenchNumber("12 345") === 12345);
@@ -184,40 +196,9 @@ async function run() {
   );
   check("une ligne ignorée ne crée rien", applied.length === 4);
 
-  console.log("\nIMPORT DE CAPTURES — QUOTA CAS");
-  const quota = new MemoryQuotaStore();
-  const first = await consumeImportQuota(quota, "2026-11-23", 2);
-  const second = await consumeImportQuota(quota, "2026-11-23", 2);
-  const third = await consumeImportQuota(quota, "2026-11-23", 2);
-  check(
-    "deux imports sont autorisés et le suivant est refusé au plafond",
-    first && second && !third,
-  );
-  check(
-    "les jours UTC ont des compteurs distincts",
-    await consumeImportQuota(quota, "2026-11-24", 2),
-  );
-
   console.log(`\nRésultat : ${passed} réussis, ${failed} échoués.`);
   if (failed > 0) process.exitCode = 1;
 }
 
-class MemoryQuotaStore implements ImportQuotaStore {
-  private records = new Map<string, { count: number; etag: string }>();
-  private revision = 0;
-
-  async get(day: string) {
-    const record = this.records.get(day);
-    return record ? { ...record } : null;
-  }
-
-  async compareAndSet(day: string, count: number, expectedEtag: string | null) {
-    const current = this.records.get(day);
-    if ((current?.etag ?? null) !== expectedEtag) return false;
-    this.revision += 1;
-    this.records.set(day, { count, etag: `etag-${this.revision}` });
-    return true;
-  }
-}
 
 void run();

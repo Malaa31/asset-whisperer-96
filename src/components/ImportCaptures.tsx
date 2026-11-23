@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Check, FileImage, LoaderCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { Check, ClipboardPaste, FileImage, LoaderCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Sheet,
@@ -27,12 +27,13 @@ import {
   type SavingsLine,
 } from "@/lib/import-positions";
 import { useApp, uid } from "@/lib/storage";
+import { parsePositionText } from "@/lib/position-parser";
 import type { Asset } from "@/lib/types";
 
 const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 const PRIVACY_NOTE =
-  "Les captures sont analysées par une IA via ta passerelle Vercel, sans conservation des données, puis oubliées. Rien n'est enregistré sans ta validation.";
+  "Tout est analysé sur ton téléphone : la capture n'est envoyée nulle part. Rien n'est enregistré sans ta validation.";
 type Capture = { name: string; dataUrl: string; size: number };
 type SearchHit = { symbol: string; name: string; exchange?: string; type?: string };
 
@@ -46,6 +47,9 @@ export function ImportCaptures({
   const { assets, setAssets } = useApp();
   const [kind, setKind] = useState<"titres" | "solde">("titres");
   const [captures, setCaptures] = useState<Capture[]>([]);
+  const [pastedText, setPastedText] = useState("");
+  const [inputMode, setInputMode] = useState<"image" | "text">("image");
+  const [progress, setProgress] = useState("");
   const [extraction, setExtraction] = useState<ImportExtraction | null>(null);
   const [positionRows, setPositionRows] = useState<PositionDraft[]>([]);
   const [savingsRow, setSavingsRow] = useState<SavingsDraft | null>(null);
@@ -103,6 +107,9 @@ export function ImportCaptures({
     onOpenChange(nextOpen);
     if (!nextOpen) {
       setCaptures([]);
+      setPastedText("");
+      setInputMode("image");
+      setProgress("");
       setExtraction(null);
       setPositionRows([]);
       setSavingsRow(null);
@@ -143,17 +150,33 @@ export function ImportCaptures({
   };
 
   const analyze = async () => {
-    if (!captures.length) return;
+    if (inputMode === "image" ? !captures.length : !pastedText.trim()) return;
     setBusy(true);
     setMessage("");
+    let worker: import("tesseract.js").Worker | null = null;
     try {
-      const response = await fetch("/api/import-positions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, images: captures.map((capture) => capture.dataUrl) }),
-      });
-      const result = (await response.json()) as ImportExtraction & { error?: string };
-      if (!response.ok) throw new Error(result.error || "Analyse impossible. Réessaie plus tard.");
+      let sourceText = pastedText;
+      if (inputMode === "image") {
+        const { createWorker } = await import("tesseract.js");
+        worker = await createWorker("fra+eng", 1, {
+          workerPath: "/ocr/worker.min.js",
+          corePath: "/ocr/tesseract-core-simd-lstm.wasm.js",
+          langPath: "/ocr/lang",
+          gzip: false,
+          logger: (event) => {
+            if (event.status === "recognizing text") setProgress(`Lecture de la capture… ${Math.round(event.progress * 100)} %`);
+            else setProgress("Préparation de la lecture sur ton téléphone…");
+          },
+        });
+        const recognized: string[] = [];
+        for (const capture of captures) {
+          const prepared = await preprocessCapture(capture.dataUrl);
+          const result = await worker.recognize(prepared);
+          recognized.push(result.data.text);
+        }
+        sourceText = recognized.join("\n");
+      }
+      const result = parsePositionText(sourceText, kind);
       setExtraction(result);
       if (result.kind === "titres") {
         const defaultEnvelope: Envelope = result.enveloppe === "CTO" ? "CTO" : "PEA";
@@ -199,6 +222,8 @@ export function ImportCaptures({
         error instanceof Error ? error.message : "Analyse impossible. Réessaie plus tard.",
       );
     } finally {
+      await worker?.terminate();
+      setProgress("");
       setBusy(false);
     }
   };
@@ -328,33 +353,27 @@ export function ImportCaptures({
                   </button>
                 </div>
               </fieldset>
-              <label className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-primary/50 bg-card px-5 py-8 text-center transition-colors hover:bg-primary/5">
-                <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <FileImage className="size-5" aria-hidden="true" />
-                </span>
-                <span className="text-sm font-semibold">Choisir 1 à 4 captures</span>
-                <span className="text-xs leading-relaxed text-muted-foreground">
-                  Jusqu&apos;à 2,5 Mo par image après compression · 8 Mo au total
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="sr-only"
-                  disabled={busy}
-                  onChange={(event) => {
-                    void selectCaptures(event.currentTarget.files);
-                    event.currentTarget.value = "";
-                  }}
-                />
-              </label>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="Méthode d’import">
+                <button type="button" aria-pressed={inputMode === "image"} onClick={() => setInputMode("image")} className={`tap flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold ${inputMode === "image" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}><FileImage className="size-4" aria-hidden="true" /> Choisir des captures</button>
+                <button type="button" aria-pressed={inputMode === "text"} onClick={() => setInputMode("text")} className={`tap flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold ${inputMode === "text" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}><ClipboardPaste className="size-4" aria-hidden="true" /> Coller le texte</button>
+              </div>
+              {inputMode === "image" ? (
+                <label className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-primary/50 bg-card px-5 py-8 text-center transition-colors hover:bg-primary/5">
+                  <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary"><FileImage className="size-5" aria-hidden="true" /></span>
+                  <span className="text-sm font-semibold">Choisir 1 à 4 captures</span>
+                  <span className="text-xs leading-relaxed text-muted-foreground">Jusqu&apos;à 2,5 Mo par image après compression · 8 Mo au total</span>
+                  <input type="file" accept="image/*" multiple className="sr-only" disabled={busy} onChange={(event) => { void selectCaptures(event.currentTarget.files); event.currentTarget.value = ""; }} />
+                </label>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="position-import-text" className="text-sm font-semibold">Texte de la capture</label>
+                  <textarea id="position-import-text" value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={8} disabled={busy} className="w-full resize-y rounded-xl border border-border bg-card px-3 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Colle ici le texte de tes positions ou de ton livret…" />
+                  <p className="text-xs leading-relaxed text-muted-foreground">Sur iPhone : ouvre la capture dans Photos, maintiens le doigt sur le texte, Tout sélectionner, Copier, puis colle ici.</p>
+                </div>
+              )}
               {busy && !extraction && (
-                <p
-                  className="flex items-center justify-center gap-2 text-xs text-muted-foreground"
-                  role="status"
-                >
-                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Compression
-                  des captures…
+                <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground" role="status">
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> {progress || (inputMode === "image" ? "Préparation des captures…" : "Lecture du texte…")}
                 </p>
               )}
               {captures.length > 0 && (
@@ -384,16 +403,12 @@ export function ImportCaptures({
               )}
               <button
                 type="button"
-                disabled={!captures.length || busy}
+                disabled={(inputMode === "image" ? !captures.length : !pastedText.trim()) || busy}
                 onClick={() => void analyze()}
                 className="tap flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-40"
               >
-                {busy && captures.length > 0 ? (
-                  <LoaderCircle className="size-4 animate-spin" />
-                ) : (
-                  <Sparkles className="size-4" />
-                )}
-                {busy && captures.length > 0 ? "Analyse en cours…" : "Analyser les captures"}
+                {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                {busy ? "Lecture en cours…" : inputMode === "image" ? "Analyser les captures" : "Analyser le texte"}
               </button>
             </div>
           ) : extraction ? (
@@ -491,6 +506,25 @@ async function compressCapture(file: File): Promise<Capture> {
     reader.readAsDataURL(blob);
   });
   return { name: file.name, dataUrl, size: blob.size };
+}
+
+async function preprocessCapture(dataUrl: string): Promise<HTMLCanvasElement> {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error("Cette image ne peut pas être décodée sur cet appareil."));
+    element.src = dataUrl;
+  });
+  const scale = Math.min(image.naturalWidth < 1300 ? 2 : 1, 3000 / image.naturalWidth, 3000 / image.naturalHeight);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Prétraitement indisponible sur cet appareil.");
+  context.filter = "grayscale(1) contrast(1.35)";
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  context.filter = "none";
+  return canvas;
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {

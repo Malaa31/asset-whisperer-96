@@ -259,31 +259,6 @@ export function applyImportDecisions(
   return next;
 }
 
-export interface ImportQuotaRecord {
-  count: number;
-  etag: string;
-}
-
-export interface ImportQuotaStore {
-  get(day: string): Promise<ImportQuotaRecord | null>;
-  compareAndSet(day: string, count: number, expectedEtag: string | null): Promise<boolean>;
-}
-
-export async function consumeImportQuota(
-  store: ImportQuotaStore,
-  day: string,
-  limit = 30,
-  attempts = 12,
-): Promise<boolean> {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const current = await store.get(day);
-    const count = current?.count ?? 0;
-    if (count >= limit) return false;
-    if (await store.compareAndSet(day, count + 1, current?.etag ?? null)) return true;
-  }
-  throw new Error("import_quota_contention");
-}
-
 function putIfPresent(
   data: Asset["data"],
   key: string,
