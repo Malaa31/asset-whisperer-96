@@ -112,6 +112,26 @@ async function run() {
       );
     });
   }
+  const expectedBourso2 = [
+    ["AMUNDI PEA EMERGENT (MSCI EMERGING) ESG TRANSITION UCITS ETF", 82, 27.91, 33.09, 2712.97],
+    ["AMUNDI PEA MONDE MSCI WORLD UCITS ETF ACC P", 1867, 5.8, 6.08, 11360.69],
+    ["AMUNDI PEA S&P 500 UCITS ETF ACC", 88, 48.48, 57.8, 5086.4],
+    ["BNP PARIBAS EASY STOXX EUROPE 600 UCITS ETF CAPITALISATION", 168, 20.06, 20.98, 3524.64],
+    ["CARMAT", 15, 22.13, 0.1, 1.49],
+  ] as const;
+  for (const [label, key] of [["2e capture", "boursoAppOcr2"], ["flèches collées", "boursoAppOcr2Stuck"]] as const) {
+    const app = parsePositionText(positionParserCases[key], "titres");
+    const lignes = app.kind === "titres" ? app.lignes : [];
+    const same = (a: number | null | undefined, b: number) => a != null && Math.abs(a - b) < 0.005;
+    check(`appli Boursorama (${label}) : 5 lignes, aucune ligne écartée`, lignes.length === 5 && app.avertissements.length === 0);
+    expectedBourso2.forEach(([nom, q, pru, cours, valeur], i) => {
+      const l = lignes[i];
+      check(
+        `appli Boursorama (${label}) : ${nom.split(" ").slice(0, 4).join(" ")}`,
+        l?.nom === nom && same(l.quantite, q) && same(l.pru, pru) && same(l.cours, cours) && same(l.valeur, valeur) && l.confiance >= 0.7,
+      );
+    });
+  }
   const livretDate = parsePositionText(positionParserCases.livretWithDate, "solde");
   check("livret : la date n'est pas prise pour le solde", livretDate.kind === "solde" && livretDate.solde === 8412.35);
   const livretInline = parsePositionText(positionParserCases.livretInline, "solde");
