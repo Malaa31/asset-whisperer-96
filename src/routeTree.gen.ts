@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PatrimoineRouteImport } from './routes/patrimoine'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as ProfilRouteImport } from './routes/profil'
+import { Route as ApiVaultRouteImport } from './routes/api/vault'
 import { Route as ApiPublicHistoryRouteImport } from './routes/api/public/history'
 import { Route as ApiPublicHoldingsRouteImport } from './routes/api/public/holdings'
 import { Route as ApiPublicQuoteRouteImport } from './routes/api/public/quote'
@@ -36,6 +37,11 @@ const PlanRoute = PlanRouteImport.update({
 const ProfilRoute = ProfilRouteImport.update({
   id: '/profil',
   path: '/profil',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVaultRoute = ApiVaultRouteImport.update({
+  id: '/api/vault',
+  path: '/api/vault',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHistoryRoute = ApiPublicHistoryRouteImport.update({
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/patrimoine': typeof PatrimoineRoute
   '/plan': typeof PlanRoute
   '/profil': typeof ProfilRoute
+  '/api/vault': typeof ApiVaultRoute
   '/api/public/history': typeof ApiPublicHistoryRoute
   '/api/public/holdings': typeof ApiPublicHoldingsRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/patrimoine': typeof PatrimoineRoute
   '/plan': typeof PlanRoute
   '/profil': typeof ProfilRoute
+  '/api/vault': typeof ApiVaultRoute
   '/api/public/history': typeof ApiPublicHistoryRoute
   '/api/public/holdings': typeof ApiPublicHoldingsRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/patrimoine': typeof PatrimoineRoute
   '/plan': typeof PlanRoute
   '/profil': typeof ProfilRoute
+  '/api/vault': typeof ApiVaultRoute
   '/api/public/history': typeof ApiPublicHistoryRoute
   '/api/public/holdings': typeof ApiPublicHoldingsRoute
   '/api/public/quote': typeof ApiPublicQuoteRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/patrimoine'
     | '/plan'
     | '/profil'
+    | '/api/vault'
     | '/api/public/history'
     | '/api/public/holdings'
     | '/api/public/quote'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/patrimoine'
     | '/plan'
     | '/profil'
+    | '/api/vault'
     | '/api/public/history'
     | '/api/public/holdings'
     | '/api/public/quote'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '/patrimoine'
     | '/plan'
     | '/profil'
+    | '/api/vault'
     | '/api/public/history'
     | '/api/public/holdings'
     | '/api/public/quote'
@@ -128,6 +140,7 @@ export interface RootRouteChildren {
   PatrimoineRoute: typeof PatrimoineRoute
   PlanRoute: typeof PlanRoute
   ProfilRoute: typeof ProfilRoute
+  ApiVaultRoute: typeof ApiVaultRoute
   ApiPublicHistoryRoute: typeof ApiPublicHistoryRoute
   ApiPublicHoldingsRoute: typeof ApiPublicHoldingsRoute
   ApiPublicQuoteRoute: typeof ApiPublicQuoteRoute
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/profil'
       fullPath: '/profil'
       preLoaderRoute: typeof ProfilRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vault': {
+      id: '/api/vault'
+      path: '/api/vault'
+      fullPath: '/api/vault'
+      preLoaderRoute: typeof ApiVaultRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/history': {
@@ -200,6 +220,7 @@ const rootRouteChildren: RootRouteChildren = {
   PatrimoineRoute: PatrimoineRoute,
   PlanRoute: PlanRoute,
   ProfilRoute: ProfilRoute,
+  ApiVaultRoute: ApiVaultRoute,
   ApiPublicHistoryRoute: ApiPublicHistoryRoute,
   ApiPublicHoldingsRoute: ApiPublicHoldingsRoute,
   ApiPublicQuoteRoute: ApiPublicQuoteRoute,

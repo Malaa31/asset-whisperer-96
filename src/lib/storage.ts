@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { Asset, Profile } from "./types";
+import type { BackupFile } from "./backup";
 
 const KEY_PROFILE = "patrimoine.profile";
 const KEY_ASSETS = "patrimoine.assets";
@@ -51,6 +52,7 @@ export interface AppState {
   removeAsset: (id: string) => void;
   setAssets: (a: Asset[]) => void;
   history: HistoryPoint[];
+  replaceBackup: (backup: BackupFile) => void;
   reset: () => void;
 }
 

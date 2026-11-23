@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { ArrowRight, Plus, Upload } from "lucide-react";
+import { ArrowRight, LockKeyhole, Plus, Upload } from "lucide-react";
 import {
   RISK_LABELS,
   TARGET_ALLOCATIONS,
@@ -11,6 +11,7 @@ import { eur } from "@/lib/format";
 import { project } from "@/lib/calc";
 import { restoreBackup } from "@/lib/backup";
 import { uid } from "@/lib/storage";
+import { VaultCodeForm } from "@/components/VaultSection";
 
 /**
  * Trois écrans, une question par écran.
@@ -35,6 +36,7 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
   const [risk, setRisk] = useState<RiskProfile | null>(null);
   const [dca, setDca] = useState(250);
   const [restoreError, setRestoreError] = useState("");
+  const [restoreVault, setRestoreVault] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reaction = REACTIONS.find((r) => r.risk === risk) ?? REACTIONS[1]!;
@@ -93,7 +95,8 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
           </h1>
           <p className="mt-5 text-[15px] leading-relaxed text-muted-foreground">
             Bourse, livrets, immobilier, crédits. Cours à jour, allocation
-            réelle, projections. Rien ne quitte ton téléphone.
+            réelle, projections. Tes données restent sur ton téléphone ; si tu
+            actives le coffre facultatif, elles sont chiffrées ici avant l'envoi.
           </p>
           <label className="mt-auto block pt-10">
             <span className="mb-2 block text-xs font-medium text-muted-foreground">
@@ -244,6 +247,14 @@ export function Onboarding({ onDone }: { onDone: (p: Profile) => void }) {
             {restoreError && (
               <p className="text-center text-[11px] text-destructive">{restoreError}</p>
             )}
+            <button
+              type="button"
+              onClick={() => setRestoreVault((value) => !value)}
+              className="tap flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-primary/25 text-sm font-semibold text-primary"
+            >
+              <LockKeyhole className="size-4" aria-hidden="true" /> J&apos;ai déjà un coffre
+            </button>
+            {restoreVault && <VaultCodeForm />}
           </>
         )}
 

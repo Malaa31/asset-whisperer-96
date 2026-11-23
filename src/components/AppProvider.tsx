@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  AppContext,
-  KEYS,
-  storage,
-  type AppState,
-  type HistoryPoint,
-} from "@/lib/storage";
+import { AppContext, KEYS, storage, type AppState, type HistoryPoint } from "@/lib/storage";
 import { totals } from "@/lib/calc";
+import { compactHistory } from "@/lib/history";
 import { pricesAreStale, refreshPrices } from "@/lib/prices";
 import { setAmountMasking } from "@/lib/format";
 import type { Asset, Profile } from "@/lib/types";
+import type { BackupFile } from "@/lib/backup";
+import { VaultProvider } from "@/lib/vault-sync";
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -38,8 +35,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const today = new Date().toISOString().slice(0, 10);
     const net = totals(assets).net;
     setHistory((prev) => {
-      const rest = prev.filter((h) => h.date.slice(0, 10) !== today);
-      const next = [...rest, { date: new Date().toISOString(), value: net }].slice(-60);
+      const latest = [...prev].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+      const nextPoints =
+        latest?.date.slice(0, 10) === today
+          ? prev.map((point) =>
+              point.date.slice(0, 10) === today
+                ? { date: new Date().toISOString(), value: net }
+                : point,
+            )
+          : [...prev, { date: new Date().toISOString(), value: net }];
+      const next = compactHistory(nextPoints);
       storage.set(KEYS.history, next);
       return next;
     });
@@ -61,6 +66,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
+  const backup = useMemo<BackupFile>(
+    () => ({
+      app: "patrimoine",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      profile,
+      assets,
+      history,
+    }),
+    [profile, assets, history],
+  );
+
   const value = useMemo<AppState>(
     () => ({
       profile,
@@ -78,6 +95,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       removeAsset: (id) => persist(assets.filter((x) => x.id !== id)),
       setAssets: persist,
+      replaceBackup: (backup: BackupFile) => {
+        if (backup.profile) storage.set(KEYS.profile, backup.profile);
+        else storage.remove(KEYS.profile);
+        storage.set(KEYS.assets, backup.assets);
+        storage.set(KEYS.history, backup.history);
+        setProfile(backup.profile);
+        setAmountMasking(Boolean(backup.profile?.hideAmounts));
+        setAssetsState(backup.assets);
+        setHistory(backup.history);
+      },
       reset: () => {
         setAmountMasking(false);
         storage.remove(KEYS.profile);
@@ -91,5 +118,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [profile, assets, ready, history, persist],
   );
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      <VaultProvider ready={ready} backup={backup} applyBackup={value.replaceBackup}>
+        {children}
+      </VaultProvider>
+    </AppContext.Provider>
+  );
 }
