@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Check, ClipboardPaste, FileImage, LoaderCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -28,31 +28,61 @@ import {
 } from "@/lib/import-positions";
 import { useApp, uid } from "@/lib/storage";
 import { parsePositionText } from "@/lib/position-parser";
+import { applyLoanDecisions, matchLoan, parseLoanCaptures } from "@/lib/loan-import";
+import {
+  CAPTURE_MARKER,
+  captureQuality,
+  detectCaptureKind,
+  dominantKind,
+  needsSecondPass,
+  splitCaptureText,
+  type CaptureKind,
+} from "@/lib/capture-kind";
+import { ocrScale, prepareForOcr, type OcrVariant } from "@/lib/ocr-preprocess";
+import {
+  ImportLoanReview,
+  isLoanDraftValid,
+  loanDraftToImport,
+  type LoanDraft,
+} from "@/components/ImportLoanReview";
 import type { Asset } from "@/lib/types";
 
-const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
+const KIND_LABEL: Record<CaptureKind, string> = {
+  titres: "positions de PEA / CTO",
+  solde: "solde de livret",
+  credit: "fiche de crédit",
+};
 const PRIVACY_NOTE =
   "Tout est analysé sur ton téléphone : la capture n'est envoyée nulle part. Rien n'est enregistré sans ta validation.";
-type Capture = { name: string; dataUrl: string; size: number };
+type Capture = { name: string; dataUrl: string; size: number; file: File };
+const MAX_CAPTURES = 8;
 type SearchHit = { symbol: string; name: string; exchange?: string; type?: string };
 
 export function ImportCaptures({
   open,
   onOpenChange,
+  initialText,
+  onInitialTextConsumed,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Texte reçu du raccourci iPhone (lecture d'Apple), analysé dès l'ouverture. */
+  initialText?: string | null | undefined;
+  onInitialTextConsumed?: (() => void) | undefined;
 }) {
   const { assets, setAssets } = useApp();
-  const [kind, setKind] = useState<"titres" | "solde">("titres");
+  const [kind, setKind] = useState<CaptureKind>("titres");
   const [captures, setCaptures] = useState<Capture[]>([]);
   const [pastedText, setPastedText] = useState("");
   const [inputMode, setInputMode] = useState<"image" | "text">("image");
+  const [autoRun, setAutoRun] = useState(false);
   const [progress, setProgress] = useState("");
   const [extraction, setExtraction] = useState<ImportExtraction | null>(null);
   const [positionRows, setPositionRows] = useState<PositionDraft[]>([]);
   const [savingsRow, setSavingsRow] = useState<SavingsDraft | null>(null);
+  const [loanRows, setLoanRows] = useState<LoanDraft[]>([]);
+  const [loanWarnings, setLoanWarnings] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
   const [stage, setStage] = useState<"choose" | "review">("choose");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -79,12 +109,15 @@ export function ImportCaptures({
       ? controlsForExtraction({ ...extraction, lignes: reviewLines })
       : [];
   const savingsControls = extraction?.kind === "solde" ? controlsForExtraction(extraction) : [];
-  const hasSelectedRows =
-    extraction?.kind === "titres"
+  const loanMode = stage === "review" && loanRows.length > 0;
+  const hasSelectedRows = loanMode
+    ? loanRows.some((row) => row.action !== "ignore")
+    : extraction?.kind === "titres"
       ? positionRows.some((row) => row.action !== "ignore")
       : Boolean(savingsRow && savingsRow.action !== "ignore");
-  const validRows =
-    extraction?.kind === "titres"
+  const validRows = loanMode
+    ? loanRows.every(isLoanDraftValid)
+    : extraction?.kind === "titres"
       ? positionRows.every((row) => {
           if (row.action === "ignore") return true;
           const quantity = parseFrenchNumber(row.quantite);
@@ -113,6 +146,9 @@ export function ImportCaptures({
       setExtraction(null);
       setPositionRows([]);
       setSavingsRow(null);
+      setLoanRows([]);
+      setLoanWarnings([]);
+      setNotice("");
       setStage("choose");
       setMessage("");
       setSearchHits({});
@@ -122,8 +158,8 @@ export function ImportCaptures({
   const selectCaptures = async (files: FileList | null) => {
     setMessage("");
     if (!files?.length) return;
-    if (files.length > 4) {
-      setMessage("Choisis au maximum quatre captures.");
+    if (files.length > MAX_CAPTURES) {
+      setMessage(`Choisis au maximum ${MAX_CAPTURES} captures.`);
       return;
     }
     setBusy(true);
@@ -132,13 +168,9 @@ export function ImportCaptures({
       for (const file of Array.from(files)) {
         if (!file.type.startsWith("image/"))
           throw new Error("Un fichier sélectionné n'est pas une image.");
-        const image = await compressCapture(file);
-        if (image.size > MAX_IMAGE_BYTES)
-          throw new Error("Chaque capture doit faire au maximum 2,5 Mo après compression.");
-        compressed.push(image);
-      }
-      if (compressed.reduce((sum, image) => sum + image.size, 0) > MAX_TOTAL_BYTES) {
-        throw new Error("Le poids total des captures ne peut pas dépasser 8 Mo.");
+        // Miniature pour l'aperçu ; la lecture se fait sur l'image d'origine, sans recompression.
+        const preview = await compressCapture(file);
+        compressed.push({ ...preview, file });
       }
       setCaptures(compressed);
     } catch (error) {
@@ -149,13 +181,31 @@ export function ImportCaptures({
     }
   };
 
+  useEffect(() => {
+    if (!open || !initialText) return;
+    setInputMode("text");
+    setPastedText(initialText);
+    setAutoRun(true);
+    onInitialTextConsumed?.();
+  }, [open, initialText, onInitialTextConsumed]);
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text.trim()) setPastedText(text);
+      else setMessage("Le presse-papiers est vide.");
+    } catch {
+      setMessage("Lecture du presse-papiers refusée : colle le texte à la main.");
+    }
+  };
+
   const analyze = async () => {
     if (inputMode === "image" ? !captures.length : !pastedText.trim()) return;
     setBusy(true);
     setMessage("");
     let worker: import("tesseract.js").Worker | null = null;
     try {
-      let sourceText = pastedText;
+      let texts = splitCaptureText(pastedText);
       if (inputMode === "image") {
         const { createWorker } = await import("tesseract.js");
         worker = await createWorker("fra+eng", 1, {
@@ -170,13 +220,67 @@ export function ImportCaptures({
         });
         const recognized: string[] = [];
         for (const capture of captures) {
-          const prepared = await preprocessCapture(capture.dataUrl);
-          const result = await worker.recognize(prepared);
-          recognized.push(result.data.text);
+          let text = (await worker.recognize(await preprocessCapture(capture.file, "standard"))).data.text;
+          // Lecture douteuse (ligne incohérente, champs manquants) : second passage binarisé,
+          // et l'on garde la lecture que l'analyse juge la plus cohérente.
+          if (needsSecondPass(text)) {
+            const retry = (await worker.recognize(await preprocessCapture(capture.file, "binarized"))).data.text;
+            if (captureQuality(retry) > captureQuality(text)) text = retry;
+          }
+          recognized.push(text);
         }
-        sourceText = recognized.join("\n");
+        texts = recognized;
       }
-      const result = parsePositionText(sourceText, kind);
+      // Le type choisi n'est qu'un indice : on suit le vocabulaire des captures.
+      const { kind: detected, others } = dominantKind(texts);
+      const effectiveKind: CaptureKind = detected ?? kind;
+      const notes: string[] = [];
+      if (detected && detected !== kind) {
+        setKind(detected);
+        notes.push(`Captures reconnues comme ${KIND_LABEL[detected]} : analyse adaptée.`);
+      }
+      if (others) notes.push(`${others} capture(s) d'un autre type mise(s) de côté : importe-les séparément.`);
+      setNotice(notes.join(" "));
+      const relevant = texts.filter((text) => {
+        const textKind = detectCaptureKind(text);
+        return !textKind || textKind === effectiveKind;
+      });
+
+      if (effectiveKind === "credit") {
+        const loans = parseLoanCaptures(relevant);
+        if (!loans.prets.length) {
+          setMessage(loans.avertissements[0] ?? "Aucun crédit reconnu.");
+          return;
+        }
+        setExtraction(null);
+        setLoanWarnings(loans.avertissements);
+        setLoanRows(
+          loans.prets.map((pret, index) => {
+            const match = matchLoan(pret, assets);
+            return {
+              id: `loan-${index}-${uid()}`,
+              pret,
+              nom: match ? String(match.data["name"] ?? pret.nom) : pret.nom,
+              capitalInitial: pret.capitalInitial === null ? "" : String(pret.capitalInitial),
+              taux: pret.taux === null ? "" : String(pret.taux),
+              dureeMois: pret.dureeMois === null ? "" : String(pret.dureeMois),
+              dateDebut: pret.dateDebut ?? "",
+              mensualite: pret.mensualite === null ? "" : String(pret.mensualite),
+              refCapital: pret.refCapital === null ? "" : String(pret.refCapital),
+              refDate: pret.refDate ?? "",
+              action: match ? "update" : "create",
+              assetId: match?.id ?? "",
+              bienId: match ? String(match.data["bienId"] ?? "") : "",
+              appliquerPaliers: Boolean(pret.paliers?.length) && !(match && match.data["paliers"]),
+            };
+          }),
+        );
+        setCaptures([]);
+        setStage("review");
+        return;
+      }
+      setLoanRows([]);
+      const result = parsePositionText(relevant.join("\n"), effectiveKind);
       setExtraction(result);
       if (result.kind === "titres") {
         const defaultEnvelope: Envelope = result.enveloppe === "CTO" ? "CTO" : "PEA";
@@ -252,10 +356,46 @@ export function ImportCaptures({
     }
   };
 
+  useEffect(() => {
+    if (!autoRun || inputMode !== "text" || !pastedText.trim() || busy) return;
+    setAutoRun(false);
+    void analyze();
+    // analyze lit l'état de ce rendu : on ne relance que sur ces dépendances.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, inputMode, pastedText, busy]);
+
   const validateImport = () => {
-    if (!extraction || !validRows || !hasSelectedRows) return;
+    if (!validRows || !hasSelectedRows) return;
     const previousAssets = assets;
     const timestamp = new Date().toISOString();
+    if (loanMode) {
+      const nextAssets = applyLoanDecisions(
+        previousAssets,
+        loanRows.map((row) => ({
+          action: row.action,
+          ...(row.assetId ? { assetId: row.assetId } : {}),
+          ...(row.bienId ? { bienId: row.bienId } : {}),
+          appliquerPaliers: row.appliquerPaliers,
+          pret: loanDraftToImport(row),
+        })),
+        timestamp,
+        uid,
+      );
+      setAssets(nextAssets);
+      close(false);
+      toast.success("Crédits mis à jour", {
+        duration: 10_000,
+        action: {
+          label: "Annuler",
+          onClick: () => {
+            setAssets(previousAssets);
+            toast.success("Import annulé");
+          },
+        },
+      });
+      return;
+    }
+    if (!extraction) return;
     const decisions: ImportDecision[] =
       extraction.kind === "titres"
         ? positionRows.map((row) => ({
@@ -334,7 +474,7 @@ export function ImportCaptures({
                 <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Type de capture
                 </legend>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     aria-pressed={kind === "titres"}
@@ -351,24 +491,43 @@ export function ImportCaptures({
                   >
                     Solde d&apos;un livret
                   </button>
+                  <button
+                    type="button"
+                    aria-pressed={kind === "credit"}
+                    onClick={() => setKind("credit")}
+                    className={`tap rounded-xl border px-3 py-3 text-left text-sm font-semibold ${kind === "credit" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}
+                  >
+                    Crédit
+                  </button>
                 </div>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {kind === "credit"
+                    ? "Fiche du crédit dans l'appli de ta banque : prends le haut et le bas de la page, et une fiche par prêt (prêt principal et PTZ ensemble pour détecter un lissage)."
+                    : "Le type est vérifié automatiquement d'après le contenu des captures."}
+                </p>
               </fieldset>
               <div className="grid grid-cols-2 gap-2" role="group" aria-label="Méthode d’import">
                 <button type="button" aria-pressed={inputMode === "image"} onClick={() => setInputMode("image")} className={`tap flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold ${inputMode === "image" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}><FileImage className="size-4" aria-hidden="true" /> Choisir des captures</button>
                 <button type="button" aria-pressed={inputMode === "text"} onClick={() => setInputMode("text")} className={`tap flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold ${inputMode === "text" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card text-muted-foreground"}`}><ClipboardPaste className="size-4" aria-hidden="true" /> Coller le texte</button>
               </div>
+              <ShortcutHelp />
               {inputMode === "image" ? (
                 <label className="flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-primary/50 bg-card px-5 py-8 text-center transition-colors hover:bg-primary/5">
                   <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary"><FileImage className="size-5" aria-hidden="true" /></span>
-                  <span className="text-sm font-semibold">Choisir 1 à 4 captures</span>
-                  <span className="text-xs leading-relaxed text-muted-foreground">Jusqu&apos;à 2,5 Mo par image après compression · 8 Mo au total</span>
+                  <span className="text-sm font-semibold">Choisir 1 à 8 captures</span>
+                  <span className="text-xs leading-relaxed text-muted-foreground">Lues sur ton téléphone, en pleine résolution</span>
                   <input type="file" accept="image/*" multiple className="sr-only" disabled={busy} onChange={(event) => { void selectCaptures(event.currentTarget.files); event.currentTarget.value = ""; }} />
                 </label>
               ) : (
                 <div className="flex flex-col gap-2">
-                  <label htmlFor="position-import-text" className="text-sm font-semibold">Texte de la capture</label>
-                  <textarea id="position-import-text" value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={8} disabled={busy} className="w-full resize-y rounded-xl border border-border bg-card px-3 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Colle ici le texte de tes positions ou de ton livret…" />
-                  <p className="text-xs leading-relaxed text-muted-foreground">Sur iPhone : ouvre la capture dans Photos, maintiens le doigt sur le texte, Tout sélectionner, Copier, puis colle ici.</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="position-import-text" className="text-sm font-semibold">Texte de la capture</label>
+                    <button type="button" onClick={() => void pasteFromClipboard()} disabled={busy} className="tap flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-primary">
+                      <ClipboardPaste className="size-3.5" aria-hidden="true" /> Coller
+                    </button>
+                  </div>
+                  <textarea id="position-import-text" value={pastedText} onChange={(event) => setPastedText(event.target.value)} rows={8} disabled={busy} className="w-full resize-y rounded-xl border border-border bg-card px-3 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Colle ici le texte de tes positions, de ton livret ou de ton crédit…" />
+                  <p className="text-xs leading-relaxed text-muted-foreground">Sur iPhone : ouvre la capture dans Photos, maintiens le doigt sur le texte, Tout sélectionner, Copier, puis colle ici. Plusieurs captures : sépare-les par une ligne « {CAPTURE_MARKER} ».</p>
                 </div>
               )}
               {busy && !extraction && (
@@ -390,7 +549,7 @@ export function ImportCaptures({
                       />
                       <span className="min-w-0 flex-1 truncate text-xs">{capture.name}</span>
                       <span className="shrink-0 num text-[11px] text-muted-foreground">
-                        {formatBytes(capture.size)}
+                        {formatBytes(capture.file.size)}
                       </span>
                     </div>
                   ))}
@@ -411,8 +570,30 @@ export function ImportCaptures({
                 {busy ? "Lecture en cours…" : inputMode === "image" ? "Analyser les captures" : "Analyser le texte"}
               </button>
             </div>
+          ) : loanMode ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Vérification manuelle</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {loanRows.length > 1 ? `${loanRows.length} crédits reconnus.` : "1 crédit reconnu."} Les modifications restent locales à cette étape.
+                  </p>
+                </div>
+                <span className="flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary">
+                  <ShieldCheck className="size-3" aria-hidden="true" /> Rien d&apos;enregistré
+                </span>
+              </div>
+              {notice && <p className="rounded-lg bg-elevated px-3 py-2 text-xs text-muted-foreground" role="status">{notice}</p>}
+              <ImportLoanReview
+                rows={loanRows}
+                assets={assets}
+                warnings={loanWarnings}
+                onChange={(id, patch) => setLoanRows((rows) => rows.map((row) => (row.id === id ? { ...row, ...patch } : row)))}
+              />
+            </div>
           ) : extraction ? (
             <div className="flex flex-col gap-4">
+              {notice && <p className="rounded-lg bg-elevated px-3 py-2 text-xs text-muted-foreground" role="status">{notice}</p>}
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold">Vérification manuelle</p>
@@ -470,7 +651,7 @@ export function ImportCaptures({
   );
 }
 
-async function compressCapture(file: File): Promise<Capture> {
+async function compressCapture(file: File): Promise<Omit<Capture, "file">> {
   let bitmap: ImageBitmap | null = null;
   try {
     bitmap = await createImageBitmap(file);
@@ -481,7 +662,7 @@ async function compressCapture(file: File): Promise<Capture> {
   const width = bitmap?.width ?? image?.naturalWidth ?? 0;
   const height = bitmap?.height ?? image?.naturalHeight ?? 0;
   if (!width || !height) throw new Error("Cette image ne peut pas être décodée sur cet appareil.");
-  const scale = Math.min(1, 2000 / Math.max(width, height));
+  const scale = Math.min(1, 600 / Math.max(width, height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(width * scale));
   canvas.height = Math.max(1, Math.round(height * scale));
@@ -508,23 +689,61 @@ async function compressCapture(file: File): Promise<Capture> {
   return { name: file.name, dataUrl, size: blob.size };
 }
 
-async function preprocessCapture(dataUrl: string): Promise<HTMLCanvasElement> {
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const element = new Image();
-    element.onload = () => resolve(element);
-    element.onerror = () => reject(new Error("Cette image ne peut pas être décodée sur cet appareil."));
-    element.src = dataUrl;
-  });
-  const scale = Math.min(image.naturalWidth < 1300 ? 2 : 1, 3000 / image.naturalWidth, 3000 / image.naturalHeight);
+async function preprocessCapture(file: File, variant: OcrVariant): Promise<HTMLCanvasElement> {
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    bitmap = null;
+  }
+  const image = bitmap ? null : await loadImage(file);
+  const width = bitmap?.width ?? image?.naturalWidth ?? 0;
+  const height = bitmap?.height ?? image?.naturalHeight ?? 0;
+  if (!width || !height) throw new Error("Cette image ne peut pas être décodée sur cet appareil.");
+  const scale = ocrScale(width, height);
   const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const context = canvas.getContext("2d");
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("Prétraitement indisponible sur cet appareil.");
-  context.filter = "grayscale(1) contrast(1.35)";
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
-  context.filter = "none";
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
+  context.drawImage(bitmap ?? image!, 0, 0, canvas.width, canvas.height);
+  bitmap?.close();
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  prepareForOcr({ data: pixels.data, width: canvas.width, height: canvas.height }, variant);
+  context.putImageData(pixels, 0, 0);
   return canvas;
+}
+
+/** Pas à pas du raccourci iPhone : la reconnaissance de texte d'Apple, plus précise, sans rien envoyer. */
+function ShortcutHelp() {
+  const [origin, setOrigin] = useState("https://asset-whisperer-96.vercel.app");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const steps = [
+    "App Raccourcis → « + » → nomme-le « Importer dans Patrimoine ». Dans ⓘ, active « Afficher dans la feuille de partage » (Images).",
+    "Ajoute « Répéter avec chaque élément » sur l'entrée du raccourci.",
+    `Dans la boucle : « Extraire le texte de l'image » (Élément de répétition), puis « Texte » : ${CAPTURE_MARKER}, un retour à la ligne, et la variable « Texte extrait ».`,
+    "Après la boucle : « Combiner le texte » (Résultats de la répétition, avec Nouvelles lignes), puis « Copier dans le presse-papiers ».",
+    `« Encoder en URL » le texte combiné, puis « Ouvrir les URL » avec : ${origin}/patrimoine#import= suivi du texte encodé.`,
+  ];
+  return (
+    <details className="rounded-xl border border-border bg-card px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+      <summary className="cursor-pointer py-1 text-sm font-semibold text-foreground">
+        Raccourci iPhone · lecture d&apos;Apple, plus précise
+      </summary>
+      <ol className="mt-2 flex list-decimal flex-col gap-1.5 pl-4">
+        {steps.map((step) => (
+          <li key={step} className="break-words">{step}</li>
+        ))}
+      </ol>
+      <p className="mt-2">
+        Ensuite : dans Photos, sélectionne tes captures → Partager → « Importer dans Patrimoine ». L&apos;analyse démarre
+        seule. Le texte passe après le « # » de l&apos;adresse, partie jamais envoyée au serveur. Appli installée sur
+        l&apos;écran d&apos;accueil : ouvre-la, choisis « Coller le texte », puis « Coller ».
+      </p>
+    </details>
+  );
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {
