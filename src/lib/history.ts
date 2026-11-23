@@ -5,6 +5,15 @@ const NINETY_DAYS_MS = 90 * DAY_MS;
 const TWO_YEARS_MS = 2 * 365.25 * DAY_MS;
 
 /** Compacts an unlimited daily net-worth history without changing its values. */
+/** Merges two histories by keeping the newest timestamp for each day, then compacts them. */
+export function mergeHistory(
+  a: HistoryPoint[],
+  b: HistoryPoint[],
+  now = new Date(),
+): HistoryPoint[] {
+  return compactHistory([...a, ...b], now);
+}
+
 export function compactHistory(points: HistoryPoint[], now = new Date()): HistoryPoint[] {
   const sorted = points
     .filter((point) => Number.isFinite(Date.parse(point.date)) && Number.isFinite(point.value))

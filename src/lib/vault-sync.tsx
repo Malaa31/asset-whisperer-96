@@ -10,6 +10,8 @@ import {
 } from "react";
 import { toast } from "sonner";
 import type { BackupFile } from "./backup";
+import { mergeHistory } from "./history";
+import { shouldShowVaultConflict } from "./vault-conflict";
 import {
   clearVaultKey,
   createVaultIdentity,
@@ -34,6 +36,7 @@ interface VaultApi {
   identity: VaultIdentity | null;
   code: string | null;
   status: SyncStatus;
+  initialSyncDone: boolean;
   lastSyncAt: string | null;
   conflict: Conflict;
   activate: (passphrase: string) => Promise<void>;
@@ -57,11 +60,13 @@ export function VaultProvider({
   ready,
   backup,
   applyBackup,
+  onInitialSyncDone,
 }: {
   children: ReactNode;
   ready: boolean;
   backup: BackupFile;
   applyBackup: (backup: BackupFile) => void;
+  onInitialSyncDone: () => void;
 }) {
   const [identity, setIdentity] = useState<VaultIdentity | null>(() => readVaultIdentity());
   const identityRef = useRef(identity);
@@ -70,6 +75,11 @@ export function VaultProvider({
   const syncOnOpenRef = useRef<() => Promise<void>>(async () => undefined);
   const skipNextOpen = useRef(false);
   const [status, setStatus] = useState<SyncStatus>("idle");
+  const [initialSyncDone, setInitialSyncDone] = useState(() => !identity?.enabled);
+  const markInitialSyncDone = useCallback(() => {
+    setInitialSyncDone(true);
+    onInitialSyncDone();
+  }, [onInitialSyncDone]);
   const [conflict, setConflict] = useState<Conflict>(null);
   const backupRef = useRef(backup);
   const previousSignature = useRef("");
@@ -97,7 +107,10 @@ export function VaultProvider({
     try {
       const key = await getVaultKey();
       if (!key) throw new Error("Clé locale indisponible.");
-      const envelope = await encryptBackup(key, backupRef.current, active.vaultId, active.salt);
+      const snapshot = backupRef.current;
+      const snapshotSignature = dataSignature(snapshot);
+      const snapshotHash = await hashProfileAssets(snapshot);
+      const envelope = await encryptBackup(key, snapshot, active.vaultId, active.salt);
       const response = await fetch("/api/vault", {
         method: "PUT",
         headers: { "content-type": "application/json" },
@@ -109,22 +122,24 @@ export function VaultProvider({
         }),
       });
       if (response.status === 409) {
-        const remote = (await response.json()) as { version: number; updatedAt: string | null };
-        setConflict({ version: remote.version, updatedAt: remote.updatedAt ?? "" });
-        setStatus("conflict");
+        setStatus("syncing");
+        window.setTimeout(() => void syncOnOpenRef.current(), 0);
         return;
       }
       if (!response.ok) throw new Error("Synchronisation impossible.");
       const result = (await response.json()) as { version: number; updatedAt: string };
+      const changedDuringUpload = dataSignature(backupRef.current) !== snapshotSignature;
       const saved: VaultIdentity = {
         ...active,
-        dirty: false,
+        dirty: changedDuringUpload,
         lastRemoteVersion: result.version,
         lastSyncAt: result.updatedAt,
+        lastSyncedDataHash: snapshotHash,
       };
       updateIdentity(saved);
       setConflict(null);
-      setStatus("saved");
+      setStatus(changedDuringUpload ? "syncing" : "saved");
+      if (changedDuringUpload) window.setTimeout(() => void uploadNowRef.current(), 10_000);
     } catch {
       setStatus(navigator.onLine ? "error" : "offline");
     }
@@ -143,22 +158,50 @@ export function VaultProvider({
   );
 
   const applyRemote = useCallback(
-    async (active: VaultIdentity, version: number, envelope?: VaultEnvelope) => {
+    async (
+      active: VaultIdentity,
+      version: number,
+      envelope?: VaultEnvelope,
+      forceRemote = false,
+    ) => {
       const remote = envelope ? { version, envelope } : await fetchRemote(active);
       const key = await getVaultKey();
       if (!key) throw new Error("Clé locale indisponible.");
       const restored = await decryptBackup(key, remote.envelope, active.vaultId);
       const current = backupRef.current;
+      const localDataHash = await hashProfileAssets(current);
+      const remoteDataHash = await hashProfileAssets(restored);
+      if (
+        !forceRemote &&
+        shouldShowVaultConflict(localDataHash, remoteDataHash, active.lastSyncedDataHash)
+      ) {
+        setConflict({ version: remote.version, updatedAt: remote.envelope.updatedAt });
+        setStatus("conflict");
+        return;
+      }
+      const keepLocalData =
+        !forceRemote &&
+        Boolean(active.lastSyncedDataHash) &&
+        localDataHash !== active.lastSyncedDataHash &&
+        remoteDataHash === active.lastSyncedDataHash;
+      const merged: BackupFile = {
+        ...(keepLocalData ? current : restored),
+        history: mergeHistory(current.history, restored.history),
+      };
+      const shouldUpload = dataSignature(merged) !== dataSignature(restored);
       window.localStorage.setItem(SAFETY_COPY_KEY, JSON.stringify(current));
       const updated: VaultIdentity = {
         ...active,
-        dirty: false,
+        dirty: shouldUpload,
         lastRemoteVersion: remote.version,
         lastSyncAt: remote.envelope.updatedAt,
+        lastSyncedDataHash: remoteDataHash,
       };
       updateIdentity(updated);
-      ignoreNextSignature.current = dataSignature(restored);
-      applyBackup(restored);
+      if (!shouldUpload && dataSignature(merged) !== dataSignature(current)) {
+        ignoreNextSignature.current = dataSignature(merged);
+      }
+      applyBackup(merged);
       window.setTimeout(() => window.localStorage.removeItem(SAFETY_COPY_KEY), 11_000);
       toast.success("Données mises à jour depuis le coffre", {
         duration: 10_000,
@@ -203,12 +246,7 @@ export function VaultProvider({
       }
       if (!response.ok) throw new Error("Coffre inaccessible.");
       const meta = (await response.json()) as { version: number; updatedAt: string };
-      if (meta.version > active.lastRemoteVersion && active.dirty) {
-        setConflict({ version: meta.version, updatedAt: meta.updatedAt });
-        setStatus("conflict");
-        return;
-      }
-      if (meta.version > active.lastRemoteVersion && !active.dirty) {
+      if (meta.version > active.lastRemoteVersion) {
         const remote = await fetchRemote(active);
         await applyRemote(active, remote.version, remote.envelope);
         return;
@@ -249,6 +287,13 @@ export function VaultProvider({
       const salt = remote.envelope.kdf.salt;
       const key = await deriveVaultKey(passphrase, salt);
       const restored = await decryptBackup(key, remote.envelope, vaultId);
+      const current = backupRef.current;
+      const merged: BackupFile = {
+        ...restored,
+        history: mergeHistory(current.history, restored.history),
+      };
+      const remoteDataHash = await hashProfileAssets(restored);
+      const shouldUpload = dataSignature(merged) !== dataSignature(restored);
       await saveVaultKey(key);
       skipNextOpen.current = true;
       const linked: VaultIdentity = {
@@ -256,11 +301,37 @@ export function VaultProvider({
         salt,
         lastRemoteVersion: remote.version,
         lastSyncAt: remote.envelope.updatedAt,
+        lastSyncedDataHash: remoteDataHash,
+        dirty: shouldUpload,
       };
+      window.localStorage.setItem(SAFETY_COPY_KEY, JSON.stringify(current));
       updateIdentity(linked);
-      ignoreNextSignature.current = dataSignature(restored);
-      applyBackup(restored);
-      toast.success("Coffre ajouté à cet appareil");
+      if (!shouldUpload && dataSignature(merged) !== dataSignature(current)) {
+        ignoreNextSignature.current = dataSignature(merged);
+      }
+      applyBackup(merged);
+      window.setTimeout(() => window.localStorage.removeItem(SAFETY_COPY_KEY), 11_000);
+      toast.success("Coffre ajouté à cet appareil", {
+        duration: 10_000,
+        action: {
+          label: "Annuler",
+          onClick: () => {
+            try {
+              const safety = JSON.parse(
+                window.localStorage.getItem(SAFETY_COPY_KEY) ?? "null",
+              ) as BackupFile | null;
+              if (!safety) return;
+              ignoreNextSignature.current = dataSignature(safety);
+              applyBackup(safety);
+              updateIdentity({ ...linked, dirty: true });
+              window.localStorage.removeItem(SAFETY_COPY_KEY);
+              window.setTimeout(() => void uploadNowRef.current(), 10_000);
+            } catch {
+              toast.error("La copie de sécurité est illisible.");
+            }
+          },
+        },
+      });
     },
     [applyBackup, fetchRemote, updateIdentity],
   );
@@ -292,16 +363,39 @@ export function VaultProvider({
       if (choice === "remote") {
         try {
           const remote = await fetchRemote(active);
-          await applyRemote(active, remote.version, remote.envelope);
+          await applyRemote(active, remote.version, remote.envelope, true);
         } catch {
           setStatus("error");
         }
         return;
       }
-      updateIdentity({ ...active, dirty: true, lastRemoteVersion: remoteVersion });
-      setTimeout(() => void uploadNow(), 0);
+      try {
+        const remote = await fetchRemote(active);
+        const key = await getVaultKey();
+        if (!key) throw new Error("Clé locale indisponible.");
+        const remoteBackup = await decryptBackup(key, remote.envelope, active.vaultId);
+        const current = backupRef.current;
+        const merged: BackupFile = {
+          ...current,
+          history: mergeHistory(current.history, remoteBackup.history),
+        };
+        const remoteDataHash = await hashProfileAssets(remoteBackup);
+        updateIdentity({
+          ...active,
+          dirty: true,
+          lastRemoteVersion: remote.version,
+          lastSyncAt: remote.envelope.updatedAt,
+          lastSyncedDataHash: remoteDataHash,
+        });
+        backupRef.current = merged;
+        ignoreNextSignature.current = dataSignature(merged);
+        applyBackup(merged);
+        void uploadNow();
+      } catch {
+        setStatus("error");
+      }
     },
-    [applyRemote, conflict, fetchRemote, identity, updateIdentity, uploadNow],
+    [applyBackup, applyRemote, conflict, fetchRemote, identity, updateIdentity, uploadNow],
   );
 
   useEffect(() => {
@@ -330,10 +424,20 @@ export function VaultProvider({
   uploadNowRef.current = uploadNow;
 
   useEffect(() => {
-    if (!ready || !identity?.enabled) return;
-    const skipInitialSync = skipNextOpen.current;
-    skipNextOpen.current = false;
-    if (!skipInitialSync) void syncOnOpenRef.current();
+    if (!ready) return;
+    if (!identity?.enabled) {
+      markInitialSyncDone();
+      return;
+    }
+    if (!navigator.onLine) {
+      if (identity.dirty) setStatus("offline");
+      markInitialSyncDone();
+    } else {
+      const skipInitialSync = skipNextOpen.current;
+      skipNextOpen.current = false;
+      if (skipInitialSync) markInitialSyncDone();
+      else void syncOnOpenRef.current().finally(markInitialSyncDone);
+    }
     const onVisible = () => {
       if (document.visibilityState === "visible") void syncOnOpenRef.current();
     };
@@ -345,13 +449,14 @@ export function VaultProvider({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", onOnline);
     };
-  }, [identity?.enabled, ready]);
+  }, [identity?.enabled, ready, markInitialSyncDone]);
 
   const value = useMemo<VaultApi>(
     () => ({
       identity,
       code: identity ? `${identity.vaultId}.${identity.writeSecret}` : null,
       status,
+      initialSyncDone,
       lastSyncAt: identity?.lastSyncAt ?? null,
       conflict,
       activate,
@@ -364,6 +469,7 @@ export function VaultProvider({
     [
       identity,
       status,
+      initialSyncDone,
       conflict,
       activate,
       uploadNow,
@@ -383,4 +489,12 @@ function dataSignature(backup: BackupFile): string {
     assets: backup.assets,
     history: backup.history,
   });
+}
+
+async function hashProfileAssets(backup: BackupFile): Promise<string> {
+  const bytes = new TextEncoder().encode(
+    JSON.stringify({ profile: backup.profile, assets: backup.assets }),
+  );
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

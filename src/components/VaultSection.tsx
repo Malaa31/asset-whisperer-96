@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Check, Copy, LockKeyhole, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { useApp } from "@/lib/storage";
 import { useVault } from "@/lib/vault-sync";
 
 export function VaultSection() {
@@ -237,13 +238,14 @@ export function VaultCodeForm({
   onDone?: () => void;
 }) {
   const { importFromCode } = useVault();
+  const { assets } = useApp();
   const [code, setCode] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [showReplacementConfirmation, setShowReplacementConfirmation] = useState(false);
 
-  const restore = async (event: FormEvent) => {
-    event.preventDefault();
+  const performRestore = async () => {
     setBusy(true);
     setMessage("");
     onError?.("");
@@ -258,6 +260,15 @@ export function VaultCodeForm({
     } finally {
       setBusy(false);
     }
+  };
+
+  const restore = (event: FormEvent) => {
+    event.preventDefault();
+    if (assets.length > 0) {
+      setShowReplacementConfirmation(true);
+      return;
+    }
+    void performRestore();
   };
 
   return (
@@ -292,6 +303,37 @@ export function VaultCodeForm({
         <Check className="size-4" aria-hidden="true" />{" "}
         {busy ? "Restauration…" : "Restaurer les données"}
       </button>
+      {showReplacementConfirmation && (
+        <div
+          className="space-y-3 rounded-xl border border-destructive/40 bg-background p-3"
+          role="alertdialog"
+          aria-labelledby="vault-restore-warning"
+        >
+          <p id="vault-restore-warning" className="text-xs leading-relaxed">
+            Les données de cet appareil seront remplacées par celles du coffre.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setShowReplacementConfirmation(false)}
+              className="tap rounded-xl border border-border px-3 py-2.5 text-xs font-semibold"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setShowReplacementConfirmation(false);
+                void performRestore();
+              }}
+              className="tap rounded-xl bg-destructive px-3 py-2.5 text-xs font-semibold text-destructive-foreground disabled:opacity-40"
+            >
+              Remplacer et restaurer
+            </button>
+          </div>
+        </div>
+      )}
       {message && (
         <p className="text-xs text-destructive" role="alert">
           {message}

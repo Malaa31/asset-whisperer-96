@@ -12,7 +12,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [assets, setAssetsState] = useState<Asset[]>([]);
   const [ready, setReady] = useState(false);
+  const [vaultReady, setVaultReady] = useState(false);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const handleInitialSyncDone = useCallback(() => setVaultReady(true), []);
 
   useEffect(() => {
     const p = storage.get<Profile>(KEYS.profile);
@@ -31,30 +33,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Enregistre un point d'historique par jour pour la courbe "réel".
   useEffect(() => {
-    if (!ready) return;
-    const today = new Date().toISOString().slice(0, 10);
+    if (!ready || !vaultReady) return;
+    const timestamp = new Date().toISOString();
+    const today = timestamp.slice(0, 10);
     const net = totals(assets).net;
     setHistory((prev) => {
-      const latest = [...prev].sort((a, b) => a.date.localeCompare(b.date)).at(-1);
+      const todayPoints = prev.filter((point) => point.date.slice(0, 10) === today);
+      const latestToday = todayPoints
+        .slice()
+        .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
+        .at(-1);
       const nextPoints =
-        latest?.date.slice(0, 10) === today
-          ? prev.map((point) =>
-              point.date.slice(0, 10) === today
-                ? { date: new Date().toISOString(), value: net }
-                : point,
-            )
-          : [...prev, { date: new Date().toISOString(), value: net }];
+        latestToday && latestToday.value === net
+          ? prev
+          : [
+              ...prev.filter((point) => point.date.slice(0, 10) !== today),
+              { date: timestamp, value: net },
+            ];
       const next = compactHistory(nextPoints);
+      if (JSON.stringify(next) === JSON.stringify(prev)) return prev;
       storage.set(KEYS.history, next);
       return next;
     });
-  }, [assets, ready]);
+  }, [assets, ready, vaultReady]);
 
   // Cours rafraîchis en arrière-plan à l'ouverture, si les derniers
   // relevés datent de plus de quatre heures. Silencieux et sans blocage :
   // un échec laisse simplement les cours précédents en place.
   useEffect(() => {
-    if (!ready || !pricesAreStale(assets)) return;
+    if (!ready || !vaultReady || !pricesAreStale(assets)) return;
     let cancelled = false;
     void refreshPrices(assets).then((next) => {
       if (next && !cancelled) persist(next);
@@ -64,7 +71,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     // Une seule tentative par montage : `assets` change après la mise à jour.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+  }, [ready, vaultReady]);
 
   const backup = useMemo<BackupFile>(
     () => ({
@@ -120,7 +127,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={value}>
-      <VaultProvider ready={ready} backup={backup} applyBackup={value.replaceBackup}>
+      <VaultProvider
+        ready={ready}
+        backup={backup}
+        applyBackup={value.replaceBackup}
+        onInitialSyncDone={handleInitialSyncDone}
+      >
         {children}
       </VaultProvider>
     </AppContext.Provider>

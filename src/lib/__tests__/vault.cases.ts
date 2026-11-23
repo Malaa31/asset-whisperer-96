@@ -13,6 +13,7 @@ import {
   type VaultStore,
 } from "../vault-server";
 import type { BackupFile } from "../backup";
+import { shouldShowVaultConflict } from "../vault-conflict";
 
 if (!globalThis.crypto) Object.defineProperty(globalThis, "crypto", { value: webcrypto });
 
@@ -33,6 +34,24 @@ const responseJson = async (response: Response) =>
   response.json() as Promise<Record<string, unknown>>;
 
 async function run() {
+  console.log("\nDÉCISION DE CONFLIT DU COFFRE");
+  check(
+    "les changements limités à l'historique ne créent pas de conflit",
+    !shouldShowVaultConflict("base", "remote-assets", "base"),
+  );
+  check(
+    "un changement réel sur un seul appareil ne crée pas de conflit",
+    !shouldShowVaultConflict("local-assets", "base", "base"),
+  );
+  check(
+    "deux changements divergents de profil ou d'actifs créent un conflit",
+    shouldShowVaultConflict("local-assets", "remote-assets", "base"),
+  );
+  check(
+    "deux appareils ayant les mêmes changements ne créent pas de conflit",
+    !shouldShowVaultConflict("same-change", "same-change", "base"),
+  );
+
   console.log("\nCHIFFREMENT DU COFFRE");
   const vaultId = randomBase64Url(16);
   const salt = randomBase64Url(16);

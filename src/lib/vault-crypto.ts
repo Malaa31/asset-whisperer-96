@@ -20,6 +20,7 @@ export interface VaultIdentity {
   salt: string;
   lastSyncAt: string | null;
   lastRemoteVersion: number;
+  lastSyncedDataHash?: string;
   dirty: boolean;
   enabled: boolean;
 }

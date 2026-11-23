@@ -1,4 +1,4 @@
-import { compactHistory } from "../history";
+import { compactHistory, mergeHistory } from "../history";
 import type { HistoryPoint } from "../storage";
 
 const DAY = 86_400_000;
@@ -20,6 +20,17 @@ const sameDay = [point(nowDay, 1), point(nowDay, 2)];
 check(
   "les doublons du jour gardent la dernière valeur",
   compactHistory(sameDay, fixedNow)[0]?.value === 2,
+);
+const earlierToday = { date: "2026-11-23T08:00:00.000Z", value: 10 };
+const laterToday = { date: "2026-11-23T18:00:00.000Z", value: 20 };
+const mergedToday = mergeHistory([earlierToday], [laterToday], fixedNow);
+check("fusion : la date la plus récente gagne pour chaque jour", mergedToday[0]?.value === 20);
+const historyA = [point(nowDay - 2, 1), point(nowDay - 1, 2)];
+const historyB = [point(nowDay - 1, 3), point(nowDay, 4)];
+check(
+  "fusion : union des jours des deux historiques",
+  sameDays(mergeHistory(historyA, historyB, fixedNow)).join() ===
+    [nowDay - 2, nowDay - 1, nowDay].map((day) => point(day).date.slice(0, 10)).join(),
 );
 
 const range = Array.from({ length: 5 * 365 }, (_, index) => point(nowDay - 5 * 365 + index));
