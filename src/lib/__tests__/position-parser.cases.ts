@@ -3,5 +3,13 @@ export const positionParserCases = {
   mobileStack: `Compte titres CTO\nAir Liquide\n10\n142,00 €\n145,00 €\n1450,00 €\nSanofi\n5\n90,00 €\n95,00 €\n475,00 €`,
   noIsin: `Portefeuille\nApple\n2,5\n180,00 €\n190,00 €\n475,00 €\nMicrosoft\n3\n300,00 €\n310,00 €\n930,00 €\nLiquidités 120,00 €`,
   livretA: `Livret A\nPlafond 22 950,00 €\nTaux 3,00 %\nSolde\n12345,67 €\nIntérêts acquis 125,00 €`,
+  boursoTable: `Mon PEA\nValeur Quantité PRU Cours Valorisation +/- values\nAMUNDI MSCI WORLD UCITS ETF LU1681043599 38 452,13 € 498,20 € 18 931,60 € +10,19 %\nBNP PARIBAS FR0000131104 25 61,40 € 58,90 € 1 472,50 € -4,07 %\nTotal 20 404,10 €`,
+  tradeRepublicCards: `Portefeuille\nAir Liquide\n12,5 actions\n2 103,75 €\n+4,3 %\nTotalEnergies\n30 actions\n1 812,00 €\n-2,1 %`,
+  livretWithDate: `LIVRET A\nTaux annuel 1,70 %\nPlafond 22 950,00 €\nSolde au 23/11/2026\n8 412,35 €`,
+  livretInline: `Livret A n° 1234\nSolde disponible : 15 300,00 €\nPlafond 22 950 €`,
+  etfNamesWithNumbers: `Mon PEA\nNom Quantité PRU Cours Valorisation\nAMUNDI PEA S&P 500 UCITS ETF FR0013412285 40 30,10 € 35,20 € 1 408,00 €\nLYXOR CAC 40 FR0007052782 10 70,00 € 75,50 € 755,00 €`,
+  mobileDetail: `Air Liquide\nFR0000120073\nQuantité\n12\nPRU 150,00 €\nDernier cours 168,30 €\nValorisation 2 019,60 €\n+/- value latente +219,60 €`,
+  wrappedNames: `Portefeuille\nAMUNDI MSCI WORLD\nUCITS ETF EUR (C)\n5 parts\n500,00 €\n512,40 €\n2 562,00 €\nAmundi CAC 40\n3 parts\n100,00 €\n110,00 €\n330,00 €`,
+  closePruCours: `Portefeuille\nHermès\n60 parts\n1 234,50 €\n1 240,00 €\n74 400,00 €`,
   ocrNoise: `PEA\nNom Qté PRU Cours Valeur\nAmundi MSCI World LU1681043599 1O\t1O0,OO\t1O2,OO\t1O2O,OO`,
 };
